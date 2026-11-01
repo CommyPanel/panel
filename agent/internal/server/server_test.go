@@ -240,6 +240,10 @@ func (f *fakeDocker) RemoveImage(_ context.Context, tag string) error {
 	return f.err
 }
 
+func (f *fakeDocker) Networks(context.Context) ([]docker.NetworkInfo, error) {
+	return []docker.NetworkInfo{{Name: "commypanel", Driver: "bridge", Subnet: "172.20.0.0/16", Containers: []docker.NetworkMember{{Name: "shop-1", IP: "172.20.0.2"}}}}, f.err
+}
+
 func (f *fakeDocker) RemoveVolumes(_ context.Context, app, name string) error {
 	if err := validate.Name(app); err != nil {
 		return err
@@ -373,6 +377,17 @@ func TestRemoveImageRoute(t *testing.T) {
 	}
 	if rec := do(t, s, "POST", "/v1/docker/images/remove", `{"tag":"library/alpine"}`); rec.Code != 400 {
 		t.Errorf("foreign image: %d, want 400", rec.Code)
+	}
+}
+
+func TestNetworksRoute(t *testing.T) {
+	s := newDockerServer(&fakeDocker{})
+	rec := do(t, s, "GET", "/v1/docker/networks", "")
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"name":"commypanel"`) || !strings.Contains(rec.Body.String(), `"ip":"172.20.0.2"`) {
+		t.Errorf("networks: %d %s", rec.Code, rec.Body)
+	}
+	if rec := do(t, newDockerServer(&fakeDocker{err: docker.ErrUnavailable}), "GET", "/v1/docker/networks", ""); rec.Code != 503 {
+		t.Errorf("docker down: %d, want 503", rec.Code)
 	}
 }
 

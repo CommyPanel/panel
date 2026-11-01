@@ -41,6 +41,7 @@ type Docker interface {
 	Restart(ctx context.Context, name string) error
 	Remove(ctx context.Context, name string) error
 	List(ctx context.Context) ([]docker.ContainerInfo, error)
+	Networks(ctx context.Context) ([]docker.NetworkInfo, error)
 	Logs(ctx context.Context, name string, tail int) (string, error)
 	ValidateBuild(s docker.BuildSpec) error
 	Build(ctx context.Context, s docker.BuildSpec, onLine func(string)) error
@@ -133,6 +134,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/docker/images/build", s.buildImage)
 	mux.HandleFunc("POST /v1/docker/images/prune", s.pruneImages)
 	mux.HandleFunc("POST /v1/docker/images/remove", s.removeImage)
+	mux.HandleFunc("GET /v1/docker/networks", s.networks)
 	mux.HandleFunc("POST /v1/volumes/remove", s.removeVolumes)
 	mux.HandleFunc("GET /v1/volumes/{app}", s.listVolumes)
 	mux.HandleFunc("GET /v1/volumes/{app}/{name}/dir", s.volumeDir)
@@ -365,6 +367,15 @@ func (s *Server) listContainers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"containers": list})
+}
+
+func (s *Server) networks(w http.ResponseWriter, r *http.Request) {
+	list, err := s.opts.Docker.Networks(r.Context())
+	if err != nil {
+		s.respond(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"networks": list})
 }
 
 func (s *Server) containerLogs(w http.ResponseWriter, r *http.Request) {

@@ -9,6 +9,8 @@ import (
 	"io"
 	"log/slog"
 	"net/url"
+	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -81,11 +83,36 @@ type ContainerSpec struct {
 
 // ContainerInfo describes a managed container.
 type ContainerInfo struct {
-	Name    string `json:"name"`
-	Image   string `json:"image"`
-	State   string `json:"state"`
-	Status  string `json:"status"`
-	Created int64  `json:"created"`
+	Name     string             `json:"name"`
+	Image    string             `json:"image"`
+	State    string             `json:"state"`
+	Status   string             `json:"status"`
+	Created  int64              `json:"created"`
+	Networks []ContainerNetwork `json:"networks"`
+	Ports    []ContainerPort    `json:"ports"`
+	Mounts   []ContainerMount   `json:"mounts"`
+}
+
+// ContainerNetwork is a network a container is attached to.
+type ContainerNetwork struct {
+	Name string `json:"name"`
+	IP   string `json:"ip"`
+}
+
+// ContainerPort is a port a container publishes (on the host's loopback only).
+type ContainerPort struct {
+	Container int    `json:"container"`
+	Host      int    `json:"host"`
+	HostIP    string `json:"host_ip"`
+	Protocol  string `json:"protocol"`
+}
+
+// ContainerMount is a volume mounted into a container. Source is relative to
+// the volumes directory (shop/uploads); mounts from anywhere else are not named.
+type ContainerMount struct {
+	Source      string `json:"source"`
+	Destination string `json:"destination"`
+	ReadOnly    bool   `json:"read_only"`
 }
 
 // Manager runs the Docker actions.
@@ -368,6 +395,22 @@ func (m *Manager) List(ctx context.Context) ([]ContainerInfo, error) {
 		State   string   `json:"State"`
 		Status  string   `json:"Status"`
 		Created int64    `json:"Created"`
+		Ports   []struct {
+			IP          string `json:"IP"`
+			PrivatePort int    `json:"PrivatePort"`
+			PublicPort  int    `json:"PublicPort"`
+			Type        string `json:"Type"`
+		} `json:"Ports"`
+		Mounts []struct {
+			Source      string `json:"Source"`
+			Destination string `json:"Destination"`
+			RW          bool   `json:"RW"`
+		} `json:"Mounts"`
+		NetworkSettings struct {
+			Networks map[string]struct {
+				IPAddress string `json:"IPAddress"`
+			} `json:"Networks"`
+		} `json:"NetworkSettings"`
 	}
 	if err := m.engine.doJSON(ctx, "GET", "/containers/json", url.Values{"all": {"true"}, "filters": {string(filters)}}, nil, &raw); err != nil {
 		return nil, err
@@ -378,7 +421,25 @@ func (m *Manager) List(ctx context.Context) ([]ContainerInfo, error) {
 		if len(c.Names) > 0 {
 			name = strings.TrimPrefix(c.Names[0], "/")
 		}
-		out = append(out, ContainerInfo{Name: name, Image: c.Image, State: c.State, Status: c.Status, Created: c.Created})
+		info := ContainerInfo{
+			Name: name, Image: c.Image, State: c.State, Status: c.Status, Created: c.Created,
+			Networks: []ContainerNetwork{}, Ports: []ContainerPort{}, Mounts: []ContainerMount{},
+		}
+		for netName, n := range c.NetworkSettings.Networks {
+			info.Networks = append(info.Networks, ContainerNetwork{Name: netName, IP: n.IPAddress})
+		}
+		sort.Slice(info.Networks, func(i, j int) bool { return info.Networks[i].Name < info.Networks[j].Name })
+		for _, p := range c.Ports {
+			if p.PublicPort != 0 { // only what is published; an exposed port nobody can reach is noise
+				info.Ports = append(info.Ports, ContainerPort{Container: p.PrivatePort, Host: p.PublicPort, HostIP: p.IP, Protocol: p.Type})
+			}
+		}
+		for _, mount := range c.Mounts {
+			if rel, err := filepath.Rel(m.volumesDir(), mount.Source); err == nil && !strings.HasPrefix(rel, "..") && rel != "." {
+				info.Mounts = append(info.Mounts, ContainerMount{Source: rel, Destination: mount.Destination, ReadOnly: !mount.RW})
+			}
+		}
+		out = append(out, info)
 	}
 	return out, nil
 }

@@ -36,6 +36,15 @@ func (f *fakeDaemon) handler() http.Handler {
 		defer f.mu.Unlock()
 		f.requests = append(f.requests, r.Method+" "+r.URL.Path)
 		switch {
+		case r.Method == "GET" && r.URL.Path == "/networks":
+			w.Write([]byte(`[{"Id":"n1"},{"Id":"gone"}]`))
+		case r.Method == "GET" && r.URL.Path == "/networks/gone":
+			w.WriteHeader(404)
+			w.Write([]byte(`{"message":"no such network"}`))
+		case r.Method == "GET" && r.URL.Path == "/networks/n1":
+			w.Write([]byte(`{"Name":"commypanel","Driver":"bridge","Internal":false,
+				"IPAM":{"Config":[{"Subnet":"172.20.0.0/16","Gateway":"172.20.0.1"}]},
+				"Containers":{"b":{"Name":"shop-2","IPv4Address":"172.20.0.3/16"},"a":{"Name":"shop-1","IPv4Address":"172.20.0.2/16"}}}`))
 		case r.Method == "GET" && strings.HasPrefix(r.URL.Path, "/networks/"):
 			w.WriteHeader(200)
 			w.Write([]byte(`{}`))
@@ -51,11 +60,23 @@ func (f *fakeDaemon) handler() http.Handler {
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"Config": map[string]any{"Labels": f.labels}})
 		case r.URL.Path == "/containers/json":
-			mounts := []map[string]string{}
+			mounts := []map[string]any{}
 			for _, source := range f.mounts {
-				mounts = append(mounts, map[string]string{"Source": source})
+				mounts = append(mounts, map[string]any{"Source": source, "Destination": "/data", "RW": true})
 			}
-			_ = json.NewEncoder(w).Encode([]map[string]any{{"Names": []string{"/demo-1"}, "Image": "demo:1", "State": "running", "Status": "Up 2 minutes", "Mounts": mounts}})
+			// A mount outside the volumes directory is not named.
+			mounts = append(mounts, map[string]any{"Source": "/etc/secret", "Destination": "/x", "RW": false})
+			_ = json.NewEncoder(w).Encode([]map[string]any{{
+				"Names": []string{"/demo-1"}, "Image": "demo:1", "State": "running", "Status": "Up 2 minutes", "Mounts": mounts,
+				"Ports": []map[string]any{
+					{"IP": "127.0.0.1", "PrivatePort": 8080, "PublicPort": 20001, "Type": "tcp"},
+					{"PrivatePort": 9090, "Type": "tcp"}, // exposed but not published
+				},
+				"NetworkSettings": map[string]any{"Networks": map[string]any{
+					"commypanel": map[string]string{"IPAddress": "172.20.0.2"},
+					"bridge":     map[string]string{"IPAddress": "172.17.0.2"},
+				}},
+			}})
 		case strings.HasSuffix(r.URL.Path, "/stats"):
 			if r.URL.Query().Get("stream") != "false" || r.URL.Query().Get("one-shot") != "true" {
 				w.WriteHeader(400)
