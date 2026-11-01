@@ -388,3 +388,11 @@ describe('the question before an upgrade', function () {
             ->and($installer)->toContain('-y|--yes) ASSUME_YES=1');
     });
 });
+
+it('writes the panel\'s own nginx site again after an upgrade, once the panel answers', function () {
+    $setup = (string) file_get_contents(base_path('installer/setup.sh'));
+
+    expect($setup)->toContain('commypanel:sync-panel-site')
+        ->and(strpos($setup, "step \"Waiting for the panel to answer\" confirm_healthy\n    refresh_panel_site"))->not->toBeFalse()
+        ->and($setup)->toMatch('/refresh_panel_site\(\) \{\s+if \[ "\$SYSTEM" != 1 \] \|\| \[ "\$UPGRADE" != 1 \]; then return 0; fi/');
+});

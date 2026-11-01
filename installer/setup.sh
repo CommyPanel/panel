@@ -300,6 +300,16 @@ conf_set() {
     mv "$file.tmp" "$file"
 }
 
+# The panel's own-domain site is written by the agent, only when the domain or its
+# certificate changes. After an upgrade it is written again so that changes a new
+# release makes to it (such as the terminal location) arrive. Best effort: the
+# panel works without it.
+refresh_panel_site() {
+    if [ "$SYSTEM" != 1 ] || [ "$UPGRADE" != 1 ]; then return 0; fi
+    as_panel commypanel:sync-panel-site >/dev/null 2>&1 \
+        || warn "Could not refresh the panel's own nginx site. If the terminal does not open on the panel's domain, save the panel domain again under Welcome."
+}
+
 as_panel() {
     ( cd "$RELEASE_DIR" && runuser -u commypanel -- env LARAVEL_STORAGE_PATH="$DATA_DIR/storage" "$PHP_BIN" artisan "$@" )
 }
@@ -856,6 +866,7 @@ main() {
     step "Configuring nginx and services" install_system_config
     step "Starting CommyPanel" go_live
     step "Waiting for the panel to answer" confirm_healthy
+    refresh_panel_site
     prune_releases
 
     if [ "$SYSTEM" != 1 ]; then

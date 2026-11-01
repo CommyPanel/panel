@@ -153,6 +153,16 @@ describe('certificate', function () {
             ->where('panel.url', 'https://panel.example.com'));
     });
 
+    it('is written again by the post-upgrade command', function () {
+        app(IssuePanelCertificate::class)();
+        $before = count(array_keys($this->host->actionNames(), 'applyNginxSite'));
+
+        $this->artisan('commypanel:sync-panel-site')->assertSuccessful();
+
+        expect(count(array_keys($this->host->actionNames(), 'applyNginxSite')))->toBe($before + 1)
+            ->and($this->host->sites())->toHaveKey('panel');
+    });
+
     it('is not served over plain HTTP before the certificate exists', function () {
         app(PanelRouting::class)->sync();
 
@@ -219,4 +229,16 @@ it('does not let an app use the panel domain', function () {
     $this->post('/apps/shop/domains', ['name' => 'panel.example.com', 'redirect' => 'none'])->assertSessionHasErrors('name');
 
     expect($app->domains()->count())->toBe(0);
+});
+
+it('refreshes nothing, and succeeds, when the panel has no domain yet', function () {
+    $this->artisan('commypanel:sync-panel-site')->assertSuccessful();
+
+    expect(app(HostDriver::class)->sites())->not->toHaveKey('panel');
+});
+
+it('reports an agent that cannot be reached when refreshing the panel site', function () {
+    app(HostDriver::class)->failOn('removeNginxSite');
+
+    $this->artisan('commypanel:sync-panel-site')->assertFailed();
 });
