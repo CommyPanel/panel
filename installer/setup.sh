@@ -472,7 +472,7 @@ check_php_security() {
 
     local version gaps advice
     version="$("$PHP_BIN" -r 'echo PHP_VERSION;')"
-    gaps="$(php_security_gaps "$RELEASE_DIR/installer/php-security.conf" "$version" "/usr/share/doc/php$PHP_VER-common/changelog.Debian.gz" | tr '\n' ' ')"
+    gaps="$(php_security_gaps "$RELEASE_DIR/installer/php-security.conf" "$version" "${PHP_CHANGELOG:-/usr/share/doc/php$PHP_VER-common/changelog.Debian.gz}" | tr '\n' ' ')"
     gaps="${gaps% }"
 
     if [ -z "$gaps" ]; then

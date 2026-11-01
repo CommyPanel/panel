@@ -171,7 +171,8 @@ it('refuses a fresh install on a vulnerable PHP but only warns during an upgrade
     chmod($this->dir.'/php', 0755);
 
     // Runs the installer's own check_php_security function with the messaging helpers replaced by echoes.
-    $check = fn (string $version, string $upgrade, string $allow = '0') => Process::env(['FAKE_PHP_VERSION' => $version, ...($this->shellEnv)()])->run([
+    // PHP_CHANGELOG points at a file that does not exist, so the machine's own changelog (CI has PHP installed) never counts.
+    $check = fn (string $version, string $upgrade, string $allow = '0') => Process::env(['FAKE_PHP_VERSION' => $version, 'PHP_CHANGELOG' => $this->dir.'/no-such-changelog', ...($this->shellEnv)()])->run([
         'bash', '-c',
         'set -e; die() { echo "DIE: $*"; exit 1; }; warn() { echo "WARN: $*"; }; log() { echo "LOG: $*"; };'
         .' . "$1"; SYSTEM=1; PHP_BIN="$2"; PHP_VER=8.5; RELEASE_DIR="$3"; UPGRADE="$4"; export COMMYPANEL_ALLOW_VULNERABLE_PHP="$5";'
