@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	"commypanel/agent/internal/system"
 	"commypanel/agent/internal/usage"
 	"commypanel/agent/internal/validate"
+	"commypanel/agent/internal/volumefs"
 )
 
 const maxBody = 64 << 10
@@ -52,6 +54,14 @@ type Docker interface {
 	ListImages(ctx context.Context) ([]docker.ImageInfo, error)
 }
 
+// Volumes is the read-only view into an app's persistent volumes.
+type Volumes interface {
+	List(ctx context.Context, app string) ([]volumefs.Volume, error)
+	Dir(app, name, rel string) (volumefs.Listing, error)
+	Preview(app, name, rel string) (volumefs.Preview, error)
+	Open(app, name, rel string) (volumefs.Download, error)
+}
+
 // Certificates is the part of the certificate manager the server needs.
 type Certificates interface {
 	Issue(ctx context.Context, r certs.Request) (certs.Info, error)
@@ -76,6 +86,7 @@ type Authorizer func(r *http.Request) bool
 type Options struct {
 	Nginx     Nginx
 	Docker    Docker
+	Volumes   Volumes
 	Certs     Certificates
 	Unit      DockerUnit
 	Usage     Usage
@@ -123,6 +134,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/docker/images/prune", s.pruneImages)
 	mux.HandleFunc("POST /v1/docker/images/remove", s.removeImage)
 	mux.HandleFunc("POST /v1/volumes/remove", s.removeVolumes)
+	mux.HandleFunc("GET /v1/volumes/{app}", s.listVolumes)
+	mux.HandleFunc("GET /v1/volumes/{app}/{name}/dir", s.volumeDir)
+	mux.HandleFunc("GET /v1/volumes/{app}/{name}/file", s.volumeFile)
+	mux.HandleFunc("GET /v1/volumes/{app}/{name}/download", s.volumeDownload)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s.opts.Authorize == nil || !s.opts.Authorize(r) {
@@ -378,6 +393,47 @@ func (s *Server) removeImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.respond(w, s.opts.Docker.RemoveImage(r.Context(), body.Tag))
+}
+
+func (s *Server) listVolumes(w http.ResponseWriter, r *http.Request) {
+	list, err := s.opts.Volumes.List(r.Context(), r.PathValue("app"))
+	if err != nil {
+		s.respond(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"volumes": list})
+}
+
+func (s *Server) volumeDir(w http.ResponseWriter, r *http.Request) {
+	l, err := s.opts.Volumes.Dir(r.PathValue("app"), r.PathValue("name"), r.URL.Query().Get("path"))
+	if err != nil {
+		s.respond(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, l)
+}
+
+func (s *Server) volumeFile(w http.ResponseWriter, r *http.Request) {
+	p, err := s.opts.Volumes.Preview(r.PathValue("app"), r.PathValue("name"), r.URL.Query().Get("path"))
+	if err != nil {
+		s.respond(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, p)
+}
+
+// volumeDownload streams one plain file as raw bytes.
+func (s *Server) volumeDownload(w http.ResponseWriter, r *http.Request) {
+	d, err := s.opts.Volumes.Open(r.PathValue("app"), r.PathValue("name"), r.URL.Query().Get("path"))
+	if err != nil {
+		s.respond(w, err)
+		return
+	}
+	defer d.File.Close()
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Length", strconv.FormatInt(d.Size, 10))
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.Copy(w, io.LimitReader(d.File, d.Size))
 }
 
 func (s *Server) removeVolumes(w http.ResponseWriter, r *http.Request) {

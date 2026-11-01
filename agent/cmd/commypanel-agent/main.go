@@ -25,6 +25,7 @@ import (
 	"commypanel/agent/internal/server"
 	"commypanel/agent/internal/system"
 	"commypanel/agent/internal/usage"
+	"commypanel/agent/internal/volumefs"
 )
 
 var version = "dev"
@@ -94,7 +95,7 @@ func run() error {
 	}, docker.NewUnixEngine(*dockerSock))
 	certMgr := certs.NewManager(certs.Config{DataDir: *dataDir, DryRun: *dryRun, UserAgent: "commypanel-agent/" + version})
 	sampler := usage.New(usage.Config{DataDir: *dataDir, Containers: dockerMgr})
-	srv := server.New(server.Options{Nginx: mgr, Docker: dockerMgr, Certs: certMgr, Unit: system.NewDockerUnit(*dryRun), Usage: sampler,
+	srv := server.New(server.Options{Nginx: mgr, Docker: dockerMgr, Volumes: volumefs.New(*dataDir), Certs: certMgr, Unit: system.NewDockerUnit(*dryRun), Usage: sampler,
 		Authorize: authorize, Version: version, DryRun: *dryRun,
 		System: func() system.Status { return system.Collect(*dataDir) },
 		Info:   system.NewReader(*dataDir).Info,

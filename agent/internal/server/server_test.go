@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -17,6 +19,7 @@ import (
 	"commypanel/agent/internal/system"
 	"commypanel/agent/internal/usage"
 	"commypanel/agent/internal/validate"
+	"commypanel/agent/internal/volumefs"
 )
 
 type fakeNginx struct {
@@ -606,5 +609,71 @@ func TestApplySiteRefusesBadCustomDirectives(t *testing.T) {
 	rec := do(t, s, "PUT", "/v1/nginx/sites", `{"name":"shop","domains":["shop.example.com"],"upstream_port":20007,"custom":"include /etc/passwd;"}`)
 	if rec.Code != http.StatusBadRequest || len(f.applied) != 0 {
 		t.Errorf("%d applied=%d", rec.Code, len(f.applied))
+	}
+}
+
+func volumeServer(t *testing.T) *Server {
+	t.Helper()
+	dir := t.TempDir()
+	vol := filepath.Join(dir, "volumes", "shop", "uploads")
+	if err := os.MkdirAll(filepath.Join(vol, "photos"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(vol, "readme.txt"), []byte("hello"), 0o644)
+	os.WriteFile(filepath.Join(dir, "secret"), []byte("TOP SECRET"), 0o600)
+	os.Symlink(filepath.Join(dir, "secret"), filepath.Join(vol, "leak"))
+	return New(Options{Nginx: &fakeNginx{}, Volumes: volumefs.New(dir), Authorize: AllowAll()})
+}
+
+func TestVolumeReadRoutes(t *testing.T) {
+	s := volumeServer(t)
+
+	rec := do(t, s, "GET", "/v1/volumes/shop", "")
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"name":"uploads"`) || !strings.Contains(rec.Body.String(), `"bytes":5`) {
+		t.Errorf("list: %d %s", rec.Code, rec.Body)
+	}
+
+	rec = do(t, s, "GET", "/v1/volumes/shop/uploads/dir", "")
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"name":"photos","kind":"dir"`) || !strings.Contains(rec.Body.String(), `"name":"leak","kind":"link"`) {
+		t.Errorf("dir: %d %s", rec.Code, rec.Body)
+	}
+
+	rec = do(t, s, "GET", "/v1/volumes/shop/uploads/file?path=readme.txt", "")
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"content":"hello"`) {
+		t.Errorf("file: %d %s", rec.Code, rec.Body)
+	}
+
+	rec = do(t, s, "GET", "/v1/volumes/shop/uploads/download?path=readme.txt", "")
+	if rec.Code != 200 || rec.Body.String() != "hello" || rec.Header().Get("Content-Length") != "5" ||
+		rec.Header().Get("Content-Type") != "application/octet-stream" {
+		t.Errorf("download: %d %q %v", rec.Code, rec.Body, rec.Header())
+	}
+}
+
+func TestVolumeReadRoutesRefuseEscapes(t *testing.T) {
+	s := volumeServer(t)
+
+	for _, path := range []string{
+		"/v1/volumes/shop/uploads/file?path=leak",
+		"/v1/volumes/shop/uploads/download?path=leak",
+		"/v1/volumes/shop/uploads/file?path=../../../secret",
+		"/v1/volumes/shop/uploads/file?path=/etc/passwd",
+		"/v1/volumes/shop/uploads/dir?path=..",
+		"/v1/volumes/shop/..%2Fuploads/dir",
+		"/v1/volumes/..%2Fx",
+	} {
+		rec := do(t, s, "GET", path, "")
+		if rec.Code == 200 || strings.Contains(rec.Body.String(), "TOP SECRET") {
+			t.Errorf("%s: %d %s", path, rec.Code, rec.Body)
+		}
+	}
+}
+
+func TestVolumeRoutesNeedAuthorization(t *testing.T) {
+	s := New(Options{Nginx: &fakeNginx{}, Volumes: volumefs.New(t.TempDir())})
+	for _, path := range []string{"/v1/volumes/shop", "/v1/volumes/shop/uploads/dir", "/v1/volumes/shop/uploads/file", "/v1/volumes/shop/uploads/download"} {
+		if rec := do(t, s, "GET", path, ""); rec.Code != http.StatusForbidden {
+			t.Errorf("%s: %d, want 403", path, rec.Code)
+		}
 	}
 }
