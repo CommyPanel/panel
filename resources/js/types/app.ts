@@ -115,3 +115,16 @@ export type TokenHelp = {
     url: string | null;
     steps: string[];
 };
+
+/** The app's push webhook; null for uploaded apps. */
+export type AppWebhook = {
+    enabled: boolean;
+    provider: string;
+    /** Where to add the webhook on the Git host. */
+    settings_url: string | null;
+    steps: string[];
+    url?: string;
+    /** Only for people who may change the app. */
+    secret?: string | null;
+    on_panel_domain?: boolean;
+};

@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Audit\AuditLogger;
+use App\Auth\Permissions;
 use App\Deploy\DestroyApp;
+use App\Deploy\Source\GitProvider;
+use App\Dns\PanelDomain;
 use App\Dns\ServerAddress;
 use App\Enums\SetupStep;
 use App\Enums\SourceType;
@@ -53,7 +56,7 @@ class AppController extends Controller
         return redirect()->route('apps.setup', $app);
     }
 
-    public function show(App $app, HttpsSettings $https, ServerAddress $server): Response|RedirectResponse
+    public function show(Request $request, App $app, HttpsSettings $https, ServerAddress $server, PanelDomain $panel): Response|RedirectResponse
     {
         if ($app->setup_step !== null) {
             return redirect()->route('apps.setup', $app);
@@ -68,7 +71,39 @@ class AppController extends Controller
             'env_keys' => $app->envVars()->orderBy('key')->pluck('key')->values(),
             'https' => ['enabled' => $https->enabled(), 'staging' => $https->staging()],
             'server' => ['ipv4' => $server->ipv4(), 'ipv6' => $server->ipv6()],
+            'webhook' => $this->webhook($request, $app, $panel),
         ]);
+    }
+
+    /**
+     * The push webhook's address and, for people who may change the app, its secret.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function webhook(Request $request, App $app, PanelDomain $panel): ?array
+    {
+        if ($app->source_type !== SourceType::Git) {
+            return null;
+        }
+
+        $provider = GitProvider::fromUrl((string) $app->git_url);
+        $help = $provider->webhookInstructions((string) $app->git_url);
+        $data = ['enabled' => $app->webhook_id !== null, 'provider' => $provider->label(), 'settings_url' => $help['url'], 'steps' => $help['steps']];
+
+        if ($app->webhook_id === null) {
+            return $data;
+        }
+
+        $public = $panel->name() !== null && $panel->certificateUsable();
+        $base = $public ? 'https://'.$panel->name() : url('/');
+
+        return [
+            ...$data,
+            'url' => rtrim($base, '/').'/webhooks/deploy/'.$app->webhook_id,
+            'secret' => $request->user()?->can(Permissions::APPS_UPDATE) ? $app->webhook_secret : null,
+            // Without the panel's own HTTPS domain the address may not be reachable from the Git host.
+            'on_panel_domain' => $public,
+        ];
     }
 
     public function update(UpdateAppRequest $request, App $app, AuditLogger $audit): RedirectResponse

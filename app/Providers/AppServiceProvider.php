@@ -18,10 +18,13 @@ use App\Host\Drivers\FakeHostDriver;
 use App\Host\HostDriver;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use RuntimeException;
@@ -69,6 +72,10 @@ class AppServiceProvider extends ServiceProvider
         $this->configureDefaults();
 
         Event::subscribe(AuditEventSubscriber::class);
+
+        // Push webhooks are public; a sender cannot make the panel do much
+        // without the secret, but it should not be able to keep it busy either.
+        RateLimiter::for('webhooks', fn (Request $request) => Limit::perMinute(30)->by($request->ip()));
     }
 
     /**

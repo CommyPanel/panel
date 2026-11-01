@@ -87,6 +87,51 @@ enum GitProvider: string
     }
 
     /**
+     * Where to add a push webhook and what to fill in, for this provider.
+     *
+     * @return array{url: string|null, steps: list<string>}
+     */
+    public function webhookInstructions(string $repositoryUrl): array
+    {
+        $path = GitUrl::path($repositoryUrl);
+        $host = GitUrl::host($repositoryUrl);
+
+        return match ($this) {
+            self::GitHub => [
+                'url' => $path === null ? null : "https://github.com/{$path}/settings/hooks/new",
+                'steps' => [
+                    'Open the repository on GitHub: Settings, then Webhooks, then Add webhook.',
+                    'Paste the URL as the Payload URL, choose application/json and paste the secret.',
+                    'Keep "Just the push event" selected and click Add webhook.',
+                ],
+            ],
+            self::GitLab => [
+                'url' => $path === null ? null : "https://{$host}/{$path}/-/hooks",
+                'steps' => [
+                    'Open the project on GitLab: Settings, then Webhooks, then Add new webhook.',
+                    'Paste the URL, and the secret as the Secret token.',
+                    'Tick only Push events, then click Add webhook.',
+                ],
+            ],
+            self::Bitbucket => [
+                'url' => $path === null ? null : "https://bitbucket.org/{$path}/admin/webhooks",
+                'steps' => [
+                    'Open the repository on Bitbucket: Repository settings, then Webhooks, then Add webhook.',
+                    'Paste the URL and the secret.',
+                    'Under Triggers keep "Repository push", then click Save.',
+                ],
+            ],
+            self::Other => [
+                'url' => null,
+                'steps' => [
+                    'Add a push webhook in your repository settings with this URL and secret.',
+                    'Gitea and Forgejo work as they are. Other senders must sign the body with HMAC-SHA256 in an X-Hub-Signature-256 header.',
+                ],
+            ],
+        };
+    }
+
+    /**
      * Where to add the deploy key and what to click, for this provider.
      *
      * @return array{url: string|null, steps: list<string>}

@@ -31,6 +31,8 @@ use Illuminate\Support\Str;
  * @property string|null $deploy_key_public
  * @property string|null $git_token
  * @property string|null $git_token_username
+ * @property string|null $webhook_id
+ * @property string|null $webhook_secret
  * @property Carbon|null $source_verified_at
  * @property int $container_port
  * @property string $health_path
@@ -51,7 +53,7 @@ class App extends Model
 
     protected $guarded = [];
 
-    protected $hidden = ['deploy_key_private', 'git_token'];
+    protected $hidden = ['deploy_key_private', 'git_token', 'webhook_secret'];
 
     protected function casts(): array
     {
@@ -64,6 +66,7 @@ class App extends Model
             'source_type' => SourceType::class,
             'deploy_key_private' => 'encrypted',
             'git_token' => 'encrypted',
+            'webhook_secret' => 'encrypted',
         ];
     }
 

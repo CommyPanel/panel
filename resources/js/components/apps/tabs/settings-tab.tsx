@@ -6,12 +6,19 @@ import type { AppFormData } from '@/components/apps/app-fields';
 import { AccessTokenCard } from '@/components/apps/access-token-card';
 import { DeployKeyCard } from '@/components/apps/deploy-key-card';
 import { UploadSourceCard } from '@/components/apps/upload-source-card';
+import { WebhookCard } from '@/components/apps/webhook-card';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import type { AppSettings } from '@/types';
+import type { AppSettings, AppWebhook } from '@/types';
 
-export function SettingsTab({ app }: { app: AppSettings }) {
+export function SettingsTab({
+    app,
+    webhook,
+}: {
+    app: AppSettings;
+    webhook: AppWebhook | null;
+}) {
     const upload = app.source_type === 'upload';
     const form = useForm<AppFormData>({
         name: app.name,
@@ -78,6 +85,9 @@ export function SettingsTab({ app }: { app: AppSettings }) {
                             publicKey={app.deploy_key_public}
                         />
                         <AccessTokenCard app={app} />
+                        {webhook && (
+                            <WebhookCard slug={app.slug} webhook={webhook} />
+                        )}
                     </>
                 )}
             </div>

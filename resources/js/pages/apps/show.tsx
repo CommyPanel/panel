@@ -25,7 +25,12 @@ import { Tabs, tabPanelProps } from '@/components/ui/tabs';
 import type { TabItem } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
 import { useCan } from '@/lib/permissions';
-import type { AppSettings, DeploymentSummary, ServerAddress } from '@/types';
+import type {
+    AppSettings,
+    AppWebhook,
+    DeploymentSummary,
+    ServerAddress,
+} from '@/types';
 
 type Props = {
     app: AppSettings;
@@ -33,6 +38,7 @@ type Props = {
     env_keys: string[];
     https: { enabled: boolean; staging: boolean };
     server: ServerAddress;
+    webhook: AppWebhook | null;
 };
 
 type TabId =
@@ -72,6 +78,7 @@ export default function Show({
     env_keys,
     https,
     server,
+    webhook,
 }: Props) {
     const { errors } = usePage().props;
     const can = useCan();
@@ -213,7 +220,9 @@ export default function Show({
                 {tab === 'environment' && (
                     <EnvironmentTab slug={app.slug} keys={env_keys} />
                 )}
-                {tab === 'settings' && <SettingsTab app={app} />}
+                {tab === 'settings' && (
+                    <SettingsTab app={app} webhook={webhook} />
+                )}
                 {tab === 'advanced' && <AdvancedTab app={app} />}
             </div>
         </AppLayout>

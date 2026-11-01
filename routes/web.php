@@ -6,6 +6,7 @@ use App\Http\Controllers\AppDomainController;
 use App\Http\Controllers\AppSetupController;
 use App\Http\Controllers\AppSourceController;
 use App\Http\Controllers\AppStateController;
+use App\Http\Controllers\AppWebhookController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\DashboardController;
@@ -82,6 +83,8 @@ Route::middleware('auth')->group(function () {
             Route::post('deploy-key', [DeployKeyController::class, 'store'])->name('deploy-key.store');
             Route::post('git-token', [GitTokenController::class, 'store'])->name('git-token.store');
             Route::delete('git-token', [GitTokenController::class, 'destroy'])->name('git-token.destroy');
+            Route::post('webhook', [AppWebhookController::class, 'store'])->name('webhook.store');
+            Route::delete('webhook', [AppWebhookController::class, 'destroy'])->name('webhook.destroy');
             Route::post('source', [AppSourceController::class, 'upload'])->name('source.upload');
         });
 
