@@ -14,6 +14,7 @@ use App\Host\Data\NginxSite;
 use App\Host\Data\NginxStatus;
 use App\Host\Data\NginxTestResult;
 use App\Host\Data\SystemStatus;
+use App\Host\Data\TaskSpec;
 use App\Host\Exceptions\DockerUnavailable;
 use App\Host\Exceptions\HostOperationFailed;
 
@@ -98,9 +99,35 @@ interface HostDriver
     public function stopContainer(string $name): void;
 
     /**
+     * Start a stopped managed container. Starting a running one succeeds.
+     *
+     * @throws HostOperationFailed
+     */
+    public function startContainer(string $name): void;
+
+    /**
+     * Stop a managed container with a grace period and start it again.
+     *
+     * @throws HostOperationFailed
+     */
+    public function restartContainer(string $name): void;
+
+    /**
      * @throws HostOperationFailed
      */
     public function removeContainer(string $name): void;
+
+    /**
+     * Run a one-off command to completion in a new container and return its
+     * exit code. The container is removed afterwards. A non-zero exit code is
+     * a result, not an exception.
+     *
+     * @param  callable(string): void|null  $onOutput  receives output lines
+     *
+     * @throws DockerUnavailable
+     * @throws HostOperationFailed when the command cannot be run or times out
+     */
+    public function runTask(TaskSpec $spec, ?callable $onOutput = null): int;
 
     /**
      * Managed containers only; containers the agent did not create are never listed.

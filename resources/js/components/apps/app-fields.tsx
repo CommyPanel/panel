@@ -6,6 +6,7 @@ export type AppFormData = {
     git_branch: string;
     container_port: string;
     health_path: string;
+    release_command: string;
     memory_limit_mb: string;
     cpu_limit: string;
 };
@@ -73,6 +74,11 @@ export function RuntimeFields({ data, errors, setData }: Props) {
                 error={errors.health_path}
                 hint="A new version goes live once this path answers (anything below HTTP 500)."
             />
+            <ReleaseCommandInput
+                value={data.release_command}
+                onChange={(value) => setData('release_command', value)}
+                error={errors.release_command}
+            />
             <Input
                 label="Memory limit (MB)"
                 type="number"
@@ -93,5 +99,33 @@ export function RuntimeFields({ data, errors, setData }: Props) {
                 error={errors.cpu_limit}
             />
         </div>
+    );
+}
+
+/**
+ * Optional command run once per deployment, from the new image, before the
+ * new version starts. Shared by the settings tab and the setup wizard.
+ */
+export function ReleaseCommandInput({
+    value,
+    onChange,
+    error,
+}: {
+    value: string;
+    onChange: (value: string) => void;
+    error?: string;
+}) {
+    return (
+        <Input
+            label="Release command"
+            placeholder="Optional, e.g. npm run migrate"
+            className="font-mono"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            error={error}
+            spellCheck={false}
+            autoComplete="off"
+            hint="Runs once per deployment in a container from the new image, before it starts. If it fails, the old version keeps serving. Runs without a shell; use sh -c '...' to chain commands."
+        />
     );
 }

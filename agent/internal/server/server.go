@@ -33,11 +33,15 @@ type Nginx interface {
 type Docker interface {
 	Run(ctx context.Context, s docker.ContainerSpec) error
 	Stop(ctx context.Context, name string) error
+	Start(ctx context.Context, name string) error
+	Restart(ctx context.Context, name string) error
 	Remove(ctx context.Context, name string) error
 	List(ctx context.Context) ([]docker.ContainerInfo, error)
 	Logs(ctx context.Context, name string, tail int) (string, error)
 	ValidateBuild(s docker.BuildSpec) error
 	Build(ctx context.Context, s docker.BuildSpec, onLine func(string)) error
+	ValidateTask(s docker.TaskSpec) error
+	RunTask(ctx context.Context, s docker.TaskSpec, onLine func(string)) (int, error)
 	PruneImages(ctx context.Context) (uint64, error)
 	RemoveImage(ctx context.Context, tag string) error
 	Info(ctx context.Context) (docker.Info, error)
@@ -88,6 +92,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/docker/containers", s.runContainer)
 	mux.HandleFunc("GET /v1/docker/containers", s.listContainers)
 	mux.HandleFunc("POST /v1/docker/containers/{name}/stop", s.stopContainer)
+	mux.HandleFunc("POST /v1/docker/containers/{name}/start", s.startContainer)
+	mux.HandleFunc("POST /v1/docker/containers/{name}/restart", s.restartContainer)
+	mux.HandleFunc("POST /v1/docker/tasks", s.runTask)
 	mux.HandleFunc("DELETE /v1/docker/containers/{name}", s.removeContainer)
 	mux.HandleFunc("GET /v1/docker/containers/{name}/logs", s.containerLogs)
 	mux.HandleFunc("POST /v1/docker/images/build", s.buildImage)
@@ -237,6 +244,14 @@ func (s *Server) stopContainer(w http.ResponseWriter, r *http.Request) {
 	s.respond(w, s.opts.Docker.Stop(r.Context(), r.PathValue("name")))
 }
 
+func (s *Server) startContainer(w http.ResponseWriter, r *http.Request) {
+	s.respond(w, s.opts.Docker.Start(r.Context(), r.PathValue("name")))
+}
+
+func (s *Server) restartContainer(w http.ResponseWriter, r *http.Request) {
+	s.respond(w, s.opts.Docker.Restart(r.Context(), r.PathValue("name")))
+}
+
 func (s *Server) removeContainer(w http.ResponseWriter, r *http.Request) {
 	s.respond(w, s.opts.Docker.Remove(r.Context(), r.PathValue("name")))
 }
@@ -300,17 +315,7 @@ func (s *Server) buildImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/x-ndjson")
-	w.WriteHeader(http.StatusOK)
-	enc := json.NewEncoder(w)
-	flusher, _ := w.(http.Flusher)
-	send := func(v any) {
-		_ = enc.Encode(v)
-		if flusher != nil {
-			flusher.Flush()
-		}
-	}
-
+	send := stream(w)
 	err := s.opts.Docker.Build(r.Context(), spec, func(line string) { send(map[string]string{"log": line}) })
 	if err != nil {
 		slog.Error("build failed", "tag", spec.Tag, "err", err)
@@ -318,6 +323,44 @@ func (s *Server) buildImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	send(map[string]bool{"ok": true})
+}
+
+// runTask runs a one-off command to completion. Like buildImage it validates
+// first, then streams {"log":"..."} lines and ends with {"exit_code":N} or
+// {"error":"..."}. A non-zero exit code is a result, not an error.
+func (s *Server) runTask(w http.ResponseWriter, r *http.Request) {
+	var spec docker.TaskSpec
+	if !decode(w, r, &spec) {
+		return
+	}
+	if err := s.opts.Docker.ValidateTask(spec); err != nil {
+		s.respond(w, err)
+		return
+	}
+
+	send := stream(w)
+	code, err := s.opts.Docker.RunTask(r.Context(), spec, func(line string) { send(map[string]string{"log": line}) })
+	if err != nil {
+		slog.Error("task failed", "name", spec.Name, "err", err)
+		send(map[string]string{"error": err.Error()})
+		return
+	}
+	send(map[string]int{"exit_code": code})
+}
+
+// stream starts a newline-delimited JSON response and returns a function
+// that writes and flushes one message.
+func stream(w http.ResponseWriter) func(v any) {
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	w.WriteHeader(http.StatusOK)
+	enc := json.NewEncoder(w)
+	flusher, _ := w.(http.Flusher)
+	return func(v any) {
+		_ = enc.Encode(v)
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}
 }
 
 func decode(w http.ResponseWriter, r *http.Request, v any) bool {

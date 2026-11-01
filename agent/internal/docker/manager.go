@@ -295,6 +295,49 @@ func (m *Manager) Stop(ctx context.Context, name string) error {
 	return err
 }
 
+// Start starts a stopped managed container. Starting a running one succeeds.
+func (m *Manager) Start(ctx context.Context, name string) error {
+	if err := m.requireExisting(ctx, name, "start"); err != nil {
+		return err
+	}
+	if m.cfg.DryRun {
+		return nil
+	}
+	// Docker answers 304 for an already running container, which is not an error.
+	return m.engine.doJSON(ctx, "POST", "/containers/"+name+"/start", nil, nil, nil)
+}
+
+// Restart stops (with a grace period) and starts a managed container.
+func (m *Manager) Restart(ctx context.Context, name string) error {
+	if err := m.requireExisting(ctx, name, "restart"); err != nil {
+		return err
+	}
+	if m.cfg.DryRun {
+		return nil
+	}
+	return m.engine.doJSON(ctx, "POST", "/containers/"+name+"/restart", url.Values{"t": {"10"}}, nil, nil)
+}
+
+// requireExisting validates the name and, outside dry-run, insists the
+// container exists and is managed.
+func (m *Manager) requireExisting(ctx context.Context, name, action string) error {
+	if err := validate.Name(name); err != nil {
+		return err
+	}
+	if m.cfg.DryRun {
+		slog.Info("dry-run: would "+action+" container", "name", name)
+		return nil
+	}
+	exists, err := m.requireManaged(ctx, name)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return &validate.InputError{Msg: fmt.Sprintf("container %q does not exist", name)}
+	}
+	return nil
+}
+
 // Remove force-removes a managed container, keeping its volumes' data.
 func (m *Manager) Remove(ctx context.Context, name string) error {
 	if err := validate.Name(name); err != nil {

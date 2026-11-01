@@ -6,7 +6,8 @@ export type AppStatus =
     | 'deploying'
     | 'running'
     | 'failed'
-    | 'stopped';
+    | 'stopped'
+    | 'deactivated';
 
 export type AppStack = 'dotnet' | 'go' | 'node';
 
@@ -48,10 +49,11 @@ export type AppSummary = {
 export type AppSettings = AppSummary & {
     container_port: number;
     health_path: string;
+    release_command: string | null;
     memory_limit_mb: number | null;
     cpu_limit: number | null;
     deploy_key_public: string | null;
-    stopped_release: number | null;
+    deactivated_release: number | null;
     url: string | null;
     domains: DomainRow[];
     certificate: CertificateSummary | null;
@@ -78,6 +80,7 @@ export type DeploymentStatus =
 export type DeploymentStage =
     | 'fetch'
     | 'build'
+    | 'release'
     | 'start'
     | 'health'
     | 'switch'
@@ -92,6 +95,7 @@ export type DeploymentSummary = {
     commit_message: string | null;
     duration_seconds: number | null;
     is_rollback: boolean;
+    has_release_command: boolean;
     can_roll_back: boolean;
     error: string | null;
     created_at: string | null;

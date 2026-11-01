@@ -82,6 +82,12 @@ Route::middleware('auth')->group(function () {
             Route::post('source', [AppSourceController::class, 'upload'])->name('source.upload');
         });
 
+        Route::middleware('can:'.Permissions::APPS_CONTROL)->group(function () {
+            Route::post('stop', [AppStateController::class, 'stop'])->name('stop');
+            Route::post('start', [AppStateController::class, 'start'])->name('start');
+            Route::post('restart', [AppStateController::class, 'restart'])->name('restart');
+        });
+
         Route::middleware('can:'.Permissions::APPS_DEACTIVATE)->group(function () {
             Route::post('deactivate', [AppStateController::class, 'deactivate'])->name('deactivate');
             Route::post('activate', [AppStateController::class, 'activate'])->name('activate');

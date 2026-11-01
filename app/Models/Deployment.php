@@ -18,6 +18,7 @@ use Illuminate\Support\Carbon;
  * @property DeploymentStage|null $stage
  * @property string|null $commit_sha
  * @property string|null $commit_message
+ * @property string|null $release_command
  * @property string|null $image_tag
  * @property bool $image_available
  * @property int|null $rolled_back_from_id

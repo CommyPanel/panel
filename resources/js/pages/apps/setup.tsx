@@ -5,6 +5,7 @@ import type { FormEvent } from 'react';
 import AppSetupController from '@/actions/App/Http/Controllers/AppSetupController';
 import DeployKeyController from '@/actions/App/Http/Controllers/DeployKeyController';
 import { AppDomains } from '@/components/apps/app-domains';
+import { ReleaseCommandInput } from '@/components/apps/app-fields';
 import { SetupSteps } from '@/components/apps/setup-steps';
 import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
@@ -343,6 +344,7 @@ function SettingsStep({ app }: { app: AppSetup }) {
     const form = useForm({
         container_port: String(app.container_port),
         health_path: app.health_path,
+        release_command: app.release_command ?? '',
         memory_limit_mb: app.memory_limit_mb ? String(app.memory_limit_mb) : '',
         cpu_limit: app.cpu_limit ? String(app.cpu_limit) : '',
         env: '',
@@ -410,6 +412,11 @@ function SettingsStep({ app }: { app: AppSetup }) {
                     }
                     error={form.errors.health_path}
                     hint="A new version goes live once this path answers (anything below HTTP 500)."
+                />
+                <ReleaseCommandInput
+                    value={form.data.release_command}
+                    onChange={(value) => form.setData('release_command', value)}
+                    error={form.errors.release_command}
                 />
                 <Input
                     label="Memory limit (MB)"

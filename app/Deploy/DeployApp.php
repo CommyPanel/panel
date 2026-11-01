@@ -13,6 +13,7 @@ use App\Enums\DeploymentStatus;
 use App\Enums\Stack;
 use App\Host\Data\ContainerSpec;
 use App\Host\Data\ImageBuildSpec;
+use App\Host\Data\TaskSpec;
 use App\Host\Exceptions\DockerUnavailable;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
@@ -22,12 +23,13 @@ use App\Tls\TlsPlanner;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Sleep;
+use InvalidArgumentException;
 use Throwable;
 
 /**
- * Runs one deployment: fetch, build, start the new container next to the old
- * one, health-check it, move traffic, then retire the old container. If any
- * step fails the previous version keeps serving.
+ * Runs one deployment: fetch, build, run the release command, start the new
+ * container next to the old one, health-check it, move traffic, then retire
+ * the old container. If any step fails the previous version keeps serving.
  */
 class DeployApp
 {
@@ -55,6 +57,10 @@ class DeployApp
             if ($deployment->rolled_back_from_id === null) {
                 $workDir = $this->workDir($app, $deployment);
                 $this->build($app, $deployment, $workDir, $log);
+
+                if ($deployment->release_command !== null) {
+                    $this->release($app, $deployment, $log);
+                }
             } else {
                 $log->step("Rolling back to release {$deployment->image_tag}.");
             }
@@ -67,7 +73,7 @@ class DeployApp
             $this->stage($deployment, DeploymentStage::Switch);
             $log->step('Switching traffic to the new version.');
             $this->traffic->switchTo($deployment);
-            $app->forceFill(['active_deployment_id' => $deployment->id])->save();
+            $app->forceFill(['active_deployment_id' => $deployment->id, 'stopped_at' => null])->save();
             $deployment->forceFill(['status' => DeploymentStatus::Active, 'stage' => DeploymentStage::Done, 'finished_at' => now()])->save();
 
             $this->tls->ensure($app);
@@ -159,12 +165,54 @@ class DeployApp
             image: (string) $deployment->image_tag,
             hostPort: $port,
             containerPort: $app->container_port,
-            env: ['PORT' => (string) $app->container_port, ...$app->environment()],
+            env: $this->environment($app),
             memoryLimitMb: $app->memory_limit_mb,
             cpuLimit: $app->cpu_limit === null ? null : (float) $app->cpu_limit,
         ));
 
         return true;
+    }
+
+    /**
+     * Run the release command once in a container from the new image, with the
+     * app's environment, before the new version starts. The old version keeps
+     * serving while it runs, so the command must leave the data usable by it.
+     */
+    private function release(App $app, Deployment $deployment, DeployLogger $log): void
+    {
+        try {
+            $command = CommandLine::split((string) $deployment->release_command);
+        } catch (InvalidArgumentException $e) {
+            throw new DeploymentFailed("The release command is not valid: {$e->getMessage()}", 0, $e);
+        }
+
+        $timeout = min(3600, max(1, (int) config('commypanel.deploy.release_timeout')));
+        $this->stage($deployment, DeploymentStage::Release);
+        $log->step("Running the release command: {$deployment->release_command}");
+
+        $code = $this->host->runTask(new TaskSpec(
+            name: "{$app->slug}-{$deployment->number}-release",
+            image: (string) $deployment->image_tag,
+            command: $command,
+            env: $this->environment($app),
+            memoryLimitMb: $app->memory_limit_mb,
+            cpuLimit: $app->cpu_limit === null ? null : (float) $app->cpu_limit,
+            timeoutSeconds: $timeout,
+        ), $log->line(...));
+
+        if ($code !== 0) {
+            throw new DeploymentFailed("The release command failed with exit code {$code}. The new version was not started.");
+        }
+
+        $log->line('The release command finished.');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function environment(App $app): array
+    {
+        return ['PORT' => (string) $app->container_port, ...$app->environment()];
     }
 
     private function checkHealth(App $app, Deployment $deployment, DeployLogger $log): void

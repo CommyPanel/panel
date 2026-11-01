@@ -100,6 +100,7 @@ describe('route protection', function () {
         'apps.create' => [['get', '/apps/create'], ['post', '/apps']],
         'apps.update' => [['patch', '/apps/shop'], ['post', '/apps/shop/deploy-key']],
         'apps.deploy' => [['post', '/apps/shop/deployments']],
+        'apps.control' => [['post', '/apps/shop/stop'], ['post', '/apps/shop/start'], ['post', '/apps/shop/restart']],
         'apps.deactivate' => [['post', '/apps/shop/deactivate'], ['post', '/apps/shop/activate']],
         'apps.delete' => [['delete', '/apps/shop']],
         'env.manage' => [['post', '/apps/shop/env'], ['post', '/apps/shop/env/import'], ['delete', '/apps/shop/env/KEY']],

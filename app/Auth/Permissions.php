@@ -17,6 +17,8 @@ final class Permissions
 
     public const APPS_DEPLOY = 'apps.deploy';
 
+    public const APPS_CONTROL = 'apps.control';
+
     public const APPS_DEACTIVATE = 'apps.deactivate';
 
     public const APPS_DELETE = 'apps.delete';
@@ -59,6 +61,7 @@ final class Permissions
             self::APPS_CREATE => ['group' => 'Apps', 'label' => 'Create apps', 'description' => 'Create new apps with the setup wizard, including connecting a repository or uploading a project.'],
             self::APPS_UPDATE => ['group' => 'Apps', 'label' => 'Change app settings', 'description' => 'Change an app\'s name, source, port, health check and resource limits; generate its deploy key; upload a new project archive.'],
             self::APPS_DEPLOY => ['group' => 'Apps', 'label' => 'Deploy and roll back', 'description' => 'Start deployments and roll an app back to an earlier release. Deploying runs the app\'s code on this server.'],
+            self::APPS_CONTROL => ['group' => 'Apps', 'label' => 'Start, stop and restart apps', 'description' => 'Stop an app\'s running container, start it again and restart it. Its domains stay configured; visitors see an error while it is stopped.'],
             self::APPS_DEACTIVATE => ['group' => 'Apps', 'label' => 'Deactivate and activate apps', 'description' => 'Take an app offline without deleting it, and bring it back.'],
             self::APPS_DELETE => ['group' => 'Apps', 'label' => 'Delete apps', 'description' => 'Permanently delete an app with its releases, images, domains, certificate and variables.'],
             self::ENV_MANAGE => ['group' => 'Apps', 'label' => 'Manage environment variables', 'description' => 'Add, replace, import and remove an app\'s environment variables. These often hold secrets such as database passwords.'],

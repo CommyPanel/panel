@@ -10,6 +10,8 @@ enum AppStatus: string
     case Deploying = 'deploying';
     case Running = 'running';
     case Failed = 'failed';
-    /** Deactivated by the user: nothing runs and no domain is served. */
+    /** The live container is stopped by the user; its domains stay configured. */
     case Stopped = 'stopped';
+    /** Deactivated by the user: nothing runs and no domain is served. */
+    case Deactivated = 'deactivated';
 }

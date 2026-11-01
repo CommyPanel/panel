@@ -4,6 +4,7 @@ use App\Host\Data\CertificateRequest;
 use App\Host\Data\ContainerSpec;
 use App\Host\Data\ImageBuildSpec;
 use App\Host\Data\NginxSite;
+use App\Host\Data\TaskSpec;
 use App\Host\Drivers\AgentHostDriver;
 use App\Host\Exceptions\HostOperationFailed;
 use Illuminate\Support\Facades\File;
@@ -118,6 +119,32 @@ it('streams a dry-run build', function () {
     );
 
     expect($lines)->toBe(['[dry-run] would build commypanel/demo:r1']);
+});
+
+it('starts and restarts containers in dry-run mode', function () {
+    $this->driver->startContainer('demo-1');
+    $this->driver->restartContainer('demo-1');
+
+    expect(true)->toBeTrue();
+});
+
+it('streams a dry-run task and returns its exit code', function () {
+    $lines = [];
+
+    $code = $this->driver->runTask(
+        new TaskSpec('demo-1-release', 'commypanel/demo:1', ['sh', '-c', 'migrate && seed'], ['A' => '1'], timeoutSeconds: 30),
+        function (string $line) use (&$lines) {
+            $lines[] = $line;
+        },
+    );
+
+    expect($code)->toBe(0)
+        ->and($lines)->toBe(['[dry-run] would run sh -c migrate && seed in commypanel/demo:1']);
+});
+
+it('surfaces agent-side task validation errors', function () {
+    expect(fn () => $this->driver->runTask(new TaskSpec('demo-1-release', 'commypanel/demo:1', ['php', "a\0b"])))
+        ->toThrow(HostOperationFailed::class, 'invalid command argument');
 });
 
 it('rejects a build context outside the builds directory', function () {

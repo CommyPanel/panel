@@ -16,6 +16,11 @@ const STEPS: Step[] = [
         detail: 'Detect the project and build a container image',
     },
     {
+        stage: 'release',
+        label: 'Release command',
+        detail: 'Run the release command in the new image',
+    },
+    {
         stage: 'start',
         label: 'Start the container',
         detail: 'Run the new version next to the old one',
@@ -71,14 +76,22 @@ const STATE_LABEL: Record<State, string> = {
 type Props = {
     stage: DeploymentStage | null;
     status: DeploymentStatus;
-    /** A rollback reuses an existing image, so it skips fetching and building. */
+    /** A rollback reuses an existing image, so it skips fetching, building and the release command. */
     isRollback: boolean;
+    hasReleaseCommand: boolean;
 };
 
-export function DeploymentStages({ stage, status, isRollback }: Props) {
-    const steps = isRollback
-        ? STEPS.filter((s) => s.stage !== 'fetch' && s.stage !== 'build')
-        : STEPS;
+export function DeploymentStages({
+    stage,
+    status,
+    isRollback,
+    hasReleaseCommand,
+}: Props) {
+    const steps = STEPS.filter((s) => {
+        if (s.stage === 'release') return hasReleaseCommand && !isRollback;
+        if (s.stage === 'fetch' || s.stage === 'build') return !isRollback;
+        return true;
+    });
     const current =
         stage === 'done'
             ? steps.length

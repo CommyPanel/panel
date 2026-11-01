@@ -3,7 +3,8 @@
 namespace App\Host\Drivers;
 
 /**
- * Parses the agent's newline-delimited JSON build output as it arrives.
+ * Parses the agent's newline-delimited JSON output (image builds and tasks)
+ * as it arrives. A build ends with {"ok":true}, a task with {"exit_code":N}.
  */
 final class BuildStream
 {
@@ -12,6 +13,8 @@ final class BuildStream
     public bool $finished = false;
 
     public ?string $error = null;
+
+    public ?int $exitCode = null;
 
     private string $buffer = '';
 
@@ -56,6 +59,11 @@ final class BuildStream
         }
 
         if (($message['ok'] ?? false) === true) {
+            $this->finished = true;
+        }
+
+        if (isset($message['exit_code']) && is_int($message['exit_code'])) {
+            $this->exitCode = $message['exit_code'];
             $this->finished = true;
         }
     }

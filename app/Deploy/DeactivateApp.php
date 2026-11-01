@@ -45,7 +45,7 @@ class DeactivateApp
         }
 
         $live->forceFill(['status' => DeploymentStatus::Stopped])->save();
-        $app->forceFill(['active_deployment_id' => null])->save();
+        $app->forceFill(['active_deployment_id' => null, 'stopped_at' => null])->save();
         $this->routing->sync($app->refresh());
 
         $this->audit->record('app.deactivated', $by, ['app' => $app->slug], $app);

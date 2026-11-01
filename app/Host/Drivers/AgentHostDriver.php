@@ -15,6 +15,7 @@ use App\Host\Data\NginxStatus;
 use App\Host\Data\NginxTestResult;
 use App\Host\Data\ResourceName;
 use App\Host\Data\SystemStatus;
+use App\Host\Data\TaskSpec;
 use App\Host\Exceptions\DockerUnavailable;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
@@ -160,6 +161,43 @@ class AgentHostDriver implements HostDriver
 
     public function buildImage(ImageBuildSpec $spec, ?callable $onOutput = null): void
     {
+        $this->stream('/v1/docker/images/build', [
+            'tag' => $spec->tag,
+            'context_path' => $spec->contextPath,
+            'dockerfile' => $spec->dockerfile,
+        ], 3600, $onOutput, 'The build output ended unexpectedly.');
+    }
+
+    public function runTask(TaskSpec $spec, ?callable $onOutput = null): int
+    {
+        $stream = $this->stream('/v1/docker/tasks', array_filter([
+            'name' => $spec->name,
+            'image' => $spec->image,
+            'command' => $spec->command,
+            'env' => $spec->env,
+            'volumes' => array_map(fn ($volume) => [
+                'source' => $volume->source,
+                'target' => $volume->target,
+                'read_only' => $volume->readOnly,
+            ], $spec->volumes),
+            'memory_mb' => $spec->memoryLimitMb,
+            'cpus' => $spec->cpuLimit,
+            'network' => $spec->network,
+            'timeout_seconds' => $spec->timeoutSeconds,
+        ], fn ($value) => $value !== null && $value !== []), $spec->timeoutSeconds + 60, $onOutput, 'The command output ended unexpectedly.');
+
+        return (int) $stream->exitCode;
+    }
+
+    /**
+     * POST to an endpoint that answers with newline-delimited JSON, passing
+     * log lines on as they arrive.
+     *
+     * @param  array<string, mixed>  $body
+     * @param  (callable(string): void)|null  $onOutput
+     */
+    private function stream(string $path, array $body, int $timeout, ?callable $onOutput, string $cutOff): BuildStream
+    {
         $stream = new BuildStream($onOutput);
 
         // Guzzle's `stream` option would switch to a handler that ignores the
@@ -172,13 +210,9 @@ class AgentHostDriver implements HostDriver
             },
         ]);
 
-        $response = $this->request(fn () => $this->client(timeout: 3600)
+        $response = $this->request(fn () => $this->client(timeout: $timeout)
             ->withOptions(['sink' => $sink])
-            ->post('/v1/docker/images/build', [
-                'tag' => $spec->tag,
-                'context_path' => $spec->contextPath,
-                'dockerfile' => $spec->dockerfile,
-            ]));
+            ->post($path, $body));
 
         if (! $stream->received) {
             $stream->write($response->body());
@@ -195,8 +229,10 @@ class AgentHostDriver implements HostDriver
         }
 
         if (! $stream->finished) {
-            throw new HostOperationFailed('The build output ended unexpectedly.');
+            throw new HostOperationFailed($cutOff);
         }
+
+        return $stream;
     }
 
     public function runContainer(ContainerSpec $spec): void
@@ -223,6 +259,20 @@ class AgentHostDriver implements HostDriver
         ResourceName::assertValid($name);
 
         $this->send('post', "/v1/docker/containers/{$name}/stop");
+    }
+
+    public function startContainer(string $name): void
+    {
+        ResourceName::assertValid($name);
+
+        $this->send('post', "/v1/docker/containers/{$name}/start");
+    }
+
+    public function restartContainer(string $name): void
+    {
+        ResourceName::assertValid($name);
+
+        $this->send('post', "/v1/docker/containers/{$name}/restart");
     }
 
     public function removeContainer(string $name): void

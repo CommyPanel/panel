@@ -9,6 +9,7 @@ use App\Enums\DeploymentStage;
 use App\Enums\DeploymentStatus;
 use App\Enums\Stack;
 use App\Host\Data\ImageBuildSpec;
+use App\Host\Data\TaskSpec;
 use App\Host\Drivers\FakeHostDriver;
 use App\Host\Exceptions\DockerUnavailable;
 use App\Host\Exceptions\HostOperationFailed;
@@ -171,6 +172,78 @@ it('removes the new container and keeps the old one when the health check fails'
         ->and($first->fresh()->status)->toBe(DeploymentStatus::Active)
         ->and($this->host->containers())->toHaveKey('shop-1')->not->toHaveKey('shop-2')
         ->and($this->traffic->switched)->toBe([$first->id]);
+});
+
+describe('release command', function () {
+    it('runs it once from the new image with the app environment before starting the container', function () {
+        AppEnvVar::query()->create(['app_id' => $this->shop->id, 'key' => 'DB_HOST', 'value' => 'db']);
+        $this->shop->update(['release_command' => "sh -c 'migrate && seed'", 'memory_limit_mb' => 256]);
+
+        $deployment = ($this->deploy)();
+
+        expect($deployment->status)->toBe(DeploymentStatus::Active)
+            ->and($deployment->release_command)->toBe("sh -c 'migrate && seed'")
+            ->and(hostActions())->toBe(['buildImage', 'runTask', 'runContainer'])
+            ->and($deployment->log)->toContain('Running the release command')
+            ->toContain('[fake] running sh -c migrate && seed')
+            ->toContain('The release command finished.');
+
+        /** @var TaskSpec $task */
+        $task = collect($this->host->actions())->firstWhere('action', 'runTask')['args']['spec'];
+        expect($task->name)->toBe('shop-1-release')
+            ->and($task->image)->toBe('commypanel/shop:1')
+            ->and($task->command)->toBe(['sh', '-c', 'migrate && seed'])
+            ->and($task->env)->toBe(['PORT' => '8080', 'DB_HOST' => 'db'])
+            ->and($task->memoryLimitMb)->toBe(256)
+            ->and($task->timeoutSeconds)->toBe(600);
+    });
+
+    it('keeps the old version serving and never starts the new one when it fails', function () {
+        $first = ($this->deploy)();
+        $this->shop->update(['release_command' => 'npm run migrate']);
+        $this->host->taskExitsWith(1);
+
+        $second = ($this->deploy)();
+
+        expect($second->status)->toBe(DeploymentStatus::Failed)
+            ->and($second->stage)->toBe(DeploymentStage::Release)
+            ->and($second->error)->toBe('The release command failed with exit code 1. The new version was not started.')
+            ->and($this->shop->fresh()->active_deployment_id)->toBe($first->id)
+            ->and($this->host->containers())->toHaveKey('shop-1')->not->toHaveKey('shop-2')
+            ->and($this->traffic->switched)->toBe([$first->id]);
+    });
+
+    it('fails the deployment when the agent cannot run it', function () {
+        $this->shop->update(['release_command' => 'npm run migrate']);
+        $this->host->failOn('runTask');
+
+        $deployment = ($this->deploy)();
+
+        expect($deployment->status)->toBe(DeploymentStatus::Failed)
+            ->and($deployment->error)->toContain('Fake failure')
+            ->and(hostActions())->not->toContain('runContainer');
+    });
+
+    it('is not run again by a rollback', function () {
+        $this->shop->update(['release_command' => 'npm run migrate']);
+        $first = ($this->deploy)();
+        ($this->deploy)();
+
+        $rollback = app(Deployer::class)->rollback($this->shop->fresh(), $first)->fresh();
+
+        expect($rollback->status)->toBe(DeploymentStatus::Active)
+            ->and($rollback->release_command)->toBeNull()
+            ->and(collect(hostActions())->filter(fn ($a) => $a === 'runTask'))->toHaveCount(2);
+    });
+});
+
+it('clears the stopped state once a new version is live', function () {
+    ($this->deploy)();
+    $this->shop->update(['stopped_at' => now()]);
+
+    ($this->deploy)();
+
+    expect($this->shop->fresh()->stopped_at)->toBeNull();
 });
 
 it('fails clearly when the source is not a supported project', function () {

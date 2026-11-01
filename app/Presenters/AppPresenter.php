@@ -47,7 +47,8 @@ class AppPresenter
             'memory_limit_mb' => $app->memory_limit_mb,
             'cpu_limit' => $app->cpu_limit === null ? null : (float) $app->cpu_limit,
             'deploy_key_public' => $app->deploy_key_public,
-            'stopped_release' => $app->status() === AppStatus::Stopped
+            'release_command' => $app->release_command,
+            'deactivated_release' => $app->status() === AppStatus::Deactivated
                 ? $app->deployments()->where('status', DeploymentStatus::Stopped)->max('number')
                 : null,
             'url' => self::liveUrl($app),
@@ -90,6 +91,7 @@ class AppPresenter
             'commit_message' => $deployment->commit_message,
             'duration_seconds' => $deployment->finished_at !== null && $deployment->started_at !== null ? (int) $deployment->started_at->diffInSeconds($deployment->finished_at, true) : null,
             'is_rollback' => $deployment->rolled_back_from_id !== null,
+            'has_release_command' => $deployment->release_command !== null,
             'can_roll_back' => $deployment->image_tag !== null && $deployment->image_available,
             'error' => $deployment->error,
             'created_at' => $deployment->created_at?->toIso8601String(),

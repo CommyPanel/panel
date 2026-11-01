@@ -9,6 +9,8 @@ type Props = {
     children: (close: () => void) => ReactNode;
     align?: 'start' | 'end';
     className?: string;
+    /** Button style of the trigger; a small text button by default. */
+    triggerClassName?: string;
 };
 
 /**
@@ -21,6 +23,7 @@ export function Dropdown({
     children,
     align = 'end',
     className,
+    triggerClassName = 'btn-text btn-sm',
 }: Props) {
     const [open, setOpen] = useState(false);
     const root = useRef<HTMLDivElement>(null);
@@ -58,7 +61,7 @@ export function Dropdown({
                 aria-haspopup="menu"
                 aria-expanded={open}
                 aria-controls={open ? menuId : undefined}
-                className="btn gap-2 btn-text btn-sm"
+                className={cn('btn gap-2', triggerClassName)}
                 onClick={() => setOpen((value) => !value)}
             >
                 {trigger}

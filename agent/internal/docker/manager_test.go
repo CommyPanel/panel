@@ -26,6 +26,7 @@ type fakeDaemon struct {
 	labels     map[string]string // labels returned by inspect; nil = container missing
 	buildTar   []string
 	buildReply string
+	waitCode   int
 }
 
 func (f *fakeDaemon) handler() http.Handler {
@@ -50,6 +51,8 @@ func (f *fakeDaemon) handler() http.Handler {
 			_ = json.NewEncoder(w).Encode(map[string]any{"Config": map[string]any{"Labels": f.labels}})
 		case r.URL.Path == "/containers/json":
 			w.Write([]byte(`[{"Names":["/demo-1"],"Image":"demo:1","State":"running","Status":"Up 2 minutes"}]`))
+		case strings.HasSuffix(r.URL.Path, "/wait"):
+			_ = json.NewEncoder(w).Encode(map[string]int{"StatusCode": f.waitCode})
 		case strings.HasSuffix(r.URL.Path, "/logs"):
 			var buf bytes.Buffer
 			for _, line := range []string{"hello\n", "world\n"} {

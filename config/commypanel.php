@@ -66,6 +66,9 @@ return [
         // Release images kept per app so rollbacks stay possible.
         'keep_images' => (int) env('DEPLOY_KEEP_IMAGES', 3),
 
+        // Seconds a release command (e.g. migrations) may run before the deploy fails.
+        'release_timeout' => (int) env('DEPLOY_RELEASE_TIMEOUT', 600),
+
         'git_timeout' => (int) env('DEPLOY_GIT_TIMEOUT', 300),
 
         // Tests only: allow cloning from local paths.

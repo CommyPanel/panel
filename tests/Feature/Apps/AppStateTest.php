@@ -4,6 +4,7 @@ use App\Deploy\Source\UploadStorage;
 use App\Enums\AppStatus;
 use App\Enums\DeploymentStatus;
 use App\Enums\SourceType;
+use App\Host\Data\ContainerSpec;
 use App\Host\Data\NginxSite;
 use App\Host\HostDriver;
 use App\Jobs\RunDeployment;
@@ -45,7 +46,7 @@ describe('deactivate', function () {
         $this->post('/apps/shop/deactivate')->assertSessionHasNoErrors();
 
         $app->refresh();
-        expect($app->status())->toBe(AppStatus::Stopped)
+        expect($app->status())->toBe(AppStatus::Deactivated)
             ->and($app->active_deployment_id)->toBeNull()
             ->and($app->domains()->count())->toBe(1)
             ->and($app->deployments()->first()->status)->toBe(DeploymentStatus::Stopped)
@@ -100,13 +101,89 @@ describe('activate', function () {
     });
 });
 
+describe('stop, start and restart', function () {
+    beforeEach(function () {
+        $this->shop = runningApp();
+        $this->host->applyNginxSite(new NginxSite('shop', ['shop.example.com'], 20001));
+        $this->host->runContainer(new ContainerSpec('shop-1', 'commypanel/shop:1', 20001, 8080));
+    });
+
+    it('stops the live container but keeps the release live and the domains configured', function () {
+        $this->post('/apps/shop/stop')->assertSessionHasNoErrors()->assertSessionHas('status');
+
+        $this->shop->refresh();
+        expect($this->shop->status())->toBe(AppStatus::Stopped)
+            ->and($this->shop->stopped_at)->not->toBeNull()
+            ->and($this->shop->active_deployment_id)->not->toBeNull()
+            ->and($this->host->sites())->toHaveKey('shop')
+            ->and($this->host->containers())->toHaveKey('shop-1')
+            ->and($this->host->listContainers()[0]->state)->toBe('exited')
+            ->and(AuditLog::query()->where('action', 'app.stopped')->exists())->toBeTrue();
+
+        $this->get('/apps/shop')->assertInertia(fn (Assert $page) => $page->where('app.status', 'stopped'));
+    });
+
+    it('starts a stopped app again without a deployment', function () {
+        Queue::fake();
+        $this->post('/apps/shop/stop');
+
+        $this->post('/apps/shop/start')->assertSessionHasNoErrors();
+
+        expect($this->shop->refresh()->status())->toBe(AppStatus::Running)
+            ->and($this->host->listContainers()[0]->state)->toBe('running')
+            ->and(AuditLog::query()->where('action', 'app.started')->exists())->toBeTrue();
+        Queue::assertNothingPushed();
+    });
+
+    it('restarts a running app', function () {
+        $this->post('/apps/shop/restart')->assertSessionHasNoErrors();
+
+        expect(collect($this->host->actions())->where('action', 'restartContainer')->pluck('args.name')->all())->toBe(['shop-1'])
+            ->and(AuditLog::query()->where('action', 'app.restarted')->exists())->toBeTrue();
+    });
+
+    it('refuses actions that do not fit the current state', function () {
+        $this->post('/apps/shop/start')->assertSessionHasErrors(['state' => 'The app is already running.']);
+
+        $this->post('/apps/shop/stop');
+        $this->post('/apps/shop/stop')->assertSessionHasErrors(['state' => 'The app is already stopped.']);
+        $this->post('/apps/shop/restart')->assertSessionHasErrors('state');
+
+        App::factory()->create(['slug' => 'idle']);
+        $this->post('/apps/idle/stop')->assertSessionHasErrors(['state' => 'This app has no live release. Deploy it first.']);
+    });
+
+    it('waits for a running deployment', function () {
+        Deployment::factory()->create(['app_id' => $this->shop->id, 'number' => 2, 'status' => DeploymentStatus::Building]);
+
+        $this->post('/apps/shop/stop')->assertSessionHasErrors('state');
+        expect($this->shop->refresh()->stopped_at)->toBeNull();
+    });
+
+    it('keeps the app running when the agent fails', function () {
+        $this->host->failOn('stopContainer');
+
+        $this->post('/apps/shop/stop')->assertSessionHasErrors('state');
+        expect($this->shop->refresh()->status())->toBe(AppStatus::Running);
+    });
+
+    it('clears the stopped state when the app is deactivated', function () {
+        $this->post('/apps/shop/stop');
+        $this->post('/apps/shop/deactivate')->assertSessionHasNoErrors();
+
+        $this->shop->refresh();
+        expect($this->shop->stopped_at)->toBeNull()
+            ->and($this->shop->status())->toBe(AppStatus::Deactivated);
+    });
+});
+
 it('shows the state on the app page', function () {
     $app = runningApp();
     $this->post('/apps/shop/deactivate');
 
     $this->get('/apps/shop')->assertInertia(fn (Assert $page) => $page
-        ->where('app.status', 'stopped')
-        ->where('app.stopped_release', 1)
+        ->where('app.status', 'deactivated')
+        ->where('app.deactivated_release', 1)
         ->where('app.url', null));
 });
 

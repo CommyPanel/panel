@@ -1,22 +1,20 @@
-import { router, usePage } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import { Play, Power, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import AppStateController from '@/actions/App/Http/Controllers/AppStateController';
 import { DeleteAppModal } from '@/components/apps/delete-app-modal';
-import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import type { AppSettings } from '@/types';
 
 export function AdvancedTab({ app }: { app: AppSettings }) {
-    const { errors } = usePage().props;
     const [confirmStop, setConfirmStop] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [busy, setBusy] = useState(false);
 
-    const running = app.status === 'running';
-    const stopped = app.status === 'stopped';
+    const running = ['running', 'stopped'].includes(app.status);
+    const stopped = app.status === 'deactivated';
 
     const post = (action: ReturnType<typeof AppStateController.activate>) =>
         router.post(
@@ -34,14 +32,12 @@ export function AdvancedTab({ app }: { app: AppSettings }) {
 
     return (
         <div className="max-w-3xl space-y-6">
-            {errors.state && <Alert variant="error">{errors.state}</Alert>}
-
             {(running || stopped) && (
                 <Card
                     title={stopped ? 'App is deactivated' : 'Deactivate app'}
                     description={
                         stopped
-                            ? `Release #${app.stopped_release ?? '?'} is stopped and its domains do not serve anything. Nothing was deleted.`
+                            ? `Release #${app.deactivated_release ?? '?'} is stopped and its domains do not serve anything. Nothing was deleted.`
                             : 'Stops the container and takes the domains offline. Releases, domains, certificates and variables are kept, so you can start it again at any time.'
                     }
                 >

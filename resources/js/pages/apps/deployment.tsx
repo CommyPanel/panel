@@ -94,6 +94,7 @@ export default function Deployment({ app, deployment }: Props) {
                             stage={deployment.stage}
                             status={deployment.status}
                             isRollback={deployment.is_rollback}
+                            hasReleaseCommand={deployment.has_release_command}
                         />
                     </Card>
                     <Card title="Details">

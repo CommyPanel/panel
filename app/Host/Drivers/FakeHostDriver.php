@@ -15,6 +15,7 @@ use App\Host\Data\NginxStatus;
 use App\Host\Data\NginxTestResult;
 use App\Host\Data\ResourceName;
 use App\Host\Data\SystemStatus;
+use App\Host\Data\TaskSpec;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
 use DateTimeImmutable;
@@ -41,6 +42,11 @@ class FakeHostDriver implements HostDriver
 
     /** @var array<string, CertificateInfo> */
     private array $certificates = [];
+
+    /** @var array<string, true> names of containers that are stopped */
+    private array $stopped = [];
+
+    private int $taskExitCode = 0;
 
     public function systemStatus(): SystemStatus
     {
@@ -132,13 +138,49 @@ class FakeHostDriver implements HostDriver
     {
         ResourceName::assertValid($name);
         $this->record('stopContainer', ['name' => $name]);
+        $this->stopped[$name] = true;
+    }
+
+    public function startContainer(string $name): void
+    {
+        ResourceName::assertValid($name);
+        $this->record('startContainer', ['name' => $name]);
+
+        if (! isset($this->containers[$name])) {
+            throw new HostOperationFailed("Agent error: container \"{$name}\" does not exist");
+        }
+
+        unset($this->stopped[$name]);
+    }
+
+    public function restartContainer(string $name): void
+    {
+        ResourceName::assertValid($name);
+        $this->record('restartContainer', ['name' => $name]);
+
+        if (! isset($this->containers[$name])) {
+            throw new HostOperationFailed("Agent error: container \"{$name}\" does not exist");
+        }
+
+        unset($this->stopped[$name]);
+    }
+
+    public function runTask(TaskSpec $spec, ?callable $onOutput = null): int
+    {
+        $this->record('runTask', ['spec' => $spec]);
+
+        if ($onOutput !== null) {
+            $onOutput('[fake] running '.implode(' ', $spec->command));
+        }
+
+        return $this->taskExitCode;
     }
 
     public function removeContainer(string $name): void
     {
         ResourceName::assertValid($name);
         $this->record('removeContainer', ['name' => $name]);
-        unset($this->containers[$name]);
+        unset($this->containers[$name], $this->stopped[$name]);
     }
 
     public function issueCertificate(CertificateRequest $request): CertificateInfo
@@ -183,7 +225,9 @@ class FakeHostDriver implements HostDriver
     public function listContainers(): array
     {
         return array_values(array_map(
-            fn (ContainerSpec $spec) => new ContainerInfo($spec->name, $spec->image, 'running', 'Up (fake)'),
+            fn (ContainerSpec $spec) => isset($this->stopped[$spec->name])
+                ? new ContainerInfo($spec->name, $spec->image, 'exited', 'Exited (0) (fake)')
+                : new ContainerInfo($spec->name, $spec->image, 'running', 'Up (fake)'),
             $this->containers,
         ));
     }
@@ -201,6 +245,16 @@ class FakeHostDriver implements HostDriver
         $this->record('pruneDanglingImages', []);
 
         return 0;
+    }
+
+    /**
+     * The exit code the next tasks report.
+     */
+    public function taskExitsWith(int $code): static
+    {
+        $this->taskExitCode = $code;
+
+        return $this;
     }
 
     /**

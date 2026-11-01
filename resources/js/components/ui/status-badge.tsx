@@ -13,6 +13,7 @@ const styles: Record<AppStatus | DeploymentStatus | DomainStatus, string> = {
     active: 'badge-success',
     superseded: 'badge-neutral',
     stopped: 'badge-warning',
+    deactivated: 'badge-neutral',
     pending: 'badge-neutral',
     verified: 'badge-success',
     misconfigured: 'badge-warning',

@@ -140,7 +140,11 @@ func TestRemoveSite(t *testing.T) {
 type fakeDocker struct {
 	ran           []docker.ContainerSpec
 	stopped       []string
+	started       []string
+	restarted     []string
 	removed       []string
+	tasks         []docker.TaskSpec
+	taskCode      int
 	err           error
 	buildErr      error
 	buildLogs     []string
@@ -160,6 +164,27 @@ func (f *fakeDocker) Run(_ context.Context, s docker.ContainerSpec) error {
 func (f *fakeDocker) Stop(_ context.Context, n string) error {
 	f.stopped = append(f.stopped, n)
 	return f.err
+}
+func (f *fakeDocker) Start(_ context.Context, n string) error {
+	f.started = append(f.started, n)
+	return f.err
+}
+func (f *fakeDocker) Restart(_ context.Context, n string) error {
+	f.restarted = append(f.restarted, n)
+	return f.err
+}
+func (f *fakeDocker) ValidateTask(s docker.TaskSpec) error {
+	if len(s.Command) == 0 {
+		return &validate.InputError{Msg: "command is required"}
+	}
+	return nil
+}
+func (f *fakeDocker) RunTask(_ context.Context, s docker.TaskSpec, onLine func(string)) (int, error) {
+	f.tasks = append(f.tasks, s)
+	for _, l := range f.buildLogs {
+		onLine(l)
+	}
+	return f.taskCode, f.buildErr
 }
 func (f *fakeDocker) Remove(_ context.Context, n string) error {
 	f.removed = append(f.removed, n)
@@ -278,6 +303,42 @@ func TestBuildFailureAndValidation(t *testing.T) {
 	rec = do(t, newDockerServer(&fakeDocker{}), "POST", "/v1/docker/images/build", `{"tag":"library/alpine","context_path":"/x"}`)
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("invalid build: code = %d, want 400", rec.Code)
+	}
+}
+
+func TestStartAndRestartRoutes(t *testing.T) {
+	f := &fakeDocker{}
+	s := newDockerServer(f)
+	if rec := do(t, s, "POST", "/v1/docker/containers/demo-1/start", ""); rec.Code != 200 || len(f.started) != 1 || f.started[0] != "demo-1" {
+		t.Errorf("start: %d %v", rec.Code, f.started)
+	}
+	if rec := do(t, s, "POST", "/v1/docker/containers/demo-1/restart", ""); rec.Code != 200 || len(f.restarted) != 1 {
+		t.Errorf("restart: %d %v", rec.Code, f.restarted)
+	}
+}
+
+func TestTaskStreamsOutputAndExitCode(t *testing.T) {
+	f := &fakeDocker{buildLogs: []string{"migrating", "done"}, taskCode: 3}
+	rec := do(t, newDockerServer(f), "POST", "/v1/docker/tasks",
+		`{"name":"demo-1-release","image":"commypanel/demo:1","command":["php","artisan","migrate"],"timeout_seconds":60}`)
+	lines := strings.Split(strings.TrimSpace(rec.Body.String()), "\n")
+	want := []string{`{"log":"migrating"}`, `{"log":"done"}`, `{"exit_code":3}`}
+	if rec.Code != 200 || strings.Join(lines, "|") != strings.Join(want, "|") {
+		t.Fatalf("code=%d lines=%v", rec.Code, lines)
+	}
+	if got := f.tasks[0].Command; len(got) != 3 || got[2] != "migrate" {
+		t.Errorf("command = %v", got)
+	}
+
+	rec = do(t, newDockerServer(&fakeDocker{}), "POST", "/v1/docker/tasks", `{"name":"demo-1-release","image":"commypanel/demo:1","command":[]}`)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("invalid task: code = %d, want 400", rec.Code)
+	}
+
+	rec = do(t, newDockerServer(&fakeDocker{buildErr: errors.New("the command did not finish within 60 seconds")}), "POST", "/v1/docker/tasks",
+		`{"name":"demo-1-release","image":"commypanel/demo:1","command":["sleep","100"]}`)
+	if !strings.Contains(rec.Body.String(), `{"error":"the command did not finish within 60 seconds"}`) {
+		t.Errorf("timeout body = %s", rec.Body)
 	}
 }
 

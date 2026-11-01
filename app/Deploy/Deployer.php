@@ -20,7 +20,7 @@ class Deployer
 
     public function deploy(App $app, ?User $by = null): Deployment
     {
-        $deployment = $this->create($app, []);
+        $deployment = $this->create($app, ['release_command' => $app->release_command]);
 
         $this->audit->record('deploy.queued', $by, ['app' => $app->slug, 'deployment' => $deployment->number], $app);
         RunDeployment::dispatch($deployment->id);

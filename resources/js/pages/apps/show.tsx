@@ -11,6 +11,7 @@ import {
 import { useEffect, useState } from 'react';
 import AppController from '@/actions/App/Http/Controllers/AppController';
 import DeploymentController from '@/actions/App/Http/Controllers/DeploymentController';
+import { AppPower } from '@/components/apps/app-power';
 import { AdvancedTab } from '@/components/apps/tabs/advanced-tab';
 import { DeploymentsTab } from '@/components/apps/tabs/deployments-tab';
 import { DomainsTab } from '@/components/apps/tabs/domains-tab';
@@ -171,6 +172,7 @@ export default function Show({
                         >
                             All apps
                         </Link>
+                        {can('apps.control') && <AppPower app={app} />}
                         {can('apps.deploy') && (
                             <Button
                                 onClick={deploy}
@@ -186,6 +188,13 @@ export default function Show({
             />
 
             {errors.deploy && <Alert variant="error">{errors.deploy}</Alert>}
+            {errors.state && <Alert variant="error">{errors.state}</Alert>}
+            {app.status === 'stopped' && (
+                <Alert variant="warning">
+                    This app is stopped. Its domains show an error until you
+                    start it again.
+                </Alert>
+            )}
 
             <Tabs
                 tabs={tabs}

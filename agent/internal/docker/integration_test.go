@@ -44,6 +44,7 @@ func TestRealDocker(t *testing.T) {
 	os.WriteFile(filepath.Join(srcDir, "main.go"), []byte(`package main
 import ("fmt";"net/http";"os")
 func main(){
+ if len(os.Args)>1 && os.Args[1]=="release" { fmt.Println("release ran"); os.Exit(3) }
  fmt.Println("server starting")
  http.HandleFunc("/",func(w http.ResponseWriter,r *http.Request){fmt.Fprintf(w,"hello %s",os.Getenv("GREETING"))})
  http.ListenAndServe(":8080",nil)
@@ -98,6 +99,38 @@ func main(){
 	logs, err := m.Logs(ctx, name, 50)
 	if err != nil || !strings.Contains(logs, "server starting") {
 		t.Errorf("logs = %q, %v", logs, err)
+	}
+
+	if err := m.Restart(ctx, name); err != nil {
+		t.Errorf("restart: %v", err)
+	}
+	if err := m.Stop(ctx, name); err != nil {
+		t.Errorf("stop: %v", err)
+	}
+	if err := m.Start(ctx, name); err != nil {
+		t.Errorf("start: %v", err)
+	}
+	if err := m.Start(ctx, name); err != nil {
+		t.Errorf("starting a running container should succeed: %v", err)
+	}
+
+	var out []string
+	task := TaskSpec{Name: name + "-release", Image: tag, Command: []string{"/server", "release"}, Network: network, TimeoutSeconds: 30}
+	code, err := m.RunTask(ctx, task, func(l string) { out = append(out, l) })
+	if err != nil || code != 3 || strings.Join(out, "|") != "release ran" {
+		t.Errorf("task: code=%d err=%v output=%v", code, err, out)
+	}
+	if exec.Command("docker", "inspect", name+"-release").Run() == nil {
+		t.Error("the task container was not removed")
+	}
+
+	task.Command = []string{"/server"} // serves forever
+	task.TimeoutSeconds = 2
+	if _, err := m.RunTask(ctx, task, func(string) {}); err == nil || !strings.Contains(err.Error(), "did not finish") {
+		t.Errorf("timeout: err = %v", err)
+	}
+	if exec.Command("docker", "inspect", name+"-release").Run() == nil {
+		t.Error("the timed-out task container was not removed")
 	}
 
 	if err := m.Stop(ctx, name); err != nil {

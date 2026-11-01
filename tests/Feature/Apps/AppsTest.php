@@ -104,6 +104,16 @@ it('validates step 1', function (array $overrides, string $field) {
     'missing name' => [['name' => ''], 'name'],
 ]);
 
+it('saves the release command, and clears it when left empty', function () {
+    $app = App::factory()->create();
+
+    $this->patch("/apps/{$app->slug}", validAppInput(['release_command' => "sh -c 'npm run migrate && npm run seed'"]))->assertSessionHasNoErrors();
+    expect($app->fresh()->release_command)->toBe("sh -c 'npm run migrate && npm run seed'");
+
+    $this->patch("/apps/{$app->slug}", validAppInput(['release_command' => '']))->assertSessionHasNoErrors();
+    expect($app->fresh()->release_command)->toBeNull();
+});
+
 it('sends a draft app to its setup instead of its page', function () {
     $app = App::factory()->create(['setup_step' => SetupStep::Source]);
 
@@ -121,7 +131,8 @@ it('validates settings on update', function (array $overrides, string $field) {
     'health path without slash' => [['health_path' => 'health'], 'health_path'],
     'health path with spaces' => [['health_path' => '/a b'], 'health_path'],
     'tiny memory' => [['memory_limit_mb' => 1], 'memory_limit_mb'],
-    'missing name' => [['name' => ''], 'name'],
+    'missing name' => [['name' => ''], 'name'],    'release command with a shell operator' => [['release_command' => 'npm run migrate && npm run seed'], 'release_command'],
+    'release command with an open quote' => [['release_command' => "sh -c 'x"], 'release_command'],
 ]);
 
 it('shows an app without leaking secrets', function () {
