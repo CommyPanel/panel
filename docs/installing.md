@@ -19,7 +19,7 @@ The installer downloads the release, checks its SHA-256 checksum and stops if it
 
 Your browser will warn about the panel's certificate. It is self-signed until you give the panel a domain of its own.
 
-Options: `--panel-port N` to choose another port, `--no-docker` if you manage Docker yourself, `--version X` to install a specific version, `--verbose` to see everything the installer does instead of the progress display.
+Options: `--panel-port N` to choose another port, `--no-docker` if you manage Docker yourself, `--version X` to install a specific version, `--yes` to skip the question before an upgrade, `--verbose` to see everything the installer does instead of the progress display.
 
 ## What it installs
 
@@ -57,6 +57,14 @@ sudo commypanel upgrade
 ```
 
 An upgrade downloads and verifies the new release, backs up the panel databases (the five newest backups are kept in `/var/lib/commypanel/backups`), migrates them, switches over and restarts the services. If the new version does not come up healthy, the previous release is started again. Running the installer again does the same thing.
+
+Before it changes anything, it downloads the release, checks it, and asks `Continue with the upgrade? [Y/n]` (Enter means yes). The question says that:
+
+- **the panel is unavailable for a short while** while its services restart and it switches to the new version;
+- **your apps stay online**: Docker and your containers are not restarted and nginx is reloaded gracefully. New deployments cannot start meanwhile, and a build in progress is interrupted;
+- **a failed upgrade goes back** to the version you had. Database changes the new version already made are kept, and the databases are backed up first.
+
+Answer `n` and nothing is changed. In scripts, add `--yes` (`sudo commypanel upgrade --yes`) to skip the question. Without a terminal the upgrade also goes ahead, with a notice.
 
 ## PHP security updates
 

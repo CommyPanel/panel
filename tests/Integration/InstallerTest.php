@@ -323,3 +323,62 @@ describe('display', function () {
             ->and(file_get_contents($log))->toContain('unable to locate package');
     });
 });
+
+describe('the question before an upgrade', function () {
+    // Runs the bootstrap installer's own confirm_upgrade with the terminal replaced by a file of answers.
+    $ask = function (?string $answer, int $yes = 0, string $from = '0.2.0', string $to = '0.2.2') {
+        $tty = storage_path('framework/testing/tty-'.bin2hex(random_bytes(4)));
+        File::ensureDirectoryExists(dirname($tty));
+
+        if ($answer !== null) {
+            file_put_contents($tty, $answer);
+        }
+
+        $result = Process::env(['COMMYPANEL_TTY' => $tty])->run([
+            'bash', '-c',
+            'set -e; log() { echo "LOG: $*"; }; ASSUME_YES="$2";'
+            .' eval "$(awk \'/^confirm_upgrade\\(\\) \\{/{p=1} p{print} p&&/^\\}/{exit}\' "$1")"; confirm_upgrade "$3" "$4"',
+            'ask', base_path('installer/install.sh'), (string) $yes, $from, $to,
+        ]);
+        File::delete($tty);
+
+        return $result;
+    };
+
+    it('says what happens and goes on when answered yes, or with just Enter', function (string $answer) use ($ask) {
+        $result = $ask($answer);
+
+        expect($result->successful())->toBeTrue()
+            ->and($result->output())->toContain('upgraded from 0.2.0 to 0.2.2')
+            ->toContain('The panel is unavailable for a short while')
+            ->toContain('Your apps stay online')
+            ->toContain('goes back to the')
+            ->toContain('[Y/n]');
+    })->with(['Enter' => "\n", 'y' => "y\n", 'Y' => "Y\n", 'yes' => "yes\n"]);
+
+    it('stops when answered anything else', function (string $answer) use ($ask) {
+        expect($ask($answer)->failed())->toBeTrue();
+    })->with(['n' => "n\n", 'N' => "N\n", 'no' => "no\n", 'nonsense' => "maybe\n", 'end of input' => '']);
+
+    it('does not ask with --yes, and goes ahead without a terminal', function () use ($ask) {
+        $yes = $ask("n\n", 1);
+        expect($yes->successful())->toBeTrue()->and($yes->output())->not->toContain('[Y/n]');
+
+        $none = $ask(null);
+        expect($none->successful())->toBeTrue()
+            ->and($none->output())->toContain('No terminal to ask on')->not->toContain('[Y/n]');
+    });
+
+    it('words a reinstall of the same version differently', function () use ($ask) {
+        expect($ask("\n", 0, '0.2.2', '0.2.2')->output())->toContain('already installed');
+    });
+
+    it('asks only after the download is verified and before anything is replaced', function () {
+        $installer = (string) file_get_contents(base_path('installer/install.sh'));
+
+        expect(strpos($installer, 'if ! confirm_upgrade'))
+            ->toBeGreaterThan(strpos($installer, 'sha256sum --check'))
+            ->toBeLessThan(strpos($installer, 'mv "$incoming"'))
+            ->and($installer)->toContain('-y|--yes) ASSUME_YES=1');
+    });
+});

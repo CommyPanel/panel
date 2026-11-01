@@ -252,6 +252,11 @@ export default function Updates({ update }: { update: UpdateInfo }) {
                                     and run:
                                 </span>
                                 <CommandBox command={command} />
+                                <span className="block text-base-content/70">
+                                    It tells you what is about to happen and
+                                    asks you to confirm before anything is
+                                    changed.
+                                </span>
                             </li>
                             <li>
                                 <strong>Wait for it to finish,</strong> then
