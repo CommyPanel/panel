@@ -8,7 +8,6 @@ use Illuminate\Database\SQLiteDatabaseDoesNotExistException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -27,9 +26,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // The agent's nginx site for the panel's own domain proxies from loopback.
         $middleware->trustProxies(at: ['127.0.0.1', '::1']);
+        // No Link preload headers: the page already preloads its scripts with
+        // <link> tags, and a page with many chunks (an app's detail page) would
+        // send a header block bigger than nginx's default 4k FastCGI buffer,
+        // which nginx reports as a 502 on a full reload.
         $middleware->web(append: [
             HandleInertiaRequests::class,
-            AddLinkHeadersForPreloadedAssets::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
