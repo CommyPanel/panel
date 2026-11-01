@@ -31,6 +31,9 @@ func (e *APIError) Error() string { return fmt.Sprintf("docker: %s (HTTP %d)", e
 type Engine struct {
 	base string
 	hc   *http.Client
+	// dial opens a raw connection to the daemon, for the few calls that turn
+	// into a bidirectional stream (an interactive exec).
+	dial func(ctx context.Context) (net.Conn, error)
 }
 
 // NewUnixEngine talks to the daemon at the given Unix socket.
@@ -40,7 +43,11 @@ func NewUnixEngine(socket string) *Engine {
 			return (&net.Dialer{}).DialContext(ctx, "unix", socket)
 		},
 	}
-	return &Engine{base: "http://docker/" + apiVersion, hc: &http.Client{Transport: tr}}
+	return &Engine{
+		base: "http://docker/" + apiVersion,
+		hc:   &http.Client{Transport: tr},
+		dial: func(ctx context.Context) (net.Conn, error) { return (&net.Dialer{}).DialContext(ctx, "unix", socket) },
+	}
 }
 
 // NewEngine talks to a daemon at an arbitrary URL (used by tests).
@@ -48,7 +55,11 @@ func NewEngine(baseURL string, hc *http.Client) *Engine {
 	if hc == nil {
 		hc = http.DefaultClient
 	}
-	return &Engine{base: strings.TrimRight(baseURL, "/"), hc: hc}
+	e := &Engine{base: strings.TrimRight(baseURL, "/"), hc: hc}
+	if u, err := url.Parse(e.base); err == nil {
+		e.dial = func(ctx context.Context) (net.Conn, error) { return (&net.Dialer{}).DialContext(ctx, "tcp", u.Host) }
+	}
+	return e
 }
 
 // do sends a request. The caller must close the response body. Responses with

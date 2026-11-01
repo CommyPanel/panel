@@ -104,6 +104,17 @@ func serve(t *testing.T, allow func(string) bool) (addr string, results chan err
 
 func dial(t *testing.T, addr string, headers map[string]string) (*peer, string) {
 	t.Helper()
+	return dialRaw(t, addr, "/terminal", headers)
+}
+
+// dialPath connects to a path as a browser at the given origin would.
+func dialPath(t *testing.T, addr, path, origin string) (*peer, string) {
+	t.Helper()
+	return dialRaw(t, addr, path, map[string]string{"Origin": origin})
+}
+
+func dialRaw(t *testing.T, addr, path string, headers map[string]string) (*peer, string) {
+	t.Helper()
 	c, err := net.Dial("tcp", addr)
 	if err != nil {
 		t.Fatal(err)
@@ -121,7 +132,7 @@ func dial(t *testing.T, addr string, headers map[string]string) (*peer, string) 
 		}
 	}
 	var req bytes.Buffer
-	req.WriteString("GET /terminal HTTP/1.1\r\n")
+	req.WriteString("GET " + path + " HTTP/1.1\r\n")
 	for k, v := range h {
 		req.WriteString(k + ": " + v + "\r\n")
 	}

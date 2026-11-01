@@ -16,6 +16,7 @@ import (
 	"commypanel/agent/internal/nginx"
 	"commypanel/agent/internal/peercred"
 	"commypanel/agent/internal/system"
+	"commypanel/agent/internal/terminal"
 	"commypanel/agent/internal/usage"
 	"commypanel/agent/internal/validate"
 	"commypanel/agent/internal/volumefs"
@@ -63,6 +64,11 @@ type Volumes interface {
 	Open(app, name, rel string) (volumefs.Download, error)
 }
 
+// Terminal hands out the single-use tickets a browser needs to open a terminal.
+type Terminal interface {
+	Issue(container, origin string) (string, error)
+}
+
 // Certificates is the part of the certificate manager the server needs.
 type Certificates interface {
 	Issue(ctx context.Context, r certs.Request) (certs.Info, error)
@@ -88,6 +94,7 @@ type Options struct {
 	Nginx     Nginx
 	Docker    Docker
 	Volumes   Volumes
+	Terminal  Terminal
 	Certs     Certificates
 	Unit      DockerUnit
 	Usage     Usage
@@ -135,6 +142,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/docker/images/prune", s.pruneImages)
 	mux.HandleFunc("POST /v1/docker/images/remove", s.removeImage)
 	mux.HandleFunc("GET /v1/docker/networks", s.networks)
+	mux.HandleFunc("POST /v1/terminal/tickets", s.terminalTicket)
 	mux.HandleFunc("POST /v1/volumes/remove", s.removeVolumes)
 	mux.HandleFunc("GET /v1/volumes/{app}", s.listVolumes)
 	mux.HandleFunc("GET /v1/volumes/{app}/{name}/dir", s.volumeDir)
@@ -367,6 +375,34 @@ func (s *Server) listContainers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"containers": list})
+}
+
+// terminalTicket registers a one-use ticket for a shell in one container. The
+// panel has already checked the user's permission and password; the agent
+// checks that the names are well formed and the container is a managed one
+// when the shell is opened.
+func (s *Server) terminalTicket(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Container string `json:"container"`
+		Origin    string `json:"origin"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	if s.opts.Terminal == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "terminals are not enabled on this agent"})
+		return
+	}
+	ticket, err := s.opts.Terminal.Issue(body.Container, body.Origin)
+	if errors.Is(err, terminal.ErrTooManyTickets) {
+		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "too many terminals are being opened; try again in a moment"})
+		return
+	}
+	if err != nil {
+		s.respond(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ticket": ticket, "expires_in": int(terminal.TicketTTL.Seconds())})
 }
 
 func (s *Server) networks(w http.ResponseWriter, r *http.Request) {

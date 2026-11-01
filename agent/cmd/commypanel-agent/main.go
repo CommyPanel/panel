@@ -24,6 +24,7 @@ import (
 	"commypanel/agent/internal/nginx"
 	"commypanel/agent/internal/server"
 	"commypanel/agent/internal/system"
+	"commypanel/agent/internal/terminal"
 	"commypanel/agent/internal/usage"
 	"commypanel/agent/internal/volumefs"
 )
@@ -60,6 +61,8 @@ func run() error {
 		defCPUs    = flag.Float64("default-cpus", 1, "CPU limit for containers that do not set one")
 		buildMem   = flag.Int("build-memory-mb", 2048, "memory limit for image builds")
 		buildCPUs  = flag.Float64("build-cpus", 2, "CPU limit for image builds")
+		termSocket = flag.String("terminal-socket", "", "Unix socket for browser terminals (WebSocket); empty turns terminals off")
+		termGroup  = flag.String("terminal-socket-group", "www-data", "group that may connect to the terminal socket (the web server's)")
 		dryRun     = flag.Bool("dry-run", false, "write configs but never run nginx or Docker (development)")
 		allowed    uidList
 	)
@@ -95,7 +98,11 @@ func run() error {
 	}, docker.NewUnixEngine(*dockerSock))
 	certMgr := certs.NewManager(certs.Config{DataDir: *dataDir, DryRun: *dryRun, UserAgent: "commypanel-agent/" + version})
 	sampler := usage.New(usage.Config{DataDir: *dataDir, Containers: dockerMgr})
-	srv := server.New(server.Options{Nginx: mgr, Docker: dockerMgr, Volumes: volumefs.New(*dataDir), Certs: certMgr, Unit: system.NewDockerUnit(*dryRun), Usage: sampler,
+	var tickets *terminal.Tickets
+	if *termSocket != "" {
+		tickets = terminal.NewTickets(terminal.TicketTTL, 32)
+	}
+	srv := server.New(server.Options{Nginx: mgr, Docker: dockerMgr, Volumes: volumefs.New(*dataDir), Terminal: ticketIssuer(tickets), Certs: certMgr, Unit: system.NewDockerUnit(*dryRun), Usage: sampler,
 		Authorize: authorize, Version: version, DryRun: *dryRun,
 		System: func() system.Status { return system.Collect(*dataDir) },
 		Info:   system.NewReader(*dataDir).Info,
@@ -128,11 +135,53 @@ func run() error {
 		slog.Warn("could not install the default port-80 site; certificates for domains without a live app will fail", "err", err)
 	}
 
+	if tickets != nil {
+		termLn, err := listen(*termSocket, *termGroup, *dryRun)
+		if err != nil {
+			return fmt.Errorf("terminal socket: %w", err)
+		}
+		termSrv := &http.Server{
+			Handler: (&terminal.Server{
+				Tickets: tickets,
+				Limits:  terminal.DefaultLimits,
+				Open: func(ctx context.Context, container string, cols, rows int) (terminal.Shell, error) {
+					sh, err := dockerMgr.OpenShell(ctx, container, cols, rows)
+					if err != nil {
+						return nil, err
+					}
+					return sh, nil
+				},
+			}).Handler(),
+			ReadHeaderTimeout: 5 * time.Second, // no overall timeout: a session lasts hours
+		}
+		go func() {
+			<-ctx.Done()
+			shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = termSrv.Shutdown(shutdown)
+		}()
+		go func() {
+			if err := termSrv.Serve(termLn); !errors.Is(err, http.ErrServerClosed) {
+				slog.Error("terminal socket stopped", "err", err)
+			}
+		}()
+		slog.Info("terminals enabled", "socket", *termSocket)
+	}
+
 	slog.Info("agent listening", "socket", *socket, "version", version, "dry_run", *dryRun)
 	if err := httpSrv.Serve(ln); !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 	return nil
+}
+
+// ticketIssuer avoids handing the server a typed nil: with terminals off the
+// server must see a nil interface so it can answer "not enabled".
+func ticketIssuer(t *terminal.Tickets) server.Terminal {
+	if t == nil {
+		return nil
+	}
+	return t
 }
 
 // listen creates the Unix socket with restrictive permissions: root-owned,

@@ -28,14 +28,51 @@ type fakeDaemon struct {
 	buildReply string
 	waitCode   int
 	mounts     []string // sources mounted by the container the list reports
+	execStatus int
+	execBody   map[string]any
+	resized    string
+	upgrade    string
 }
 
 func (f *fakeDaemon) handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// An interactive exec turns into a stream, so it must not hold the lock.
+		if strings.HasPrefix(r.URL.Path, "/exec/") && strings.HasSuffix(r.URL.Path, "/start") {
+			f.mu.Lock()
+			f.requests = append(f.requests, r.Method+" "+r.URL.Path)
+			f.upgrade = r.Header.Get("Upgrade")
+			f.mu.Unlock()
+			conn, _, err := w.(http.Hijacker).Hijack()
+			if err != nil {
+				return
+			}
+			defer conn.Close()
+			conn.Write([]byte("HTTP/1.1 101 UPGRADED\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n\r\n"))
+			buf := make([]byte, 256)
+			for {
+				n, err := conn.Read(buf)
+				if err != nil {
+					return
+				}
+				conn.Write(append([]byte("echo:"), buf[:n]...))
+			}
+		}
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		f.requests = append(f.requests, r.Method+" "+r.URL.Path)
 		switch {
+		case r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/exec"):
+			if f.execStatus != 0 {
+				w.WriteHeader(f.execStatus)
+				w.Write([]byte(`{"message":"container is not running"}`))
+				return
+			}
+			_ = json.NewDecoder(r.Body).Decode(&f.execBody)
+			w.WriteHeader(201)
+			w.Write([]byte(`{"Id":"exec1"}`))
+		case r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/resize"):
+			f.resized = r.URL.RawQuery
+			w.WriteHeader(200)
 		case r.Method == "GET" && r.URL.Path == "/networks":
 			w.Write([]byte(`[{"Id":"n1"},{"Id":"gone"}]`))
 		case r.Method == "GET" && r.URL.Path == "/networks/gone":

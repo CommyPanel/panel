@@ -17,6 +17,7 @@ import (
 	"commypanel/agent/internal/docker"
 	"commypanel/agent/internal/nginx"
 	"commypanel/agent/internal/system"
+	"commypanel/agent/internal/terminal"
 	"commypanel/agent/internal/usage"
 	"commypanel/agent/internal/validate"
 	"commypanel/agent/internal/volumefs"
@@ -690,5 +691,55 @@ func TestVolumeRoutesNeedAuthorization(t *testing.T) {
 		if rec := do(t, s, "GET", path, ""); rec.Code != http.StatusForbidden {
 			t.Errorf("%s: %d, want 403", path, rec.Code)
 		}
+	}
+}
+
+type fakeTerminal struct {
+	container, origin string
+	err               error
+}
+
+func (f *fakeTerminal) Issue(container, origin string) (string, error) {
+	f.container, f.origin = container, origin
+	return "ticket-123", f.err
+}
+
+func TestTerminalTicketRoute(t *testing.T) {
+	f := &fakeTerminal{}
+	s := New(Options{Nginx: &fakeNginx{}, Terminal: f, Authorize: AllowAll()})
+
+	rec := do(t, s, "POST", "/v1/terminal/tickets", `{"container":"shop-1","origin":"https://panel.example.com"}`)
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"ticket":"ticket-123"`) || !strings.Contains(rec.Body.String(), `"expires_in":30`) {
+		t.Errorf("ticket: %d %s", rec.Code, rec.Body)
+	}
+	if f.container != "shop-1" || f.origin != "https://panel.example.com" {
+		t.Errorf("issued for %q %q", f.container, f.origin)
+	}
+
+	if rec := do(t, s, "POST", "/v1/terminal/tickets", `{"container":"shop-1","origin":"x","extra":1}`); rec.Code != 400 {
+		t.Errorf("unknown field: %d", rec.Code)
+	}
+
+	f.err = &validate.InputError{Msg: "invalid origin"}
+	if rec := do(t, s, "POST", "/v1/terminal/tickets", `{"container":"shop-1","origin":"x"}`); rec.Code != 400 {
+		t.Errorf("bad input: %d", rec.Code)
+	}
+	f.err = terminal.ErrTooManyTickets
+	if rec := do(t, s, "POST", "/v1/terminal/tickets", `{"container":"shop-1","origin":"https://a.example.com"}`); rec.Code != 429 {
+		t.Errorf("too many: %d", rec.Code)
+	}
+}
+
+func TestTerminalTicketsWhenTheAgentHasTerminalsOff(t *testing.T) {
+	s := New(Options{Nginx: &fakeNginx{}, Authorize: AllowAll()})
+	if rec := do(t, s, "POST", "/v1/terminal/tickets", `{"container":"shop-1","origin":"https://a.example.com"}`); rec.Code != 503 {
+		t.Errorf("code = %d, want 503", rec.Code)
+	}
+}
+
+func TestTerminalTicketsNeedAuthorization(t *testing.T) {
+	s := New(Options{Nginx: &fakeNginx{}, Terminal: &fakeTerminal{}})
+	if rec := do(t, s, "POST", "/v1/terminal/tickets", `{}`); rec.Code != http.StatusForbidden {
+		t.Errorf("code = %d, want 403", rec.Code)
 	}
 }
