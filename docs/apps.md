@@ -28,7 +28,7 @@ An optional command that runs once per deployment, for example database migratio
 
 An app, or one of its volumes, can be **locked**. A locked app cannot be deleted, and neither can its volumes' files with it; a locked volume cannot be removed from its app, and deleting the app is refused while one of its volumes is locked. The delete button stays visible but is disabled, with a note saying why, and a lock icon shows next to the name in the lists and beside the title.
 
-Locking is a safety catch against a slip, such as deleting the wrong app. It does not stop deployments, restarts or any other change, and anyone who may change the app (`apps.update`) can unlock it. Locking and unlocking are recorded in the audit log. Lock an app on its **Advanced** tab.
+Locking is a safety catch against a slip, such as deleting the wrong app. It does not stop deployments, restarts or any other change, and anyone who may change the app (`apps.update`) can unlock it. Locking and unlocking are recorded in the audit log. Lock an app on its **Advanced** tab, and a volume on the **Volumes** tab.
 
 ## Start, stop and restart
 
@@ -38,42 +38,32 @@ This differs from **Deactivate** (Advanced tab), which removes the container and
 
 ## Persistent volumes
 
-Everything an app writes inside its container is gone when the next deployment replaces the container. To keep files (uploads, a SQLite database), add a **persistent volume** in **Settings**: the path inside the container, such as `/app/data`. The files are stored on the server under `/var/lib/commypanel/volumes/<app>/<folder>`.
+Everything an app writes inside its container is gone when the next deployment replaces the container. To keep files (uploads, a SQLite database), add a **persistent volume** on the app's **Volumes** tab with **Add volume**: the path inside the container, such as `/app/uploads`. The files are stored on the server under `/var/lib/commypanel/volumes/<app>/<folder>`. The **How volumes work** button on the tab explains this in the panel.
+
+Two names are involved, and only one has to match your app:
+
+- The **path** (`/app/uploads`) is where the app sees the folder. It must be the path your app reads and writes, and it is case-sensitive. In the images CommyPanel builds for .NET and Node apps the app lives in `/app`, so that is its root folder, and a relative path in your code (`uploads/`) starts there. If you bring your own Dockerfile, use the folder its `WORKDIR` names. A Go app is built into a single file called `/app`, so give it another folder such as `/data`.
+- The **folder** on the server (`app-uploads`) is made up from the path and is only a label. It does not have to match anything.
+
+Also worth knowing:
 
 - A change applies from the **next deployment**, to the app and to its release command.
 - The old and the new container **share** a volume while a deployment switches over, so both can read and write it. Make sure two versions can run against the same files for a moment.
 - A **rollback does not roll back volume data.** The files stay as the running version left them.
 - Whatever the image has at that path is **hidden** by the volume, which starts empty.
-- **Remove** stops mounting a path but leaves its files on the server. **Deleting the app deletes them.**
+- **Remove** (on the tab; you type the path to confirm) stops mounting a path but leaves its files on the server, as a volume that is **not attached**. **Deleting the app deletes them.**
+- A volume can be **locked**, which stops it being removed; see Locking.
 - Up to 8 volumes per app. `/proc`, `/sys` and `/dev` cannot be used.
-
-### Looking at volumes
-
-The **Volumes** tab shows how much space each volume uses (with a bar to compare them) and lets you **browse** its files, read only: folders, sizes and dates, a preview of text files (the first 256 KB) and a download for anything up to 25 MB. Links and special files inside a volume are listed but never opened, because the app that wrote them is not trusted and could point them at the server's own files.
-
-Volume files are private data (databases, uploads), so browsing needs its own permission, `apps.volumes`. **Roles you made yourself do not have it** until you grant it; the built-in admin role and the super user do. Every download is recorded in the audit log.
-
-A volume you removed from Settings shows as **Not attached**, with its files. **Delete data** removes them (it asks for your password first, and is recorded). The agent refuses while any container still has that volume mounted, so deploy the app again first.
 
 The folder is writable for whichever user the app runs as, since that differs from image to image. It cannot be reached from anywhere else on the server, because the folders above it belong to root and are closed to everybody else.
 
-## Containers and networks
+### Looking at volumes
 
-The **Usage** tab also lists the app's containers: the live release and, for a moment during a deployment, the previous one. For each it shows the state, the release, the network and address it has, the ports it publishes (only on the server's loopback; nginx is what reaches them) and the volumes mounted into it.
+The **Volumes** tab lists the app's volumes with a search box, how much space each uses (with a bar to compare them), where it is mounted and whether it is locked. **Browse** opens the volume on a page of its own, read only: the totals (files in the current folder, files in the whole volume, disk space used), the folder as a table with an icon per file type, a `..` row to go up, a preview of text files (the first 256 KB) and a download for anything up to 25 MB. Each folder has its own address, so the back button and links work. Links and special files inside a volume are listed but never opened, because the app that wrote them is not trusted and could point them at the server's own files.
 
-Below that are the networks those containers are on and everything attached to them. **Server > Docker** shows the same for every container, plus all networks CommyPanel created.
+Volume files are private data (databases, uploads), so browsing needs its own permission, `apps.volumes`. **Roles you made yourself do not have it** until you grant it; the built-in admin role and the super user do. Every download is recorded in the audit log.
 
-Today every app's container joins the same Docker network, so containers of different apps can reach each other directly. When a network holds more than one app, both pages say so. Treat apps you do not fully trust accordingly.
-
-## Terminal
-
-The **Terminal** tab opens a shell inside the running container: `/bin/sh`, as the user the app runs as and with the app's environment variables and volumes. It is not privileged and cannot reach the host. Images without a shell (for example `distroless` ones) cannot open a terminal; the tab says so.
-
-Because the app's environment often holds secrets, this is close to full control of the app. Opening a terminal needs its own permission, `apps.terminal` (the built-in admin role and the super user have it; **roles you made yourself do not** until you grant it), asks for your password unless you confirmed it recently, is limited to 10 attempts a minute, and is recorded in the audit log. What you type is not recorded.
-
-How it works, in short: the panel checks the permission and password and asks the agent for a one-time ticket that works for about 30 seconds, for one container and one web address. The browser then opens a WebSocket that nginx hands to the agent on a separate socket that serves nothing else. A session ends after 15 minutes without input or output, or after 2 hours, with at most 8 open at once across the server. Changes made inside the container are lost at the next deployment, except in persistent volumes.
-
-The panel's own nginx sites pass `/terminal` to the agent. If you put another proxy or a CDN in front of the panel, it has to allow WebSocket connections and long-lived requests on that path.
+A volume you removed shows as **Not attached**, with its files. **Delete data** removes them (it asks for your password first, and is recorded). The agent refuses while any container still has that volume mounted, so deploy the app again first.
 
 ## Logs
 

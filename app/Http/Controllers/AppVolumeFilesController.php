@@ -9,9 +9,12 @@ use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
 use App\Models\App;
 use App\Models\AppVolume;
+use App\Presenters\AppPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -32,7 +35,7 @@ class AppVolumeFilesController extends Controller
 
         $attached = $app->volumes()->orderBy('id')->get();
 
-        $rows = $attached->map(fn (AppVolume $volume) => $this->row($volume->name, $volume->path, $onDisk->get($volume->name)));
+        $rows = $attached->map(fn (AppVolume $volume) => $this->row($volume->name, $volume->path, $onDisk->get($volume->name), $volume));
 
         $detached = $onDisk->reject(fn (VolumeUsage $v) => $attached->contains('name', $v->name))
             ->map(fn (VolumeUsage $v) => $this->row($v->name, null, $v))
@@ -47,25 +50,67 @@ class AppVolumeFilesController extends Controller
         ]);
     }
 
-    public function browse(Request $request, App $app, string $name, HostDriver $host): JsonResponse
+    /**
+     * The page for browsing one volume: where it is mounted, its totals, and the
+     * files and folders of the folder being looked at.
+     */
+    public function show(Request $request, App $app, string $name, HostDriver $host): InertiaResponse
     {
         $path = $this->path($request);
+        $attached = $app->volumes()->where('name', $name)->first();
 
         try {
-            $listing = $host->browseVolume($app->slug, $name, $path);
+            $usage = collect($host->listVolumes($app->slug))->first(fn (VolumeUsage $v) => $v->name === $name);
+            $error = null;
         } catch (HostOperationFailed $e) {
-            return response()->json(['error' => $e->getMessage()], 502);
+            $usage = null;
+            $error = $e->getMessage();
         }
 
-        return response()->json([
+        // A name that is neither one of the app's volumes nor a folder on disk.
+        abort_if($attached === null && $usage === null && $error === null, 404);
+
+        $entries = [];
+        $truncated = false;
+
+        if ($usage !== null) {
+            try {
+                $listing = $host->browseVolume($app->slug, $name, $path);
+                $entries = array_map(fn (VolumeEntry $e) => [
+                    'name' => $e->name,
+                    'kind' => $e->kind,
+                    'size' => $e->size,
+                    'modified' => $e->modified === 0 ? null : date('c', $e->modified),
+                ], $listing->entries);
+                $truncated = $listing->truncated;
+            } catch (HostOperationFailed $e) {
+                $error = $e->getMessage();
+            }
+        }
+
+        return Inertia::render('apps/volume', [
+            'app' => AppPresenter::summary($app),
+            'volume' => [
+                'id' => $attached?->id,
+                'name' => $name,
+                'path' => $attached?->path,
+                'attached' => $attached !== null,
+                'locked' => $attached !== null && $attached->isLocked(),
+                // An attached volume has no folder until a container using it has started.
+                'exists' => $usage !== null,
+                'bytes' => $usage === null ? 0 : $usage->bytes,
+                'files' => $usage === null ? 0 : $usage->files,
+                'partial' => $usage !== null && $usage->partial,
+            ],
             'path' => $path,
-            'truncated' => $listing->truncated,
-            'entries' => array_map(fn (VolumeEntry $e) => [
-                'name' => $e->name,
-                'kind' => $e->kind,
-                'size' => $e->size,
-                'modified' => $e->modified === 0 ? null : date('c', $e->modified),
-            ], $listing->entries),
+            'entries' => $entries,
+            'folder' => [
+                'files' => count(array_filter($entries, fn (array $e) => $e['kind'] === 'file')),
+                'folders' => count(array_filter($entries, fn (array $e) => $e['kind'] === 'dir')),
+                'other' => count(array_filter($entries, fn (array $e) => ! in_array($e['kind'], ['file', 'dir'], true))),
+                'truncated' => $truncated,
+            ],
+            'error' => $error,
         ]);
     }
 
@@ -132,9 +177,11 @@ class AppVolumeFilesController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function row(string $name, ?string $path, ?VolumeUsage $usage): array
+    private function row(string $name, ?string $path, ?VolumeUsage $usage, ?AppVolume $volume = null): array
     {
         return [
+            'id' => $volume?->id,
+            'locked' => $volume !== null && $volume->isLocked(),
             'name' => $name,
             'path' => $path,
             'attached' => $path !== null,

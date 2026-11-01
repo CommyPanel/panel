@@ -103,7 +103,7 @@ describe('route protection', function () {
         'apps.update' => [['patch', '/apps/shop'], ['post', '/apps/shop/deploy-key'], ['post', '/apps/shop/git-token'], ['delete', '/apps/shop/git-token'], ['post', '/apps/shop/webhook'], ['delete', '/apps/shop/webhook'], ['post', '/apps/shop/volumes'], ['put', '/apps/shop/lock'], ['put', '/apps/shop/volumes/1/lock'], ['delete', '/apps/shop/volumes/1'], ['delete', '/apps/shop/volumes/uploads/data']],
         'apps.deploy' => [['post', '/apps/shop/deployments']],
         'apps.nginx' => [['get', '/apps/shop/nginx'], ['put', '/apps/shop/nginx']],
-        'apps.volumes' => [['get', '/apps/shop/volumes'], ['get', '/apps/shop/volumes/data/browse'], ['get', '/apps/shop/volumes/data/file'], ['get', '/apps/shop/volumes/data/download']],
+        'apps.volumes' => [['get', '/apps/shop/volumes'], ['get', '/apps/shop/volumes/data'], ['get', '/apps/shop/volumes/data/file'], ['get', '/apps/shop/volumes/data/download']],
         'apps.terminal' => [['post', '/apps/shop/terminal']],
         'apps.logs' => [['get', '/apps/shop/logs'], ['get', '/apps/shop/logs/download']],
         'apps.control' => [['post', '/apps/shop/stop'], ['post', '/apps/shop/start'], ['post', '/apps/shop/restart']],

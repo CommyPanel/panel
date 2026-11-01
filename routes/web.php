@@ -116,7 +116,7 @@ Route::middleware('auth')->group(function () {
 
         Route::middleware('can:'.Permissions::APPS_VOLUMES)->where(['name' => '[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?'])->group(function () {
             Route::get('volumes', [AppVolumeFilesController::class, 'index'])->name('volumes.index');
-            Route::get('volumes/{name}/browse', [AppVolumeFilesController::class, 'browse'])->name('volumes.browse');
+            Route::get('volumes/{name}', [AppVolumeFilesController::class, 'show'])->name('volumes.show');
             Route::get('volumes/{name}/file', [AppVolumeFilesController::class, 'file'])->name('volumes.file');
             Route::get('volumes/{name}/download', [AppVolumeFilesController::class, 'download'])->name('volumes.download');
         });

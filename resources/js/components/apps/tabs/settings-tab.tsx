@@ -5,7 +5,6 @@ import { RuntimeFields, SourceFields } from '@/components/apps/app-fields';
 import type { AppFormData } from '@/components/apps/app-fields';
 import { AccessTokenCard } from '@/components/apps/access-token-card';
 import { DeployKeyCard } from '@/components/apps/deploy-key-card';
-import { VolumesCard } from '@/components/apps/volumes-card';
 import { UploadSourceCard } from '@/components/apps/upload-source-card';
 import { WebhookCard } from '@/components/apps/webhook-card';
 import { Button } from '@/components/ui/button';
@@ -77,7 +76,6 @@ export function SettingsTab({
                         Save settings
                     </Button>
                 </form>
-                <VolumesCard slug={app.slug} volumes={app.volumes} />
             </div>
             <div className="min-w-0 space-y-6">
                 {upload ? (
