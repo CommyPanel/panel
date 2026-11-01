@@ -1,5 +1,6 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import {
+    Activity,
     ExternalLink,
     Globe,
     Layers,
@@ -19,6 +20,7 @@ import { DomainsTab } from '@/components/apps/tabs/domains-tab';
 import { EnvironmentTab } from '@/components/apps/tabs/environment-tab';
 import { NginxTab } from '@/components/apps/tabs/nginx-tab';
 import { SettingsTab } from '@/components/apps/tabs/settings-tab';
+import { UsageTab } from '@/components/apps/tabs/usage-tab';
 import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -45,6 +47,7 @@ type Props = {
 
 type TabId =
     | 'deployments'
+    | 'usage'
     | 'domains'
     | 'environment'
     | 'nginx'
@@ -53,6 +56,7 @@ type TabId =
 
 const TAB_IDS: TabId[] = [
     'deployments',
+    'usage',
     'domains',
     'environment',
     'nginx',
@@ -141,6 +145,11 @@ export default function Show({
             id: 'deployments',
             label: 'Deployments',
             icon: <Layers className="size-4" aria-hidden />,
+        },
+        {
+            id: 'usage',
+            label: 'Usage',
+            icon: <Activity className="size-4" aria-hidden />,
         },
         {
             id: 'domains',
@@ -239,6 +248,7 @@ export default function Show({
                 {active === 'deployments' && (
                     <DeploymentsTab app={app} deployments={deployments} />
                 )}
+                {active === 'usage' && <UsageTab app={app} />}
                 {active === 'domains' && (
                     <DomainsTab app={app} server={server} https={https} />
                 )}

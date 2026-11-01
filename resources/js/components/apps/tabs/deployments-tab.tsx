@@ -4,7 +4,6 @@ import DeploymentController from '@/actions/App/Http/Controllers/DeploymentContr
 import { DeploymentStatusMark } from '@/components/apps/deployment-status';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { AppUsageCard } from '@/components/usage/app-usage-card';
 import { formatDate, formatDuration, timeAgo } from '@/lib/format';
 import type { AppSettings, DeploymentSummary } from '@/types';
 
@@ -47,12 +46,6 @@ export function DeploymentsTab({ app, deployments }: Props) {
     return (
         <div className="space-y-6">
             <Overview app={app} />
-            {(app.status === 'running' || app.status === 'stopped') && (
-                <AppUsageCard
-                    slug={app.slug}
-                    stopped={app.status === 'stopped'}
-                />
-            )}
             <Card title="Deployments" flush>
                 {deployments.length === 0 ? (
                     <p className="p-5 text-sm text-base-content/70 sm:p-6">

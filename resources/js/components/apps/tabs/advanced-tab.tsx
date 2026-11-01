@@ -31,7 +31,7 @@ export function AdvancedTab({ app }: { app: AppSettings }) {
         );
 
     return (
-        <div className="max-w-3xl space-y-6">
+        <div className="space-y-6">
             {(running || stopped) && (
                 <Card
                     title={stopped ? 'App is deactivated' : 'Deactivate app'}
@@ -40,9 +40,8 @@ export function AdvancedTab({ app }: { app: AppSettings }) {
                             ? `Release #${app.deactivated_release ?? '?'} is stopped and its domains do not serve anything. Nothing was deleted.`
                             : 'Stops the container and takes the domains offline. Releases, domains, certificates and variables are kept, so you can start it again at any time.'
                     }
-                >
-                    {stopped ? (
-                        <div>
+                    actions={
+                        stopped ? (
                             <Button
                                 onClick={() =>
                                     post(AppStateController.activate(app.slug))
@@ -52,9 +51,7 @@ export function AdvancedTab({ app }: { app: AppSettings }) {
                                 <Play className="size-4" aria-hidden />
                                 Activate
                             </Button>
-                        </div>
-                    ) : (
-                        <div>
+                        ) : (
                             <Button
                                 variant="warning"
                                 onClick={() => setConfirmStop(true)}
@@ -62,16 +59,15 @@ export function AdvancedTab({ app }: { app: AppSettings }) {
                                 <Power className="size-4" aria-hidden />
                                 Deactivate
                             </Button>
-                        </div>
-                    )}
-                </Card>
+                        )
+                    }
+                />
             )}
 
             <Card
                 title="Delete app"
                 description="Stops the app and permanently removes its containers, images, domains, certificate, variables and uploaded files. This cannot be undone."
-            >
-                <div>
+                actions={
                     <Button
                         variant="error"
                         onClick={() => setConfirmDelete(true)}
@@ -79,8 +75,8 @@ export function AdvancedTab({ app }: { app: AppSettings }) {
                         <Trash2 className="size-4" aria-hidden />
                         Delete app
                     </Button>
-                </div>
-            </Card>
+                }
+            />
 
             <ConfirmModal
                 open={confirmStop}
