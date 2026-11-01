@@ -45,6 +45,35 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
+          tag="$GITHUB_REF_NAME"
+          version="${tag#v}"
+          title="CommyPanel $version"
+          flags=(--verify-tag)
+          : > release-notes.md
+
+          # A tag with a dash (v0.2.0-rc.1) is a release candidate. It is published
+          # as a pre-release, so "latest" and the one-line installer keep pointing at
+          # the newest stable release, and it gets a banner saying how to install it.
+          if [[ "$tag" == *-* ]]; then
+            title="$title (release candidate)"
+            flags+=(--prerelease)
+            sed -e "s|@TAG@|$tag|g" -e "s|@VERSION@|$version|g" -e "s|@REPO@|$GITHUB_REPOSITORY|g" \
+              .github/prerelease-banner.md >> release-notes.md
+          fi
+
+          # Hand-written notes are docs/releases/<stable version>.md, shared by a
+          # release and its candidates (v0.2.0-rc.1 uses v0.2.0.md).
+          notes="docs/releases/${tag%%-*}.md"
+          if [ -f "$notes" ]; then
+            cat "$notes" >> release-notes.md
+          fi
+
+          if [ -s release-notes.md ]; then
+            flags+=(--notes-file release-notes.md)
+          else
+            flags+=(--generate-notes)
+          fi
+
+          gh release create "$tag" \
             dist/commypanel.tar.gz dist/commypanel.tar.gz.sha256 dist/install.sh \
-            --generate-notes --verify-tag
+            --title "$title" "${flags[@]}"
