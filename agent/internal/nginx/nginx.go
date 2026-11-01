@@ -135,6 +135,9 @@ type Config struct {
 	SitesDir string // directory included by the main nginx.conf
 	DataDir  string // panel data dir (certs, ACME webroot)
 	DryRun   bool   // write files but never run nginx
+	// TerminalSocket is the agent's terminal socket. When set, the panel's own
+	// site (and only that one) proxies /terminal to it as a WebSocket.
+	TerminalSocket string
 }
 
 type Manager struct {
@@ -151,6 +154,10 @@ func NewManager(cfg Config, run Runner) *Manager {
 	}
 	return &Manager{cfg: cfg, run: run}
 }
+
+// panelSiteName is the reserved name of the panel's own site (see the panel's
+// PanelDomain); it is the only site that serves the terminal.
+const panelSiteName = "panel"
 
 var siteTmpl = template.Must(template.New("site").Parse(`# Managed by CommyPanel. Do not edit; changes are overwritten.
 server {
@@ -187,7 +194,20 @@ server {
     set $commypanel_upstream http://127.0.0.1:{{.Port}};
 {{if .Custom}}
     # Custom directives, edited in CommyPanel. Checked before they are written.
-{{.Custom}}{{end}}
+{{.Custom}}{{end}}{{if .TerminalSocket}}
+    # Browser terminals: a WebSocket to the agent's terminal socket, which only
+    # accepts a single-use ticket.
+    location = /terminal {
+        proxy_pass http://unix:{{.TerminalSocket}};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 7200s;
+        proxy_send_timeout 7200s;
+        proxy_buffering off;
+    }
+{{end}}
     location / {
         proxy_pass http://127.0.0.1:{{.Port}};
     }
@@ -278,16 +298,19 @@ func (m *Manager) Render(s Site) (string, error) {
 		return "", err
 	}
 	data := struct {
-		ServerNames, Webroot, CertDir, Custom string
-		Port                                  int
-		ModernHTTP2                           bool
-		Redirects                             []Redirect
+		ServerNames, Webroot, CertDir, Custom, TerminalSocket string
+		Port                                                  int
+		ModernHTTP2                                           bool
+		Redirects                                             []Redirect
 	}{
 		ServerNames: strings.Join(s.served(), " "),
 		Redirects:   s.Redirects,
 		Webroot:     filepath.Join(m.cfg.DataDir, "acme-webroot"),
 		Port:        s.UpstreamPort,
 		Custom:      custom,
+	}
+	if s.Name == panelSiteName {
+		data.TerminalSocket = m.cfg.TerminalSocket
 	}
 	if s.Certificate != "" {
 		data.ModernHTTP2 = m.modernHTTP2() // only HTTPS sites use HTTP/2

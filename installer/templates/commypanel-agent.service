@@ -9,12 +9,14 @@ Type=simple
 ExecStart=@@PREFIX@@/current/bin/commypanel-agent \
     --socket /run/commypanel/agent.sock \
     --socket-group commypanel \
+    --terminal-socket /run/commypanel-terminal/terminal.sock \
+    --terminal-socket-group www-data \
     --data-dir @@DATA_DIR@@ \
     --nginx-sites-dir /etc/nginx/commypanel \
     --allow-uid @@PANEL_UID@@
 Restart=always
 RestartSec=2
-RuntimeDirectory=commypanel
+RuntimeDirectory=commypanel commypanel-terminal
 RuntimeDirectoryMode=0755
 LimitNOFILE=65536
 

@@ -411,3 +411,54 @@ func TestReloadTestsFirst(t *testing.T) {
 		}
 	}
 }
+
+func TestOnlyThePanelSiteProxiesTheTerminal(t *testing.T) {
+	m, _ := newManager(t, nil, true)
+	m.cfg.TerminalSocket = "/run/commypanel-terminal/terminal.sock"
+
+	panel := Site{Name: "panel", Domains: []string{"panel.example.com"}, UpstreamPort: 8081}
+	conf, err := m.Render(panel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"location = /terminal {",
+		"proxy_pass http://unix:/run/commypanel-terminal/terminal.sock;",
+		`proxy_set_header Upgrade $http_upgrade;`,
+		`proxy_set_header Connection "upgrade";`,
+		"proxy_buffering off;",
+	} {
+		if !strings.Contains(conf, want) {
+			t.Errorf("panel site is missing %q:\n%s", want, conf)
+		}
+	}
+	// The terminal block comes before the catch-all location, and the app proxy is untouched.
+	if strings.Index(conf, "location = /terminal") > strings.Index(conf, "location / {") {
+		t.Error("the terminal location must come before location /")
+	}
+
+	// An app, even one whose custom directives try to reach the socket, gets no terminal.
+	app := Site{Name: "shop", Domains: []string{"shop.example.com"}, UpstreamPort: 20001}
+	conf, err = m.Render(app)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(conf, "terminal") {
+		t.Errorf("an app site must not proxy the terminal:\n%s", conf)
+	}
+	app.Custom = "location = /terminal {\n proxy_pass http://unix:/run/commypanel-terminal/terminal.sock;\n}"
+	if _, err := m.Render(app); err == nil {
+		t.Error("custom directives must not be able to proxy to the terminal socket")
+	}
+}
+
+func TestPanelSiteWithoutTerminalsHasNoTerminalLocation(t *testing.T) {
+	m, _ := newManager(t, nil, true)
+	conf, err := m.Render(Site{Name: "panel", Domains: []string{"panel.example.com"}, UpstreamPort: 8081})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(conf, "terminal") {
+		t.Errorf("terminals are off, yet:\n%s", conf)
+	}
+}

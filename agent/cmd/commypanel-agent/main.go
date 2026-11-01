@@ -90,7 +90,7 @@ func run() error {
 		return errors.New("must run as root (use --dry-run for development)")
 	}
 
-	mgr := nginx.NewManager(nginx.Config{SitesDir: *sitesDir, DataDir: *dataDir, DryRun: *dryRun}, nil)
+	mgr := nginx.NewManager(nginx.Config{SitesDir: *sitesDir, DataDir: *dataDir, DryRun: *dryRun, TerminalSocket: *termSocket}, nil)
 	dockerMgr := docker.NewManager(docker.Config{
 		DataDir: *dataDir, DryRun: *dryRun,
 		DefaultMemoryMB: *defMemory, DefaultCPUs: *defCPUs,
