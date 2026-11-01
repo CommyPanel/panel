@@ -59,6 +59,16 @@ Below that are the networks those containers are on and everything attached to t
 
 Today every app's container joins the same Docker network, so containers of different apps can reach each other directly. When a network holds more than one app, both pages say so. Treat apps you do not fully trust accordingly.
 
+## Terminal
+
+The **Terminal** tab opens a shell inside the running container: `/bin/sh`, as the user the app runs as and with the app's environment variables and volumes. It is not privileged and cannot reach the host. Images without a shell (for example `distroless` ones) cannot open a terminal; the tab says so.
+
+Because the app's environment often holds secrets, this is close to full control of the app. Opening a terminal needs its own permission, `apps.terminal` (the built-in admin role and the super user have it; **roles you made yourself do not** until you grant it), asks for your password unless you confirmed it recently, is limited to 10 attempts a minute, and is recorded in the audit log. What you type is not recorded.
+
+How it works, in short: the panel checks the permission and password and asks the agent for a one-time ticket that works for about 30 seconds, for one container and one web address. The browser then opens a WebSocket that nginx hands to the agent on a separate socket that serves nothing else. A session ends after 15 minutes without input or output, or after 2 hours, with at most 8 open at once across the server. Changes made inside the container are lost at the next deployment, except in persistent volumes.
+
+The panel's own nginx sites pass `/terminal` to the agent. If you put another proxy or a CDN in front of the panel, it has to allow WebSocket connections and long-lived requests on that path.
+
 ## Logs
 
 The **Logs** tab shows what the running container printed, newest at the bottom. Choose how many lines to load (200 to 5,000). **Follow** refreshes every 3 seconds and keeps the view at the end; switch it off to read in peace. Search the log with the box above it, or press Cmd/Ctrl+F while the log is focused: matches are highlighted, and Enter and Shift+Enter move between them. **Download** saves the last 5,000 lines as a text file.

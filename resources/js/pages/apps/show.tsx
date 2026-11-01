@@ -8,11 +8,12 @@ import {
     FileCode,
     Rocket,
     ScrollText,
+    SquareTerminal,
     Settings,
     SlidersHorizontal,
     Variable,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import AppController from '@/actions/App/Http/Controllers/AppController';
 import DeploymentController from '@/actions/App/Http/Controllers/DeploymentController';
 import { AppPower } from '@/components/apps/app-power';
@@ -40,6 +41,13 @@ import type {
     ServerAddress,
 } from '@/types';
 
+// The terminal brings its own library, so it is loaded only when somebody opens it.
+const TerminalTab = lazy(() =>
+    import('@/components/apps/tabs/terminal-tab').then((m) => ({
+        default: m.TerminalTab,
+    })),
+);
+
 type Props = {
     app: AppSettings;
     deployments: DeploymentSummary[];
@@ -54,6 +62,7 @@ type TabId =
     | 'usage'
     | 'logs'
     | 'volumes'
+    | 'terminal'
     | 'domains'
     | 'environment'
     | 'nginx'
@@ -65,6 +74,7 @@ const TAB_IDS: TabId[] = [
     'usage',
     'logs',
     'volumes',
+    'terminal',
     'domains',
     'environment',
     'nginx',
@@ -105,10 +115,12 @@ export default function Show({
     const canNginx = can('apps.nginx');
     const canLogs = can('apps.logs');
     const canVolumes = can('apps.volumes');
+    const canTerminal = can('apps.terminal');
     const active: TabId =
         (tab === 'nginx' && !canNginx) ||
         (tab === 'logs' && !canLogs) ||
-        (tab === 'volumes' && !canVolumes)
+        (tab === 'volumes' && !canVolumes) ||
+        (tab === 'terminal' && !canTerminal)
             ? 'deployments'
             : tab;
 
@@ -182,6 +194,15 @@ export default function Show({
                       label: 'Volumes',
                       icon: <HardDrive className="size-4" aria-hidden />,
                       badge: <Count value={app.volumes.length} />,
+                  },
+              ]
+            : []),
+        ...(canTerminal
+            ? [
+                  {
+                      id: 'terminal' as const,
+                      label: 'Terminal',
+                      icon: <SquareTerminal className="size-4" aria-hidden />,
                   },
               ]
             : []),
@@ -285,6 +306,17 @@ export default function Show({
                 {active === 'usage' && <UsageTab app={app} />}
                 {active === 'logs' && <LogsTab app={app} />}
                 {active === 'volumes' && <VolumesTab app={app} />}
+                {active === 'terminal' && (
+                    <Suspense
+                        fallback={
+                            <p className="text-sm text-base-content/70">
+                                Loading...
+                            </p>
+                        }
+                    >
+                        <TerminalTab app={app} />
+                    </Suspense>
+                )}
                 {active === 'domains' && (
                     <DomainsTab app={app} server={server} https={https} />
                 )}

@@ -12,7 +12,12 @@ Seeing and shaping what your apps do on the server.
 | 2   | **Persistent volumes**: an app declares container paths to keep; both blue/green containers mount them | done  |
 | 3   | **Volumes view and file browser**: list volumes with their size, look at files read-only               | done  |
 | 4   | **Containers and networks overview**: what is connected to an app, and on which networks               | done  |
-| 5   | **Browser terminal**: a shell in a managed container, ticket-based over a second agent socket          | next  |
+| 5   | **Browser terminal**: a shell in a managed container, ticket-based over a second agent socket          | done  |
+
+## Before releasing 0.3.0
+
+- Test on a Debian 13 and an Ubuntu 24.04 VM with real Docker: the terminal (exec over a hijacked connection, the nginx WebSocket proxy), volumes (ownership of the volume folder for the images CommyPanel generates, deleting data) and the networks overview. These were verified against stand-ins, not a real daemon.
+- Write `docs/releases/v0.3.0.md` (new permissions: `apps.logs`, `apps.volumes`, `apps.terminal`; custom roles must be granted them) and publish a `0.3.0-rc.1` first.
 
 ## After 0.3.0
 
