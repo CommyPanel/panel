@@ -123,12 +123,15 @@ export function LogsTab({ app }: { app: AppSettings }) {
         }
     }, [text, follow, query]);
 
+    // Scroll the log itself to the match, not the whole page: the search box
+    // above it has to stay in view.
     useEffect(() => {
-        if (count === 0) return;
+        const el = viewer.current;
+        const mark = el?.querySelector<HTMLElement>(`[data-match="${shown}"]`);
 
-        viewer.current
-            ?.querySelector(`[data-match="${shown}"]`)
-            ?.scrollIntoView({ block: 'center' });
+        if (el && mark) {
+            el.scrollTop = mark.offsetTop - el.clientHeight / 2;
+        }
     }, [shown, count, text]);
 
     const step = (by: number) => {
@@ -310,7 +313,7 @@ export function LogsTab({ app }: { app: AppSettings }) {
                     tabIndex={0}
                     role="log"
                     aria-label="Container log"
-                    className="max-h-[65vh] min-h-48 overflow-auto rounded-field bg-base-200 p-3 font-mono text-xs"
+                    className="relative max-h-[65vh] min-h-48 overflow-auto rounded-field bg-base-200 p-3 font-mono text-xs"
                 >
                     {live === null ? (
                         <p className="text-base-content/70">Loading...</p>
