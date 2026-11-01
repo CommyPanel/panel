@@ -2,10 +2,13 @@ package docker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"commypanel/agent/internal/validate"
 )
@@ -32,9 +35,10 @@ func ensureVolumeDir(source string) error {
 
 // RemoveVolumes deletes the data of one volume of an app, or of all of them
 // when name is empty. It never follows links out of the volumes directory, and
-// a volume that does not exist is not an error. The caller makes sure nothing
-// still mounts it: removing a mounted folder would break the running app.
-func (m *Manager) RemoveVolumes(_ context.Context, app, name string) error {
+// a volume that does not exist is not an error. It refuses while any container,
+// running or not, still has the folder mounted, because deleting it under a
+// running app would break the app.
+func (m *Manager) RemoveVolumes(ctx context.Context, app, name string) error {
 	if err := validate.Name(app); err != nil {
 		return err
 	}
@@ -53,8 +57,44 @@ func (m *Manager) RemoveVolumes(_ context.Context, app, name string) error {
 		slog.Info("dry-run: would remove volume data", "path", resolved)
 		return nil
 	}
+	if user, err := m.mountedBy(ctx, resolved); err != nil {
+		return err
+	} else if user != "" {
+		return &validate.InputError{Msg: fmt.Sprintf("container %s still has this volume mounted; deploy the app without it first", user)}
+	}
 	if err := os.RemoveAll(resolved); err != nil {
 		return fmt.Errorf("remove volume data: %w", err)
 	}
 	return nil
+}
+
+// mountedBy returns the name of a container that has path (or something inside
+// it) mounted, or "". When the Docker daemon cannot be reached nothing can be
+// running, so there is nothing to protect.
+func (m *Manager) mountedBy(ctx context.Context, path string) (string, error) {
+	var raw []struct {
+		Names  []string `json:"Names"`
+		Mounts []struct {
+			Source string `json:"Source"`
+		} `json:"Mounts"`
+	}
+	err := m.engine.doJSON(ctx, "GET", "/containers/json", url.Values{"all": {"true"}}, nil, &raw)
+	if errors.Is(err, ErrUnavailable) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	for _, c := range raw {
+		for _, mount := range c.Mounts {
+			if mount.Source == path || strings.HasPrefix(mount.Source, path+string(filepath.Separator)) {
+				name := "(unnamed)"
+				if len(c.Names) > 0 {
+					name = strings.TrimPrefix(c.Names[0], "/")
+				}
+				return name, nil
+			}
+		}
+	}
+	return "", nil
 }

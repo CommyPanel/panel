@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -127,5 +128,44 @@ func TestRemoveVolumesRefusesBadNamesAndNeverFollowsALink(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(outside, "keep")); err != nil {
 		t.Error("data outside the volumes directory was touched")
+	}
+}
+
+func TestRemoveVolumesRefusesWhileAContainerStillMountsIt(t *testing.T) {
+	m, d, dir := setup(t)
+	volumes := filepath.Join(dir, "volumes")
+	for _, p := range []string{"shop/uploads", "shop/cache"} {
+		os.MkdirAll(filepath.Join(volumes, p), 0o755)
+	}
+	d.mounts = []string{filepath.Join(volumes, "shop", "uploads")}
+
+	err := m.RemoveVolumes(context.Background(), "shop", "uploads")
+	if err == nil || !strings.Contains(err.Error(), "demo-1") {
+		t.Fatalf("a mounted volume must be refused, naming the container: %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(volumes, "shop", "uploads")); statErr != nil {
+		t.Error("the mounted volume was deleted")
+	}
+	// Removing all of an app's volumes is refused too while one is mounted.
+	if err := m.RemoveVolumes(context.Background(), "shop", ""); err == nil {
+		t.Error("removing everything must be refused while one volume is mounted")
+	}
+	// A volume nothing mounts can still go.
+	if err := m.RemoveVolumes(context.Background(), "shop", "cache"); err != nil {
+		t.Errorf("an unmounted volume: %v", err)
+	}
+}
+
+func TestRemoveVolumesProceedsWhenDockerIsDown(t *testing.T) {
+	dir := t.TempDir()
+	m := NewManager(Config{DataDir: dir}, NewEngine("http://127.0.0.1:1", nil))
+	target := filepath.Join(dir, "volumes", "shop", "data")
+	os.MkdirAll(target, 0o755)
+
+	if err := m.RemoveVolumes(context.Background(), "shop", "data"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(target); err == nil {
+		t.Error("the volume should be gone")
 	}
 }

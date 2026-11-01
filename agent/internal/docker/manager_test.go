@@ -27,6 +27,7 @@ type fakeDaemon struct {
 	buildTar   []string
 	buildReply string
 	waitCode   int
+	mounts     []string // sources mounted by the container the list reports
 }
 
 func (f *fakeDaemon) handler() http.Handler {
@@ -50,7 +51,11 @@ func (f *fakeDaemon) handler() http.Handler {
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"Config": map[string]any{"Labels": f.labels}})
 		case r.URL.Path == "/containers/json":
-			w.Write([]byte(`[{"Names":["/demo-1"],"Image":"demo:1","State":"running","Status":"Up 2 minutes"}]`))
+			mounts := []map[string]string{}
+			for _, source := range f.mounts {
+				mounts = append(mounts, map[string]string{"Source": source})
+			}
+			_ = json.NewEncoder(w).Encode([]map[string]any{{"Names": []string{"/demo-1"}, "Image": "demo:1", "State": "running", "Status": "Up 2 minutes", "Mounts": mounts}})
 		case strings.HasSuffix(r.URL.Path, "/stats"):
 			if r.URL.Query().Get("stream") != "false" || r.URL.Query().Get("one-shot") != "true" {
 				w.WriteHeader(400)
