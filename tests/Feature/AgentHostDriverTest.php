@@ -274,3 +274,33 @@ it('refuses a volume name that could change the agent request', function () {
 
     Http::assertNothingSent();
 });
+
+it('maps container networks, published ports and mounts, and lists networks', function () {
+    Http::fake([
+        'agent/v1/docker/containers' => Http::response(['containers' => [[
+            'name' => 'shop-1', 'image' => 'img:1', 'state' => 'running', 'status' => 'Up',
+            'networks' => [['name' => 'commypanel', 'ip' => '172.20.0.2']],
+            'ports' => [['container' => 8080, 'host' => 20001, 'host_ip' => '127.0.0.1', 'protocol' => 'tcp']],
+            'mounts' => [['source' => 'shop/uploads', 'destination' => '/data', 'read_only' => true]],
+        ]]]),
+        'agent/v1/docker/networks' => Http::response(['networks' => [[
+            'name' => 'commypanel', 'driver' => 'bridge', 'subnet' => '172.20.0.0/16', 'gateway' => '172.20.0.1', 'internal' => false,
+            'containers' => [['name' => 'shop-1', 'ip' => '172.20.0.2']],
+        ]]]),
+    ]);
+
+    $container = agentDriver()->listContainers()[0];
+    $network = agentDriver()->listNetworks()[0];
+
+    expect($container->networks)->toBe([['name' => 'commypanel', 'ip' => '172.20.0.2']])
+        ->and($container->ports)->toBe([['container' => 8080, 'host' => 20001, 'host_ip' => '127.0.0.1', 'protocol' => 'tcp']])
+        ->and($container->mounts)->toBe([['source' => 'shop/uploads', 'destination' => '/data', 'read_only' => true]])
+        ->and($network)->toMatchObject(['name' => 'commypanel', 'subnet' => '172.20.0.0/16', 'gateway' => '172.20.0.1', 'internal' => false])
+        ->and($network->containers)->toBe([['name' => 'shop-1', 'ip' => '172.20.0.2']]);
+});
+
+it('copes with an older agent that does not report networks, ports or mounts', function () {
+    Http::fake(['agent/v1/docker/containers' => Http::response(['containers' => [['name' => 'shop-1', 'image' => 'i', 'state' => 'running', 'status' => 'Up']]])]);
+
+    expect(agentDriver()->listContainers()[0])->toMatchObject(['networks' => [], 'ports' => [], 'mounts' => []]);
+});

@@ -98,7 +98,7 @@ describe('route protection', function () {
     });
 
     $routes = [
-        'apps.view' => [['get', '/apps'], ['get', '/apps/shop/usage']],
+        'apps.view' => [['get', '/apps'], ['get', '/apps/shop/usage'], ['get', '/apps/shop/containers']],
         'apps.create' => [['get', '/apps/create'], ['post', '/apps']],
         'apps.update' => [['patch', '/apps/shop'], ['post', '/apps/shop/deploy-key'], ['post', '/apps/shop/git-token'], ['delete', '/apps/shop/git-token'], ['post', '/apps/shop/webhook'], ['delete', '/apps/shop/webhook'], ['post', '/apps/shop/volumes'], ['delete', '/apps/shop/volumes/1'], ['delete', '/apps/shop/volumes/uploads/data']],
         'apps.deploy' => [['post', '/apps/shop/deployments']],

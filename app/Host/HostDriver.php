@@ -11,6 +11,7 @@ use App\Host\Data\DockerInfo;
 use App\Host\Data\HostInfo;
 use App\Host\Data\ImageBuildSpec;
 use App\Host\Data\ImageInfo;
+use App\Host\Data\NetworkInfo;
 use App\Host\Data\NginxSite;
 use App\Host\Data\NginxStatus;
 use App\Host\Data\NginxTestResult;
@@ -183,8 +184,19 @@ interface HostDriver
      * @return list<ContainerInfo>
      *
      * @throws DockerUnavailable
+     * @throws HostOperationFailed when the agent cannot be reached
      */
     public function listContainers(): array;
+
+    /**
+     * The Docker networks CommyPanel created, with what is attached to each.
+     *
+     * @return list<NetworkInfo>
+     *
+     * @throws DockerUnavailable
+     * @throws HostOperationFailed when the agent cannot be reached
+     */
+    public function listNetworks(): array;
 
     /**
      * @throws HostOperationFailed

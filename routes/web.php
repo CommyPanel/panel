@@ -1,6 +1,7 @@
 <?php
 
 use App\Auth\Permissions;
+use App\Http\Controllers\AppContainerController;
 use App\Http\Controllers\AppController;
 use App\Http\Controllers\AppDomainController;
 use App\Http\Controllers\AppLogController;
@@ -71,6 +72,9 @@ Route::middleware('auth')->group(function () {
             Route::post('setup/finish', [AppSetupController::class, 'finish'])->name('setup.finish');
             Route::delete('setup', [AppSetupController::class, 'cancel'])->name('setup.cancel');
         });
+
+        Route::get('containers', [AppContainerController::class, 'show'])
+            ->middleware('can:'.Permissions::APPS_VIEW)->name('containers');
 
         Route::get('usage', [AppUsageController::class, 'show'])
             ->middleware('can:'.Permissions::APPS_VIEW)->name('usage');

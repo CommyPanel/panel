@@ -3,6 +3,8 @@ import { FileText, RotateCw, Trash } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import AppController from '@/actions/App/Http/Controllers/AppController';
 import ServerDockerController from '@/actions/App/Http/Controllers/ServerDockerController';
+import { ContainerFacts } from '@/components/containers/container-facts';
+import { NetworkList } from '@/components/containers/network-list';
 import { ServerLayout } from '@/components/server/server-layout';
 import { StateMark, toneOfContainer } from '@/components/server/state-mark';
 import { Alert } from '@/components/ui/alert';
@@ -13,6 +15,12 @@ import { Modal } from '@/components/ui/modal';
 import { useConfirmedAction } from '@/hooks/use-confirmed-action';
 import { formatBytes, formatDate, timeAgo } from '@/lib/format';
 import { useCan } from '@/lib/permissions';
+import type {
+    ContainerMount,
+    ContainerNetwork,
+    ContainerPort,
+    DockerNetwork,
+} from '@/types';
 
 type Container = {
     name: string;
@@ -22,6 +30,9 @@ type Container = {
     created: number;
     app: { slug: string; name: string } | null;
     release: number | null;
+    networks: ContainerNetwork[];
+    ports: ContainerPort[];
+    mounts: ContainerMount[];
 };
 
 type Props = {
@@ -46,6 +57,7 @@ type Props = {
     } | null;
     diagnosis: Diagnosis | null;
     containers: Container[];
+    networks: DockerNetwork[];
     images: { tags: string[]; size: number; created: number }[];
 };
 
@@ -226,6 +238,7 @@ export default function Docker({
     docker,
     diagnosis,
     containers,
+    networks,
     images,
 }: Props) {
     const { errors } = usePage().props;
@@ -326,9 +339,14 @@ export default function Docker({
                                                 </td>
                                                 <td>
                                                     <code>{c.name}</code>
-                                                    <p className="text-xs text-base-content/60">
+                                                    <p className="mb-2 text-xs text-base-content/60">
                                                         {c.status}
                                                     </p>
+                                                    <ContainerFacts
+                                                        networks={c.networks}
+                                                        ports={c.ports}
+                                                        mounts={c.mounts}
+                                                    />
                                                 </td>
                                                 <td>
                                                     {c.app ? (
@@ -388,6 +406,20 @@ export default function Docker({
                                     </tbody>
                                 </table>
                             </div>
+                        )}
+                    </Card>
+
+                    <Card
+                        title="Networks"
+                        description="The Docker networks CommyPanel created and what is attached to them."
+                    >
+                        {networks.length === 0 ? (
+                            <p className="text-sm text-base-content/70">
+                                No networks yet. One is created with the first
+                                app.
+                            </p>
+                        ) : (
+                            <NetworkList networks={networks} />
                         )}
                     </Card>
 

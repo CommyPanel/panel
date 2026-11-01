@@ -12,6 +12,7 @@ use App\Host\Data\DockerInfo;
 use App\Host\Data\HostInfo;
 use App\Host\Data\ImageBuildSpec;
 use App\Host\Data\ImageInfo;
+use App\Host\Data\NetworkInfo;
 use App\Host\Data\NginxSite;
 use App\Host\Data\NginxStatus;
 use App\Host\Data\NginxTestResult;
@@ -19,6 +20,7 @@ use App\Host\Data\ResourceName;
 use App\Host\Data\ResourceUsage;
 use App\Host\Data\SystemStatus;
 use App\Host\Data\TaskSpec;
+use App\Host\Data\Volume;
 use App\Host\Data\VolumeEntry;
 use App\Host\Data\VolumeFilePreview;
 use App\Host\Data\VolumeListing;
@@ -341,12 +343,42 @@ class FakeHostDriver implements HostDriver
 
     public function listContainers(): array
     {
-        return array_values(array_map(
-            fn (ContainerSpec $spec) => isset($this->stopped[$spec->name])
-                ? new ContainerInfo($spec->name, $spec->image, 'exited', 'Exited (0) (fake)')
-                : new ContainerInfo($spec->name, $spec->image, 'running', 'Up (fake)'),
-            $this->containers,
-        ));
+        $index = 1;
+
+        return array_values(array_map(function (ContainerSpec $spec) use (&$index) {
+            $stopped = isset($this->stopped[$spec->name]);
+            $index++;
+
+            return new ContainerInfo(
+                $spec->name,
+                $spec->image,
+                $stopped ? 'exited' : 'running',
+                $stopped ? 'Exited (0) (fake)' : 'Up (fake)',
+                networks: [['name' => $spec->network ?? 'commypanel', 'ip' => "172.20.0.{$index}"]],
+                ports: $stopped ? [] : [['container' => $spec->containerPort, 'host' => $spec->hostPort, 'host_ip' => '127.0.0.1', 'protocol' => 'tcp']],
+                mounts: array_map(fn (Volume $v) => [
+                    'source' => preg_replace('#^.*/volumes/#', '', $v->source) ?? $v->source,
+                    'destination' => $v->target,
+                    'read_only' => $v->readOnly,
+                ], $spec->volumes),
+            );
+        }, $this->containers));
+    }
+
+    public function listNetworks(): array
+    {
+        $members = [];
+
+        foreach ($this->listContainers() as $container) {
+            foreach ($container->networks as $network) {
+                $members[$network['name']][] = ['name' => $container->name, 'ip' => $network['ip']];
+            }
+        }
+
+        $names = array_unique(['commypanel', ...array_keys($members)]);
+        sort($names);
+
+        return array_map(fn (string $name) => new NetworkInfo($name, 'bridge', '172.20.0.0/16', '172.20.0.1', false, $members[$name] ?? []), $names);
     }
 
     public function containerLogs(string $name, int $tail = 200): string

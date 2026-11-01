@@ -10,6 +10,7 @@ use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
 use App\Host\HostHealth;
 use App\Models\Deployment;
+use App\Presenters\ContainerPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -23,11 +24,12 @@ class ServerDockerController extends Controller
         try {
             $info = $host->dockerInfo();
             $containers = $info->available ? $host->listContainers() : [];
+            $networks = $info->available ? $host->listNetworks() : [];
             $images = $info->available ? $host->listImages() : [];
             $error = null;
         } catch (HostOperationFailed $e) {
             $info = null;
-            $containers = $images = [];
+            $containers = $images = $networks = [];
             $error = $e->getMessage();
         }
 
@@ -72,12 +74,9 @@ class ServerDockerController extends Controller
                 'socket' => $diagnosis->socket,
                 'journal' => $diagnosis->journal,
             ],
+            'networks' => array_map(ContainerPresenter::network(...), $networks),
             'containers' => array_map(fn (ContainerInfo $c) => [
-                'name' => $c->name,
-                'image' => $c->image,
-                'state' => $c->state,
-                'status' => $c->status,
-                'created' => $c->created,
+                ...ContainerPresenter::container($c),
                 'app' => $owners->get($c->name)?->app?->only(['slug', 'name']),
                 'release' => $owners->get($c->name)?->number,
             ], $containers),

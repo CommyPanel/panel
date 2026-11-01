@@ -1,3 +1,4 @@
+import { AppContainersCard } from '@/components/containers/app-containers-card';
 import { Card } from '@/components/ui/card';
 import { AppUsageCard } from '@/components/usage/app-usage-card';
 import type { AppSettings } from '@/types';
@@ -7,19 +8,27 @@ import type { AppSettings } from '@/types';
  * tab is open, so nothing is polled while somebody is looking at another tab.
  */
 export function UsageTab({ app }: { app: AppSettings }) {
-    if (app.status !== 'running' && app.status !== 'stopped') {
-        return (
-            <Card
-                title="Resource usage"
-                description="Live CPU, memory and network of the running container."
-            >
-                <p className="text-sm text-base-content/70">
-                    There is nothing to measure yet. Usage appears here while
-                    the app is running.
-                </p>
-            </Card>
-        );
-    }
+    const live = app.status === 'running' || app.status === 'stopped';
 
-    return <AppUsageCard slug={app.slug} stopped={app.status === 'stopped'} />;
+    return (
+        <div className="space-y-6">
+            {live ? (
+                <AppUsageCard
+                    slug={app.slug}
+                    stopped={app.status === 'stopped'}
+                />
+            ) : (
+                <Card
+                    title="Resource usage"
+                    description="Live CPU, memory and network of the running container."
+                >
+                    <p className="text-sm text-base-content/70">
+                        There is nothing to measure yet. Usage appears here
+                        while the app is running.
+                    </p>
+                </Card>
+            )}
+            <AppContainersCard slug={app.slug} />
+        </div>
+    );
 }

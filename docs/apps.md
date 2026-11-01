@@ -51,6 +51,14 @@ A volume you removed from Settings shows as **Not attached**, with its files. **
 
 The folder is writable for whichever user the app runs as, since that differs from image to image. It cannot be reached from anywhere else on the server, because the folders above it belong to root and are closed to everybody else.
 
+## Containers and networks
+
+The **Usage** tab also lists the app's containers: the live release and, for a moment during a deployment, the previous one. For each it shows the state, the release, the network and address it has, the ports it publishes (only on the server's loopback; nginx is what reaches them) and the volumes mounted into it.
+
+Below that are the networks those containers are on and everything attached to them. **Server > Docker** shows the same for every container, plus all networks CommyPanel created.
+
+Today every app's container joins the same Docker network, so containers of different apps can reach each other directly. When a network holds more than one app, both pages say so. Treat apps you do not fully trust accordingly.
+
 ## Logs
 
 The **Logs** tab shows what the running container printed, newest at the bottom. Choose how many lines to load (200 to 5,000). **Follow** refreshes every 3 seconds and keeps the view at the end; switch it off to read in peace. Search the log with the box above it, or press Cmd/Ctrl+F while the log is focused: matches are highlighted, and Enter and Shift+Enter move between them. **Download** saves the last 5,000 lines as a text file.

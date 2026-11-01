@@ -12,6 +12,7 @@ use App\Host\Data\DockerInfo;
 use App\Host\Data\HostInfo;
 use App\Host\Data\ImageBuildSpec;
 use App\Host\Data\ImageInfo;
+use App\Host\Data\NetworkInfo;
 use App\Host\Data\NginxSite;
 use App\Host\Data\NginxStatus;
 use App\Host\Data\NginxTestResult;
@@ -439,7 +440,33 @@ class AgentHostDriver implements HostDriver
             state: (string) ($c['state'] ?? ''),
             status: (string) ($c['status'] ?? ''),
             created: (int) ($c['created'] ?? 0),
+            networks: array_values(array_map(fn (array $n) => ['name' => (string) ($n['name'] ?? ''), 'ip' => (string) ($n['ip'] ?? '')], $c['networks'] ?? [])),
+            ports: array_values(array_map(fn (array $p) => [
+                'container' => (int) ($p['container'] ?? 0),
+                'host' => (int) ($p['host'] ?? 0),
+                'host_ip' => (string) ($p['host_ip'] ?? ''),
+                'protocol' => (string) ($p['protocol'] ?? 'tcp'),
+            ], $c['ports'] ?? [])),
+            mounts: array_values(array_map(fn (array $m) => [
+                'source' => (string) ($m['source'] ?? ''),
+                'destination' => (string) ($m['destination'] ?? ''),
+                'read_only' => (bool) ($m['read_only'] ?? false),
+            ], $c['mounts'] ?? [])),
         ), $data['containers'] ?? []));
+    }
+
+    public function listNetworks(): array
+    {
+        $data = $this->send('get', '/v1/docker/networks');
+
+        return array_values(array_map(fn (array $n) => new NetworkInfo(
+            name: (string) ($n['name'] ?? ''),
+            driver: (string) ($n['driver'] ?? ''),
+            subnet: (string) ($n['subnet'] ?? ''),
+            gateway: (string) ($n['gateway'] ?? ''),
+            internal: (bool) ($n['internal'] ?? false),
+            containers: array_values(array_map(fn (array $c) => ['name' => (string) ($c['name'] ?? ''), 'ip' => (string) ($c['ip'] ?? '')], $n['containers'] ?? [])),
+        ), $data['networks'] ?? []));
     }
 
     public function containerLogs(string $name, int $tail = 200): string
