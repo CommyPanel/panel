@@ -96,7 +96,7 @@ describe('route protection', function () {
     });
 
     $routes = [
-        'apps.view' => [['get', '/apps']],
+        'apps.view' => [['get', '/apps'], ['get', '/apps/shop/usage']],
         'apps.create' => [['get', '/apps/create'], ['post', '/apps']],
         'apps.update' => [['patch', '/apps/shop'], ['post', '/apps/shop/deploy-key'], ['post', '/apps/shop/git-token'], ['delete', '/apps/shop/git-token'], ['post', '/apps/shop/webhook'], ['delete', '/apps/shop/webhook']],
         'apps.deploy' => [['post', '/apps/shop/deployments']],
@@ -107,7 +107,7 @@ describe('route protection', function () {
         'domains.view' => [['get', '/domains']],
         'domains.manage' => [['post', '/apps/shop/domains'], ['post', '/apps/shop/certificate']],
         'domains.settings' => [['get', '/welcome'], ['put', '/settings/https'], ['put', '/settings/server-address'], ['post', '/settings/server-address/detect']],
-        'server.view' => [['get', '/server'], ['get', '/server/docker'], ['get', '/server/nginx']],
+        'server.view' => [['get', '/server'], ['get', '/server/docker'], ['get', '/server/nginx'], ['get', '/server/usage']],
         'server.manage' => [['post', '/server/nginx/reload'], ['post', '/server/nginx/test'], ['post', '/server/docker/prune'], ['get', '/server/docker/containers/shop-1/logs'], ['post', '/server/docker/restart']],
         'users.view' => [['get', '/users']],
         'users.create' => [['get', '/users/create'], ['post', '/users']],

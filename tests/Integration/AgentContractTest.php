@@ -74,6 +74,21 @@ it('serves the server page data against the real agent', function () {
     $this->driver->reloadNginx();
 });
 
+it('reports resource usage from the real sampler', function () {
+    // The sampler takes its first reading at start-up and the next two seconds later.
+    for ($i = 0; $i < 40 && ! $this->driver->resourceUsage()->host['ready']; $i++) {
+        usleep(100_000);
+    }
+
+    $usage = $this->driver->resourceUsage(history: true);
+
+    expect($usage->intervalMs)->toBe(2000)
+        ->and($usage->host['disk_total'])->toBeGreaterThan(0)
+        ->and($usage->host['disk_used'])->toBeLessThanOrEqual($usage->host['disk_total'])
+        ->and($usage->containers)->toBe([])
+        ->and($usage->hostHistory)->toBeArray();
+});
+
 it('applies and removes an nginx site', function () {
     $this->driver->applyNginxSite(new NginxSite('demo', ['demo.example.com'], 20001));
 

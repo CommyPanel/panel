@@ -6,6 +6,7 @@ use App\Host\Data\CertificateInfo;
 use App\Host\Data\CertificateRequest;
 use App\Host\Data\ContainerInfo;
 use App\Host\Data\ContainerSpec;
+use App\Host\Data\ContainerUsage;
 use App\Host\Data\DockerDiagnosis;
 use App\Host\Data\DockerInfo;
 use App\Host\Data\HostInfo;
@@ -15,6 +16,7 @@ use App\Host\Data\NginxSite;
 use App\Host\Data\NginxStatus;
 use App\Host\Data\NginxTestResult;
 use App\Host\Data\ResourceName;
+use App\Host\Data\ResourceUsage;
 use App\Host\Data\SystemStatus;
 use App\Host\Data\TaskSpec;
 use App\Host\Exceptions\DockerUnavailable;
@@ -71,6 +73,54 @@ class AgentHostDriver implements HostDriver
             )),
             agentVersion: (string) ($data['version'] ?? ''),
         );
+    }
+
+    public function resourceUsage(bool $history = false): ResourceUsage
+    {
+        $d = $this->send('get', '/v1/system/usage'.($history ? '?history=1' : ''));
+        $h = $d['host'] ?? [];
+
+        return new ResourceUsage(
+            intervalMs: (int) ($d['interval_ms'] ?? 2000),
+            now: (int) ($d['now'] ?? 0),
+            host: [
+                'ready' => (bool) ($h['ready'] ?? false),
+                'cpu_percent' => (float) ($h['cpu_percent'] ?? 0),
+                'cpus' => (int) ($h['cpus'] ?? 0),
+                'mem_total' => (int) ($h['mem_total'] ?? 0),
+                'mem_used' => (int) ($h['mem_used'] ?? 0),
+                'disk_total' => (int) ($h['disk_total'] ?? 0),
+                'disk_used' => (int) ($h['disk_used'] ?? 0),
+                'net_rx_bps' => (float) ($h['net_rx_bps'] ?? 0),
+                'net_tx_bps' => (float) ($h['net_tx_bps'] ?? 0),
+            ],
+            hostHistory: $this->samples($d['host_history'] ?? []),
+            containers: array_values(array_map(fn (array $c) => new ContainerUsage(
+                name: (string) ($c['name'] ?? ''),
+                t: (int) ($c['t'] ?? 0),
+                cpuPercent: (float) ($c['cpu_percent'] ?? 0),
+                memUsed: (int) ($c['mem_used'] ?? 0),
+                memLimit: (int) ($c['mem_limit'] ?? 0),
+                netRxBps: (float) ($c['net_rx_bps'] ?? 0),
+                netTxBps: (float) ($c['net_tx_bps'] ?? 0),
+                history: $this->samples($c['history'] ?? []),
+            ), $d['containers'] ?? [])),
+        );
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $samples
+     * @return list<array{t: int, cpu: float, mem: int, rx: float, tx: float}>
+     */
+    private function samples(array $samples): array
+    {
+        return array_values(array_map(fn (array $s) => [
+            't' => (int) ($s['t'] ?? 0),
+            'cpu' => (float) ($s['cpu'] ?? 0),
+            'mem' => (int) ($s['mem'] ?? 0),
+            'rx' => (float) ($s['rx'] ?? 0),
+            'tx' => (float) ($s['tx'] ?? 0),
+        ], $samples));
     }
 
     public function dockerInfo(): DockerInfo

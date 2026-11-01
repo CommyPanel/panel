@@ -6,6 +6,7 @@ use App\Host\Data\CertificateInfo;
 use App\Host\Data\CertificateRequest;
 use App\Host\Data\ContainerInfo;
 use App\Host\Data\ContainerSpec;
+use App\Host\Data\ContainerUsage;
 use App\Host\Data\DockerDiagnosis;
 use App\Host\Data\DockerInfo;
 use App\Host\Data\HostInfo;
@@ -15,6 +16,7 @@ use App\Host\Data\NginxSite;
 use App\Host\Data\NginxStatus;
 use App\Host\Data\NginxTestResult;
 use App\Host\Data\ResourceName;
+use App\Host\Data\ResourceUsage;
 use App\Host\Data\SystemStatus;
 use App\Host\Data\TaskSpec;
 use App\Host\Exceptions\DockerUnavailable;
@@ -89,6 +91,64 @@ class FakeHostDriver implements HostDriver
             available: true, serverVersion: '27.0.0-fake', apiVersion: '1.46', os: 'linux', arch: 'amd64',
             kernelVersion: '6.8.0-fake', storageDriver: 'overlay2', cgroupDriver: 'systemd',
             containers: $running, running: $running, images: count($this->images), cpus: 4, memTotalBytes: 4 * 1024 ** 3,
+        );
+    }
+
+    /**
+     * Smoothly moving made-up readings, so the charts have something to show
+     * during development. Containers are the ones this fake was told to run.
+     */
+    public function resourceUsage(bool $history = false): ResourceUsage
+    {
+        $interval = 2000;
+        $now = time() * 1000;
+        $wave = fn (int $t, float $period, float $phase = 0.0): float => (sin($t / 1000 / $period + $phase) + 1) / 2;
+        $hostAt = fn (int $t) => [
+            't' => $t,
+            'cpu' => round(8 + 40 * $wave($t, 40) + 6 * $wave($t, 7, 2), 1),
+            'mem' => (int) (1.1 * 1024 ** 3 + 0.3 * 1024 ** 3 * $wave($t, 90, 1)),
+            'rx' => round(40_000 + 300_000 * $wave($t, 25, 3), 0),
+            'tx' => round(15_000 + 120_000 * $wave($t, 31, 5), 0),
+        ];
+        $containerAt = fn (int $t, int $seed) => [
+            't' => $t,
+            'cpu' => round(2 + 30 * $wave($t, 20 + $seed * 3, $seed), 1),
+            'mem' => (int) ((90 + 40 * $wave($t, 60, $seed)) * 1024 ** 2),
+            'rx' => round(2_000 + 40_000 * $wave($t, 17, $seed), 0),
+            'tx' => round(1_000 + 25_000 * $wave($t, 23, $seed + 1), 0),
+        ];
+        $series = fn (callable $at) => array_map($at, array_map(fn (int $i) => $now - (149 - $i) * $interval, range(0, 149)));
+
+        $containers = [];
+        $seed = 0;
+
+        foreach ($this->containers as $name => $spec) {
+            if (isset($this->stopped[$name])) {
+                continue;
+            }
+
+            $seed++;
+            $point = $containerAt($now, $seed);
+            $containers[] = new ContainerUsage(
+                name: $name, t: $now, cpuPercent: $point['cpu'], memUsed: $point['mem'],
+                memLimit: ($spec->memoryLimitMb ?? 512) * 1024 ** 2, netRxBps: $point['rx'], netTxBps: $point['tx'],
+                history: $history ? $series(fn (int $t) => $containerAt($t, $seed)) : [],
+            );
+        }
+
+        $point = $hostAt($now);
+
+        return new ResourceUsage(
+            intervalMs: $interval,
+            now: $now,
+            host: [
+                'ready' => true, 'cpu_percent' => $point['cpu'], 'cpus' => 4,
+                'mem_total' => 4 * 1024 ** 3, 'mem_used' => $point['mem'],
+                'disk_total' => 100 * 1024 ** 3, 'disk_used' => 50 * 1024 ** 3,
+                'net_rx_bps' => $point['rx'], 'net_tx_bps' => $point['tx'],
+            ],
+            hostHistory: $history ? $series($hostAt) : [],
+            containers: $containers,
         );
     }
 

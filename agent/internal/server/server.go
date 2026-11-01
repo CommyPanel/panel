@@ -15,6 +15,7 @@ import (
 	"commypanel/agent/internal/nginx"
 	"commypanel/agent/internal/peercred"
 	"commypanel/agent/internal/system"
+	"commypanel/agent/internal/usage"
 	"commypanel/agent/internal/validate"
 )
 
@@ -62,6 +63,11 @@ type DockerUnit interface {
 	Restart(ctx context.Context) error
 }
 
+// Usage is the resource sampler.
+type Usage interface {
+	Snapshot(history bool) usage.Snapshot
+}
+
 // Authorizer decides whether the caller of a request may use the agent.
 type Authorizer func(r *http.Request) bool
 
@@ -70,6 +76,7 @@ type Options struct {
 	Docker    Docker
 	Certs     Certificates
 	Unit      DockerUnit
+	Usage     Usage
 	Authorize Authorizer
 	Version   string
 	DryRun    bool
@@ -87,6 +94,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/status", s.status)
 	mux.HandleFunc("GET /v1/system/info", s.systemInfo)
+	mux.HandleFunc("GET /v1/system/usage", s.systemUsage)
 	mux.HandleFunc("GET /v1/nginx/status", s.nginxStatus)
 	mux.HandleFunc("POST /v1/nginx/test", s.nginxTest)
 	mux.HandleFunc("POST /v1/nginx/reload", s.nginxReload)
@@ -189,6 +197,16 @@ func (s *Server) systemInfo(w http.ResponseWriter, r *http.Request) {
 		info = s.opts.Info(r.Context())
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"version": s.opts.Version, "dry_run": s.opts.DryRun, "info": info})
+}
+
+// systemUsage returns the latest CPU, memory, disk and network readings of the
+// host and its containers; ?history=1 adds the last few minutes.
+func (s *Server) systemUsage(w http.ResponseWriter, r *http.Request) {
+	if s.opts.Usage == nil {
+		writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "resource usage is not available"})
+		return
+	}
+	writeJSON(w, http.StatusOK, s.opts.Usage.Snapshot(r.URL.Query().Get("history") == "1"))
 }
 
 func (s *Server) nginxStatus(w http.ResponseWriter, r *http.Request) {

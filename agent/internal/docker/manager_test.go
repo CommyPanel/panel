@@ -51,6 +51,14 @@ func (f *fakeDaemon) handler() http.Handler {
 			_ = json.NewEncoder(w).Encode(map[string]any{"Config": map[string]any{"Labels": f.labels}})
 		case r.URL.Path == "/containers/json":
 			w.Write([]byte(`[{"Names":["/demo-1"],"Image":"demo:1","State":"running","Status":"Up 2 minutes"}]`))
+		case strings.HasSuffix(r.URL.Path, "/stats"):
+			if r.URL.Query().Get("stream") != "false" || r.URL.Query().Get("one-shot") != "true" {
+				w.WriteHeader(400)
+				return
+			}
+			w.Write([]byte(`{"cpu_stats":{"cpu_usage":{"total_usage":2000},"system_cpu_usage":50000,"online_cpus":4},
+				"memory_stats":{"usage":300,"limit":1000,"stats":{"inactive_file":100,"active_file":7}},
+				"networks":{"eth0":{"rx_bytes":10,"tx_bytes":4},"eth1":{"rx_bytes":5,"tx_bytes":1}}}`))
 		case strings.HasSuffix(r.URL.Path, "/wait"):
 			_ = json.NewEncoder(w).Encode(map[string]int{"StatusCode": f.waitCode})
 		case strings.HasSuffix(r.URL.Path, "/logs"):

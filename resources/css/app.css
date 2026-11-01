@@ -99,6 +99,25 @@
     --color-error-content: oklch(14.7% 0.004 49.25);
 }
 
+/*
+ * Chart series colours (--chart-1, --chart-2). Each theme's pair was checked
+ * with the dataviz palette validator against that theme's card surface:
+ * lightness band, chroma, colour-blind separation and contrast all pass. The
+ * theme's own primary and info are too light for the dark band, hence the
+ * separate values there.
+ */
+:root,
+[data-theme='commy-light'] {
+    --chart-1: oklch(55.3% 0.195 38.402);
+    --chart-2: oklch(50% 0.134 242.749);
+}
+
+[data-theme='commy-dim'],
+[data-theme='commy-dark'] {
+    --chart-1: #e85d04;
+    --chart-2: #1e9bd8;
+}
+
 :root,
 [data-theme] {
     --radius-selector: 0.5rem;

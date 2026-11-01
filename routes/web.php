@@ -6,6 +6,7 @@ use App\Http\Controllers\AppDomainController;
 use App\Http\Controllers\AppSetupController;
 use App\Http\Controllers\AppSourceController;
 use App\Http\Controllers\AppStateController;
+use App\Http\Controllers\AppUsageController;
 use App\Http\Controllers\AppWebhookController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\CertificateController;
@@ -22,6 +23,7 @@ use App\Http\Controllers\ServerAddressController;
 use App\Http\Controllers\ServerController;
 use App\Http\Controllers\ServerDockerController;
 use App\Http\Controllers\ServerNginxController;
+use App\Http\Controllers\ServerUsageController;
 use App\Http\Controllers\SetupController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WelcomeController;
@@ -64,6 +66,9 @@ Route::middleware('auth')->group(function () {
             Route::post('setup/finish', [AppSetupController::class, 'finish'])->name('setup.finish');
             Route::delete('setup', [AppSetupController::class, 'cancel'])->name('setup.cancel');
         });
+
+        Route::get('usage', [AppUsageController::class, 'show'])
+            ->middleware('can:'.Permissions::APPS_VIEW)->name('usage');
 
         Route::get('deployments/{deployment:number}', [DeploymentController::class, 'show'])
             ->middleware('can:'.Permissions::APPS_VIEW)->name('deployments.show');
@@ -108,6 +113,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('server')->name('server.')->group(function () {
         Route::middleware('can:'.Permissions::SERVER_VIEW)->group(function () {
             Route::get('/', [ServerController::class, 'index'])->name('index');
+            Route::get('usage', [ServerUsageController::class, 'show'])->name('usage');
             Route::get('docker', [ServerDockerController::class, 'index'])->name('docker');
             Route::get('nginx', [ServerNginxController::class, 'index'])->name('nginx');
         });

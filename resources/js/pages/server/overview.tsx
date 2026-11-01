@@ -1,8 +1,8 @@
 import { ServerLayout } from '@/components/server/server-layout';
 import { StateMark, toneOfService } from '@/components/server/state-mark';
 import { Card } from '@/components/ui/card';
-import { formatBytes, formatUptime } from '@/lib/format';
-import { cn } from '@/lib/utils';
+import { LiveUsage } from '@/components/usage/live-usage';
+import { formatUptime } from '@/lib/format';
 
 type Props = {
     error: string | null;
@@ -21,42 +21,6 @@ type Props = {
     } | null;
 };
 
-function Meter({
-    label,
-    used,
-    total,
-}: {
-    label: string;
-    used: number;
-    total: number;
-}) {
-    const percent = total > 0 ? Math.round((used / total) * 100) : 0;
-
-    return (
-        <div className="space-y-1">
-            <div className="flex items-baseline justify-between gap-2 text-sm">
-                <span className="font-medium">{label}</span>
-                <span className="text-base-content/70">
-                    {formatBytes(used)} of {formatBytes(total)} ({percent}%)
-                </span>
-            </div>
-            <progress
-                className={cn(
-                    'progress w-full',
-                    percent >= 90
-                        ? 'progress-error'
-                        : percent >= 75
-                          ? 'progress-warning'
-                          : 'progress-primary',
-                )}
-                value={percent}
-                max={100}
-                aria-label={`${label} used`}
-            />
-        </div>
-    );
-}
-
 function Row({ label, value }: { label: string; value: string }) {
     return (
         <div className="flex flex-wrap justify-between gap-x-4 py-2">
@@ -71,6 +35,7 @@ function Row({ label, value }: { label: string; value: string }) {
 export default function Overview({ error, host }: Props) {
     return (
         <ServerLayout active="overview" error={error}>
+            {host && <LiveUsage />}
             {host && (
                 <div className="grid items-start gap-6 xl:grid-cols-2">
                     <div className="min-w-0 space-y-6">
@@ -98,18 +63,6 @@ export default function Overview({ error, host }: Props) {
                                     value={host.agent_version}
                                 />
                             </dl>
-                        </Card>
-                        <Card title="Resources">
-                            <Meter
-                                label="Memory"
-                                used={host.memory.total - host.memory.available}
-                                total={host.memory.total}
-                            />
-                            <Meter
-                                label="Disk"
-                                used={host.disk.total - host.disk.free}
-                                total={host.disk.total}
-                            />
                         </Card>
                     </div>
                     <Card

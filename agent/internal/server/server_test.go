@@ -15,6 +15,7 @@ import (
 	"commypanel/agent/internal/docker"
 	"commypanel/agent/internal/nginx"
 	"commypanel/agent/internal/system"
+	"commypanel/agent/internal/usage"
 	"commypanel/agent/internal/validate"
 )
 
@@ -497,5 +498,35 @@ func TestDockerDiagnoseAndRestart(t *testing.T) {
 	unit.err = errors.New("restarting Docker failed: Job for docker.service failed.")
 	if rec := do(t, s, "POST", "/v1/docker/restart", ""); rec.Code != 500 || !strings.Contains(rec.Body.String(), "Job for docker.service failed") {
 		t.Errorf("failed restart: %d %s", rec.Code, rec.Body)
+	}
+}
+
+type fakeUsage struct{ history []bool }
+
+func (f *fakeUsage) Snapshot(history bool) usage.Snapshot {
+	f.history = append(f.history, history)
+	return usage.Snapshot{IntervalMS: 2000, Host: usage.HostNow{Ready: true, CPUPercent: 12.5, CPUs: 4}, Containers: []usage.ContainerUsage{{Name: "shop-1", CPUPercent: 3}}}
+}
+
+func TestSystemUsage(t *testing.T) {
+	f := &fakeUsage{}
+	s := New(Options{Nginx: &fakeNginx{}, Docker: &fakeDocker{}, Usage: f, Authorize: AllowAll()})
+
+	rec := do(t, s, "GET", "/v1/system/usage", "")
+	var got usage.Snapshot
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil || rec.Code != 200 {
+		t.Fatalf("%d %s %v", rec.Code, rec.Body, err)
+	}
+	if got.Host.CPUPercent != 12.5 || len(got.Containers) != 1 || got.Containers[0].Name != "shop-1" {
+		t.Errorf("snapshot = %+v", got)
+	}
+
+	do(t, s, "GET", "/v1/system/usage?history=1", "")
+	if len(f.history) != 2 || f.history[0] || !f.history[1] {
+		t.Errorf("history flags = %v, want [false true]", f.history)
+	}
+
+	if rec := do(t, New(Options{Nginx: &fakeNginx{}, Docker: &fakeDocker{}, Authorize: AllowAll()}), "GET", "/v1/system/usage", ""); rec.Code != http.StatusNotImplemented {
+		t.Errorf("without a sampler: %d", rec.Code)
 	}
 }

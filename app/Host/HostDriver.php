@@ -14,6 +14,7 @@ use App\Host\Data\ImageInfo;
 use App\Host\Data\NginxSite;
 use App\Host\Data\NginxStatus;
 use App\Host\Data\NginxTestResult;
+use App\Host\Data\ResourceUsage;
 use App\Host\Data\SystemStatus;
 use App\Host\Data\TaskSpec;
 use App\Host\Exceptions\DockerUnavailable;
@@ -34,6 +35,18 @@ interface HostDriver
      * @throws HostOperationFailed
      */
     public function systemInfo(): HostInfo;
+
+    /**
+     * How busy the host and its running containers are right now. CPU and
+     * network are rates, so the first readings after the agent starts (or the
+     * first time a container is looked at) can be missing. Reading it keeps
+     * the agent sampling containers for a minute.
+     *
+     * @param  bool  $history  also return the last few minutes
+     *
+     * @throws HostOperationFailed
+     */
+    public function resourceUsage(bool $history = false): ResourceUsage;
 
     /**
      * @throws HostOperationFailed when the agent cannot be reached; an
