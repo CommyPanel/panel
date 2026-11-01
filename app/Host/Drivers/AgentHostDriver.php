@@ -19,6 +19,10 @@ use App\Host\Data\ResourceName;
 use App\Host\Data\ResourceUsage;
 use App\Host\Data\SystemStatus;
 use App\Host\Data\TaskSpec;
+use App\Host\Data\VolumeEntry;
+use App\Host\Data\VolumeFilePreview;
+use App\Host\Data\VolumeListing;
+use App\Host\Data\VolumeUsage;
 use App\Host\Exceptions\DockerUnavailable;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
@@ -29,6 +33,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use InvalidArgumentException;
 
 /**
  * Performs host operations through commypanel-agent over its Unix socket.
@@ -451,6 +456,69 @@ class AgentHostDriver implements HostDriver
         ResourceName::assertValid($app);
 
         $this->send('post', '/v1/volumes/remove', ['app' => $app, 'name' => $name ?? '']);
+    }
+
+    public function listVolumes(string $app): array
+    {
+        ResourceName::assertValid($app);
+
+        $data = $this->send('get', "/v1/volumes/{$app}");
+
+        return array_values(array_map(fn (array $v) => new VolumeUsage(
+            name: (string) ($v['name'] ?? ''),
+            bytes: (int) ($v['bytes'] ?? 0),
+            files: (int) ($v['files'] ?? 0),
+            partial: (bool) ($v['partial'] ?? false),
+        ), $data['volumes'] ?? []));
+    }
+
+    public function browseVolume(string $app, string $name, string $path = ''): VolumeListing
+    {
+        $data = $this->send('get', $this->volumeUrl($app, $name, 'dir'), $path === '' ? [] : ['path' => $path]);
+
+        return new VolumeListing(
+            array_values(array_map(fn (array $e) => new VolumeEntry(
+                name: (string) ($e['name'] ?? ''),
+                kind: (string) ($e['kind'] ?? 'other'),
+                size: (int) ($e['size'] ?? 0),
+                modified: (int) ($e['modified'] ?? 0),
+            ), $data['entries'] ?? [])),
+            (bool) ($data['truncated'] ?? false),
+        );
+    }
+
+    public function previewVolumeFile(string $app, string $name, string $path): VolumeFilePreview
+    {
+        $data = $this->send('get', $this->volumeUrl($app, $name, 'file'), ['path' => $path]);
+
+        return new VolumeFilePreview(
+            size: (int) ($data['size'] ?? 0),
+            content: (string) ($data['content'] ?? ''),
+            binary: (bool) ($data['binary'] ?? false),
+            truncated: (bool) ($data['truncated'] ?? false),
+        );
+    }
+
+    public function readVolumeFile(string $app, string $name, string $path): string
+    {
+        $response = $this->request(fn () => $this->client(120)->get($this->volumeUrl($app, $name, 'download'), ['path' => $path]));
+
+        if ($response->failed()) {
+            $this->throwFor($response->status(), $response->json('error'));
+        }
+
+        return $response->body();
+    }
+
+    private function volumeUrl(string $app, string $name, string $action): string
+    {
+        ResourceName::assertValid($app);
+
+        if (preg_match('/^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$/', $name) !== 1) {
+            throw new InvalidArgumentException("Invalid volume name [{$name}].");
+        }
+
+        return "/v1/volumes/{$app}/{$name}/{$action}";
     }
 
     public function pruneDanglingImages(): int

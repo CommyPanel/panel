@@ -237,3 +237,40 @@ describe('server page data', function () {
         Http::assertSent(fn ($request) => str_ends_with($request->url(), '/v1/nginx/reload'));
     });
 });
+
+it('lists, browses and previews volumes through the agent', function () {
+    Http::fake([
+        'agent/v1/volumes/shop/uploads/dir*' => Http::response(['entries' => [['name' => 'photos', 'kind' => 'dir', 'size' => 0, 'modified' => 1700000000]], 'truncated' => true]),
+        'agent/v1/volumes/shop/uploads/file*' => Http::response(['size' => 5, 'content' => 'hello', 'binary' => false, 'truncated' => false]),
+        'agent/v1/volumes/shop' => Http::response(['volumes' => [['name' => 'uploads', 'bytes' => 99, 'files' => 3, 'partial' => true]]]),
+    ]);
+
+    $driver = agentDriver();
+
+    expect($driver->listVolumes('shop')[0])->toMatchObject(['name' => 'uploads', 'bytes' => 99, 'files' => 3, 'partial' => true])
+        ->and($driver->browseVolume('shop', 'uploads', 'a b/c')->entries[0])->toMatchObject(['name' => 'photos', 'kind' => 'dir', 'modified' => 1700000000])
+        ->and($driver->browseVolume('shop', 'uploads')->truncated)->toBeTrue()
+        ->and($driver->previewVolumeFile('shop', 'uploads', 'readme.txt'))->toMatchObject(['size' => 5, 'content' => 'hello']);
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), '/v1/volumes/shop/uploads/dir?path=a%20b%2Fc'));
+});
+
+it('fetches a volume file as raw bytes and maps its errors', function () {
+    Http::fake([
+        'agent/v1/volumes/shop/uploads/download*path=ok*' => Http::response("\xff\0raw", 200),
+        'agent/v1/volumes/shop/uploads/download*' => Http::response(['error' => 'that file is larger than 25 MB and cannot be fetched here'], 400),
+    ]);
+
+    expect(agentDriver()->readVolumeFile('shop', 'uploads', 'ok'))->toBe("\xff\0raw")
+        ->and(fn () => agentDriver()->readVolumeFile('shop', 'uploads', 'big'))->toThrow(HostOperationFailed::class, 'larger than 25 MB');
+});
+
+it('refuses a volume name that could change the agent request', function () {
+    Http::fake();
+
+    foreach (['../x', 'a/b', 'Up', '', 'a b', 'x?y'] as $name) {
+        expect(fn () => agentDriver()->browseVolume('shop', $name))->toThrow(InvalidArgumentException::class);
+    }
+
+    Http::assertNothingSent();
+});

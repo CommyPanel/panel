@@ -19,6 +19,10 @@ use App\Host\Data\ResourceName;
 use App\Host\Data\ResourceUsage;
 use App\Host\Data\SystemStatus;
 use App\Host\Data\TaskSpec;
+use App\Host\Data\VolumeEntry;
+use App\Host\Data\VolumeFilePreview;
+use App\Host\Data\VolumeListing;
+use App\Host\Data\VolumeUsage;
 use App\Host\Exceptions\DockerUnavailable;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
@@ -53,6 +57,9 @@ class FakeHostDriver implements HostDriver
     private int $taskExitCode = 0;
 
     private bool $dockerDown = false;
+
+    /** @var array<string, array<string, string>> "app/volume" => relative path => content */
+    private array $volumeFiles = [];
 
     /** Actions that need the Docker daemon; they fail while it is down. */
     private const DOCKER_ACTIONS = [
@@ -354,6 +361,89 @@ class FakeHostDriver implements HostDriver
     {
         ResourceName::assertValid($app);
         $this->record('removeVolumes', ['app' => $app, 'name' => $name]);
+    }
+
+    /**
+     * Put a file into a fake volume (tests): $path is relative to the volume.
+     */
+    public function putVolumeFile(string $app, string $name, string $path, string $content): static
+    {
+        $this->volumeFiles["{$app}/{$name}"][trim($path, '/')] = $content;
+
+        return $this;
+    }
+
+    public function listVolumes(string $app): array
+    {
+        ResourceName::assertValid($app);
+        $this->record('listVolumes', ['app' => $app]);
+
+        $out = [];
+
+        foreach ($this->volumeFiles as $key => $files) {
+            [$owner, $name] = explode('/', $key, 2);
+
+            if ($owner === $app) {
+                $out[] = new VolumeUsage($name, array_sum(array_map('strlen', $files)), count($files));
+            }
+        }
+
+        usort($out, fn (VolumeUsage $a, VolumeUsage $b) => $a->name <=> $b->name);
+
+        return $out;
+    }
+
+    public function browseVolume(string $app, string $name, string $path = ''): VolumeListing
+    {
+        ResourceName::assertValid($app);
+        $this->record('browseVolume', ['app' => $app, 'name' => $name, 'path' => $path]);
+
+        $files = $this->volumeFiles["{$app}/{$name}"] ?? throw new HostOperationFailed('Agent error: that does not exist');
+        $prefix = trim($path, '/') === '' ? '' : trim($path, '/').'/';
+        $entries = [];
+
+        foreach ($files as $file => $content) {
+            if (! str_starts_with($file, $prefix)) {
+                continue;
+            }
+
+            $rest = substr($file, strlen($prefix));
+            $first = explode('/', $rest, 2);
+
+            if (count($first) === 2) {
+                $entries[$first[0]] = new VolumeEntry($first[0], 'dir', 0, 1_700_000_000);
+            } else {
+                $entries[$first[0]] = new VolumeEntry($first[0], 'file', strlen($content), 1_700_000_000);
+            }
+        }
+
+        if ($entries === [] && $prefix !== '') {
+            throw new HostOperationFailed('Agent error: that does not exist');
+        }
+
+        uasort($entries, fn (VolumeEntry $a, VolumeEntry $b) => [$a->kind !== 'dir', strtolower($a->name)] <=> [$b->kind !== 'dir', strtolower($b->name)]);
+
+        return new VolumeListing(array_values($entries));
+    }
+
+    public function previewVolumeFile(string $app, string $name, string $path): VolumeFilePreview
+    {
+        $content = $this->readVolumeFile($app, $name, $path);
+        $this->record('previewVolumeFile', ['app' => $app, 'name' => $name, 'path' => $path]);
+
+        if (str_contains($content, "\0")) {
+            return new VolumeFilePreview(strlen($content), '', binary: true);
+        }
+
+        return new VolumeFilePreview(strlen($content), substr($content, 0, 262144), truncated: strlen($content) > 262144);
+    }
+
+    public function readVolumeFile(string $app, string $name, string $path): string
+    {
+        ResourceName::assertValid($app);
+        $this->record('readVolumeFile', ['app' => $app, 'name' => $name, 'path' => $path]);
+
+        return $this->volumeFiles["{$app}/{$name}"][trim($path, '/')] ?? throw new HostOperationFailed('Agent error: that does not exist');
     }
 
     public function pruneDanglingImages(): int

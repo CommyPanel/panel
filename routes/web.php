@@ -10,6 +10,7 @@ use App\Http\Controllers\AppSourceController;
 use App\Http\Controllers\AppStateController;
 use App\Http\Controllers\AppUsageController;
 use App\Http\Controllers\AppVolumeController;
+use App\Http\Controllers\AppVolumeFilesController;
 use App\Http\Controllers\AppWebhookController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\CertificateController;
@@ -96,12 +97,20 @@ Route::middleware('auth')->group(function () {
             Route::delete('webhook', [AppWebhookController::class, 'destroy'])->name('webhook.destroy');
             Route::post('source', [AppSourceController::class, 'upload'])->name('source.upload');
             Route::post('volumes', [AppVolumeController::class, 'store'])->name('volumes.store');
-            Route::delete('volumes/{volume}', [AppVolumeController::class, 'destroy'])->name('volumes.destroy');
+            Route::delete('volumes/{volume}', [AppVolumeController::class, 'destroy'])->whereNumber('volume')->name('volumes.destroy');
+            Route::delete('volumes/{name}/data', [AppVolumeFilesController::class, 'destroyData'])->where('name', '[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?')->middleware('password.confirm')->name('volumes.data.destroy');
         });
 
         Route::middleware('can:'.Permissions::APPS_LOGS)->group(function () {
             Route::get('logs', [AppLogController::class, 'show'])->name('logs.show');
             Route::get('logs/download', [AppLogController::class, 'download'])->name('logs.download');
+        });
+
+        Route::middleware('can:'.Permissions::APPS_VOLUMES)->where(['name' => '[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?'])->group(function () {
+            Route::get('volumes', [AppVolumeFilesController::class, 'index'])->name('volumes.index');
+            Route::get('volumes/{name}/browse', [AppVolumeFilesController::class, 'browse'])->name('volumes.browse');
+            Route::get('volumes/{name}/file', [AppVolumeFilesController::class, 'file'])->name('volumes.file');
+            Route::get('volumes/{name}/download', [AppVolumeFilesController::class, 'download'])->name('volumes.download');
         });
 
         Route::middleware('can:'.Permissions::APPS_NGINX)->group(function () {

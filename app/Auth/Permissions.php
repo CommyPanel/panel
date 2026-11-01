@@ -23,6 +23,8 @@ final class Permissions
 
     public const APPS_LOGS = 'apps.logs';
 
+    public const APPS_VOLUMES = 'apps.volumes';
+
     public const APPS_DEACTIVATE = 'apps.deactivate';
 
     public const APPS_DELETE = 'apps.delete';
@@ -68,6 +70,7 @@ final class Permissions
             self::APPS_CONTROL => ['group' => 'Apps', 'label' => 'Start, stop and restart apps', 'description' => 'Stop an app\'s running container, start it again and restart it. Its domains stay configured; visitors see an error while it is stopped.'],
             self::APPS_NGINX => ['group' => 'Apps', 'label' => 'Edit nginx directives', 'description' => 'Add custom nginx directives to an app\'s site: upload limits, timeouts, headers, redirects and extra locations. Only a list of safe directives is accepted and nginx tests the result before it is applied, but the app\'s traffic goes through it.'],
             self::APPS_LOGS => ['group' => 'Apps', 'label' => 'Read app logs', 'description' => 'Read and download the output of an app\'s running container. Apps often print secrets, such as tokens or personal data, into their logs, and a download is recorded in the audit log.'],
+            self::APPS_VOLUMES => ['group' => 'Apps', 'label' => 'Browse volume files', 'description' => 'See how much space an app\'s persistent volumes use, look at their files and download them. Volumes often hold databases, uploads and other private data, and a download is recorded in the audit log.'],
             self::APPS_DEACTIVATE => ['group' => 'Apps', 'label' => 'Deactivate and activate apps', 'description' => 'Take an app offline without deleting it, and bring it back.'],
             self::APPS_DELETE => ['group' => 'Apps', 'label' => 'Delete apps', 'description' => 'Permanently delete an app with its releases, images, domains, certificate and variables.'],
             self::ENV_MANAGE => ['group' => 'Apps', 'label' => 'Manage environment variables', 'description' => 'Add, replace, import and remove an app\'s environment variables. These often hold secrets such as database passwords.'],

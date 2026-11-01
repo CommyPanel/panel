@@ -17,6 +17,9 @@ use App\Host\Data\NginxTestResult;
 use App\Host\Data\ResourceUsage;
 use App\Host\Data\SystemStatus;
 use App\Host\Data\TaskSpec;
+use App\Host\Data\VolumeFilePreview;
+use App\Host\Data\VolumeListing;
+use App\Host\Data\VolumeUsage;
 use App\Host\Exceptions\DockerUnavailable;
 use App\Host\Exceptions\HostOperationFailed;
 
@@ -195,6 +198,37 @@ interface HostDriver
      * @throws HostOperationFailed
      */
     public function removeVolumes(string $app, ?string $name = null): void;
+
+    /**
+     * The volume folders that exist on the host for an app, with their size.
+     *
+     * @return list<VolumeUsage>
+     *
+     * @throws HostOperationFailed
+     */
+    public function listVolumes(string $app): array;
+
+    /**
+     * The items in a folder of a volume. `$path` is relative to the volume and
+     * empty for its top. Read only; links are listed but never followed.
+     *
+     * @throws HostOperationFailed
+     */
+    public function browseVolume(string $app, string $name, string $path = ''): VolumeListing;
+
+    /**
+     * The start of a plain file as text.
+     *
+     * @throws HostOperationFailed
+     */
+    public function previewVolumeFile(string $app, string $name, string $path): VolumeFilePreview;
+
+    /**
+     * The whole content of a plain file, up to 25 MB.
+     *
+     * @throws HostOperationFailed
+     */
+    public function readVolumeFile(string $app, string $name, string $path): string;
 
     /**
      * Remove dangling images and return the bytes reclaimed.
