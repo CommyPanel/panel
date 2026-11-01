@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Host\Data\Volume;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * A folder of an app that survives deployments: mounted at `path` in every
@@ -14,10 +15,25 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $app_id
  * @property string $name
  * @property string $path
+ * @property Carbon|null $locked_at
  */
 class AppVolume extends Model
 {
     protected $guarded = [];
+
+    protected function casts(): array
+    {
+        return ['locked_at' => 'datetime'];
+    }
+
+    /**
+     * A locked volume cannot be removed from its app, and its files cannot be
+     * deleted, with the app or on their own.
+     */
+    public function isLocked(): bool
+    {
+        return $this->locked_at !== null;
+    }
 
     /**
      * @return BelongsTo<App, $this>

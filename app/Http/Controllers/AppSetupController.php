@@ -6,6 +6,7 @@ use App\Audit\AuditLogger;
 use App\Deploy\Deployer;
 use App\Deploy\DestroyApp;
 use App\Deploy\EnvParser;
+use App\Deploy\LockedException;
 use App\Deploy\Source\GitCredentials;
 use App\Deploy\Source\GitProvider;
 use App\Deploy\Source\GitUrl;
@@ -177,7 +178,13 @@ class AppSetupController extends Controller
         abort_unless($app->setup_step !== null, 404);
 
         $slug = $app->slug;
-        $destroy($app);
+
+        try {
+            $destroy($app);
+        } catch (LockedException $e) {
+            return back()->withErrors(['setup' => $e->getMessage()]);
+        }
+
         $audit->record('app.setup_cancelled', null, ['app' => $slug]);
 
         return redirect()->route('apps.index')->with('status', 'Setup cancelled.');

@@ -1,17 +1,30 @@
 import { router } from '@inertiajs/react';
-import { Play, Power, Trash2 } from 'lucide-react';
+import { Lock, LockOpen, Play, Power, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import AppLockController from '@/actions/App/Http/Controllers/AppLockController';
 import AppStateController from '@/actions/App/Http/Controllers/AppStateController';
 import { DeleteAppModal } from '@/components/apps/delete-app-modal';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { Tooltip } from '@/components/ui/tooltip';
 import type { AppSettings } from '@/types';
 
 export function AdvancedTab({ app }: { app: AppSettings }) {
     const [confirmStop, setConfirmStop] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [busy, setBusy] = useState(false);
+
+    const setLocked = (locked: boolean) =>
+        router.put(
+            AppLockController.app(app.slug),
+            { locked },
+            {
+                preserveScroll: true,
+                onStart: () => setBusy(true),
+                onFinish: () => setBusy(false),
+            },
+        );
 
     const running = ['running', 'stopped'].includes(app.status);
     const stopped = app.status === 'deactivated';
@@ -65,16 +78,55 @@ export function AdvancedTab({ app }: { app: AppSettings }) {
             )}
 
             <Card
-                title="Delete app"
-                description="Stops the app and permanently removes its containers, images, domains, certificate, variables and uploaded files. This cannot be undone."
+                title={app.locked ? 'App is locked' : 'Lock app'}
+                description="A locked app cannot be deleted, and neither can its volumes' files with it. Locking is a safety catch against a slip, such as deleting the wrong app: it does not stop deployments, restarts or any other change, and anyone who may change the app can unlock it. Locking and unlocking are recorded in the audit log."
                 actions={
                     <Button
-                        variant="error"
-                        onClick={() => setConfirmDelete(true)}
+                        variant={app.locked ? 'soft' : 'primary'}
+                        onClick={() => setLocked(!app.locked)}
+                        loading={busy}
                     >
-                        <Trash2 className="size-4" aria-hidden />
-                        Delete app
+                        {app.locked ? (
+                            <LockOpen className="size-4" aria-hidden />
+                        ) : (
+                            <Lock className="size-4" aria-hidden />
+                        )}
+                        {app.locked ? 'Unlock' : 'Lock'}
                     </Button>
+                }
+            />
+
+            <Card
+                // The disabled button's tooltip opens above it and must not be cut off by the card.
+                className="overflow-visible"
+                title="Delete app"
+                description="Stops the app and permanently removes its containers, images, domains, certificate, variables, uploaded files and the files in its persistent volumes. This cannot be undone."
+                actions={
+                    app.locked ? (
+                        // aria-disabled, not disabled: the button stays focusable so the reason can be read.
+                        <Tooltip
+                            side="top"
+                            label="App is locked and cannot be deleted. Unlock it first."
+                        >
+                            <Button
+                                variant="error"
+                                aria-disabled="true"
+                                className="cursor-not-allowed opacity-50"
+                                onClick={(event) => event.preventDefault()}
+                            >
+                                <Trash2 className="size-4" aria-hidden />
+                                Delete app
+                            </Button>
+                        </Tooltip>
+                    ) : (
+                        <Button
+                            variant="error"
+                            onClick={() => setConfirmDelete(true)}
+                        >
+                            <Trash2 className="size-4" aria-hidden />
+                            Delete app
+                        </Button>
+                    )
                 }
             />
 

@@ -15,10 +15,33 @@ class DestroyApp
     public function __construct(private readonly HostDriver $host, private readonly UploadStorage $uploads) {}
 
     /**
+     * Deleting an app deletes the files of its volumes, so a locked volume
+     * protects the app from deletion too.
+     *
+     * @throws LockedException
+     */
+    public static function assertUnlocked(App $app): void
+    {
+        if ($app->isLocked()) {
+            throw new LockedException('App is locked and cannot be deleted. Unlock it first.');
+        }
+
+        $locked = $app->volumes()->whereNotNull('locked_at')->orderBy('id')->pluck('path');
+
+        if ($locked->isNotEmpty()) {
+            throw new LockedException('Volume '.$locked->first().' is locked, and deleting the app would delete its files. Unlock the volume first.');
+        }
+    }
+
+    /**
      * @return list<string> problems cleaning up the host; the app is deleted regardless
+     *
+     * @throws LockedException when the app, or one of its volumes, is locked
      */
     public function __invoke(App $app): array
     {
+        self::assertUnlocked($app);
+
         $problems = [];
         $deployments = $app->deployments()->get();
 

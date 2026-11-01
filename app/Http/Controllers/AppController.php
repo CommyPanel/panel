@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Audit\AuditLogger;
 use App\Auth\Permissions;
 use App\Deploy\DestroyApp;
+use App\Deploy\LockedException;
 use App\Deploy\Source\GitProvider;
 use App\Dns\PanelDomain;
 use App\Dns\ServerAddress;
@@ -121,7 +122,13 @@ class AppController extends Controller
         ]);
 
         $slug = $app->slug;
-        $problems = $destroy($app);
+
+        try {
+            $problems = $destroy($app);
+        } catch (LockedException $e) {
+            return back()->withErrors(['confirm' => $e->getMessage()]);
+        }
+
         $audit->record('app.deleted', null, ['app' => $slug, 'cleanup_problems' => $problems]);
 
         $redirect = redirect()->route('apps.index')->with('status', "App {$slug} deleted.");

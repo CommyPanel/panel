@@ -29,6 +29,7 @@ import { UsageTab } from '@/components/apps/tabs/usage-tab';
 import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { LockIcon } from '@/components/ui/lock-icon';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Tabs, tabPanelProps } from '@/components/ui/tabs';
 import type { TabItem } from '@/components/ui/tabs';
@@ -243,7 +244,12 @@ export default function Show({
         <AppLayout title={app.name}>
             <PageHeader
                 title={app.name}
-                badge={<StatusBadge status={app.status} />}
+                badge={
+                    <>
+                        <StatusBadge status={app.status} />
+                        {app.locked && <LockIcon what="app" />}
+                    </>
+                }
                 description={
                     app.source_type === 'upload'
                         ? 'Uploaded project'

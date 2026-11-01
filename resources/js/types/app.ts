@@ -41,13 +41,19 @@ export type AppSummary = {
     stack: string | null;
     source_type: 'git' | 'upload';
     status: AppStatus;
+    locked: boolean;
     git_url: string | null;
     git_branch: string;
     active_release: number | null;
     last_deployed_at: string | null;
 };
 
-export type AppVolume = { id: number; name: string; path: string };
+export type AppVolume = {
+    id: number;
+    name: string;
+    path: string;
+    locked: boolean;
+};
 
 export type AppSettings = AppSummary & {
     container_port: number;

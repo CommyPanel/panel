@@ -33,6 +33,10 @@ class AppVolumeController extends Controller
 
     public function destroy(Request $request, App $app, AppVolume $volume, AuditLogger $audit): RedirectResponse
     {
+        if ($volume->isLocked()) {
+            return back()->withErrors(['volume' => 'Volume is locked and cannot be removed. Unlock it first.']);
+        }
+
         $volume->delete();
 
         $audit->record('app.volume_removed', $request->user(), ['app' => $app->slug, 'path' => $volume->path, 'name' => $volume->name], $app);

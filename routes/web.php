@@ -4,6 +4,7 @@ use App\Auth\Permissions;
 use App\Http\Controllers\AppContainerController;
 use App\Http\Controllers\AppController;
 use App\Http\Controllers\AppDomainController;
+use App\Http\Controllers\AppLockController;
 use App\Http\Controllers\AppLogController;
 use App\Http\Controllers\AppNginxController;
 use App\Http\Controllers\AppSetupController;
@@ -101,6 +102,8 @@ Route::middleware('auth')->group(function () {
             Route::post('webhook', [AppWebhookController::class, 'store'])->name('webhook.store');
             Route::delete('webhook', [AppWebhookController::class, 'destroy'])->name('webhook.destroy');
             Route::post('source', [AppSourceController::class, 'upload'])->name('source.upload');
+            Route::put('lock', [AppLockController::class, 'app'])->name('lock');
+            Route::put('volumes/{volume}/lock', [AppLockController::class, 'volume'])->whereNumber('volume')->name('volumes.lock');
             Route::post('volumes', [AppVolumeController::class, 'store'])->name('volumes.store');
             Route::delete('volumes/{volume}', [AppVolumeController::class, 'destroy'])->whereNumber('volume')->name('volumes.destroy');
             Route::delete('volumes/{name}/data', [AppVolumeFilesController::class, 'destroyData'])->where('name', '[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?')->middleware('password.confirm')->name('volumes.data.destroy');

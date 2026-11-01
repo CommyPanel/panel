@@ -5,6 +5,7 @@ import AppSetupController from '@/actions/App/Http/Controllers/AppSetupControlle
 import { PageHeader } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
 import { useCan } from '@/lib/permissions';
+import { LockIcon } from '@/components/ui/lock-icon';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/format';
@@ -67,6 +68,11 @@ export default function Index({ apps }: Props) {
                                             >
                                                 {app.name}
                                             </Link>
+                                            {app.locked && (
+                                                <span className="ml-2 inline-flex align-middle">
+                                                    <LockIcon what="app" />
+                                                </span>
+                                            )}
                                         </td>
                                         <td>
                                             <StatusBadge status={app.status} />

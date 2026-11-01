@@ -42,6 +42,7 @@ use Illuminate\Support\Str;
  * @property string|null $cpu_limit
  * @property int|null $active_deployment_id
  * @property Carbon|null $stopped_at
+ * @property Carbon|null $locked_at
  * @property Carbon $created_at
  * @property Carbon $updated_at
  */
@@ -64,6 +65,7 @@ class App extends Model
             'stack_hint' => Stack::class,
             'source_verified_at' => 'datetime',
             'stopped_at' => 'datetime',
+            'locked_at' => 'datetime',
             'source_type' => SourceType::class,
             'deploy_key_private' => 'encrypted',
             'git_token' => 'encrypted',
@@ -138,6 +140,15 @@ class App extends Model
     public function domains(): HasMany
     {
         return $this->hasMany(Domain::class);
+    }
+
+    /**
+     * A locked app cannot be deleted. Locking guards against a slip, not against
+     * a determined administrator: anyone who may change the app can unlock it.
+     */
+    public function isLocked(): bool
+    {
+        return $this->locked_at !== null;
     }
 
     /**
