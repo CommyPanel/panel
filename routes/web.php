@@ -3,6 +3,7 @@
 use App\Auth\Permissions;
 use App\Http\Controllers\AppController;
 use App\Http\Controllers\AppDomainController;
+use App\Http\Controllers\AppLogController;
 use App\Http\Controllers\AppNginxController;
 use App\Http\Controllers\AppSetupController;
 use App\Http\Controllers\AppSourceController;
@@ -93,6 +94,11 @@ Route::middleware('auth')->group(function () {
             Route::post('webhook', [AppWebhookController::class, 'store'])->name('webhook.store');
             Route::delete('webhook', [AppWebhookController::class, 'destroy'])->name('webhook.destroy');
             Route::post('source', [AppSourceController::class, 'upload'])->name('source.upload');
+        });
+
+        Route::middleware('can:'.Permissions::APPS_LOGS)->group(function () {
+            Route::get('logs', [AppLogController::class, 'show'])->name('logs.show');
+            Route::get('logs/download', [AppLogController::class, 'download'])->name('logs.download');
         });
 
         Route::middleware('can:'.Permissions::APPS_NGINX)->group(function () {

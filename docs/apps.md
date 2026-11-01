@@ -30,6 +30,12 @@ The **Container** menu on the app page restarts or stops the live version. A sto
 
 This differs from **Deactivate** (Advanced tab), which removes the container and takes the domains offline until you activate the app again.
 
+## Logs
+
+The **Logs** tab shows what the running container printed, newest at the bottom. Choose how many lines to load (200 to 5,000). **Follow** refreshes every 3 seconds and keeps the view at the end; switch it off to read in peace. Search the log with the box above it, or press Cmd/Ctrl+F while the log is focused: matches are highlighted, and Enter and Shift+Enter move between them. **Download** saves the last 5,000 lines as a text file.
+
+Apps often print secrets into their logs, so reading them needs its own permission, `apps.logs`. The built-in admin role and the super user have it; **roles you made yourself do not** until you grant it. Every download is recorded in the audit log. Only the live container's output is shown, not that of earlier releases.
+
 ## Deploy on push
 
 Under Settings > Deploy on push, turn on the webhook and add its URL and secret to your repository (GitHub, GitLab, Bitbucket Cloud, Gitea and Forgejo are supported). Every push to the app's branch then starts a deployment.

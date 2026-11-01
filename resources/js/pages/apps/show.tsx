@@ -6,6 +6,7 @@ import {
     Layers,
     FileCode,
     Rocket,
+    ScrollText,
     Settings,
     SlidersHorizontal,
     Variable,
@@ -17,6 +18,7 @@ import { AppPower } from '@/components/apps/app-power';
 import { AdvancedTab } from '@/components/apps/tabs/advanced-tab';
 import { DeploymentsTab } from '@/components/apps/tabs/deployments-tab';
 import { DomainsTab } from '@/components/apps/tabs/domains-tab';
+import { LogsTab } from '@/components/apps/tabs/logs-tab';
 import { EnvironmentTab } from '@/components/apps/tabs/environment-tab';
 import { NginxTab } from '@/components/apps/tabs/nginx-tab';
 import { SettingsTab } from '@/components/apps/tabs/settings-tab';
@@ -48,6 +50,7 @@ type Props = {
 type TabId =
     | 'deployments'
     | 'usage'
+    | 'logs'
     | 'domains'
     | 'environment'
     | 'nginx'
@@ -57,6 +60,7 @@ type TabId =
 const TAB_IDS: TabId[] = [
     'deployments',
     'usage',
+    'logs',
     'domains',
     'environment',
     'nginx',
@@ -95,7 +99,11 @@ export default function Show({
     // The nginx editor reports unsaved changes, so switching tabs can warn first.
     const nginxDirty = useRef(false);
     const canNginx = can('apps.nginx');
-    const active: TabId = tab === 'nginx' && !canNginx ? 'deployments' : tab;
+    const canLogs = can('apps.logs');
+    const active: TabId =
+        (tab === 'nginx' && !canNginx) || (tab === 'logs' && !canLogs)
+            ? 'deployments'
+            : tab;
 
     // Keep the tab in the address so a reload or a shared link lands on it.
     const select = (id: TabId) => {
@@ -151,6 +159,15 @@ export default function Show({
             label: 'Usage',
             icon: <Activity className="size-4" aria-hidden />,
         },
+        ...(canLogs
+            ? [
+                  {
+                      id: 'logs' as const,
+                      label: 'Logs',
+                      icon: <ScrollText className="size-4" aria-hidden />,
+                  },
+              ]
+            : []),
         {
             id: 'domains',
             label: 'Domains & SSL',
@@ -249,6 +266,7 @@ export default function Show({
                     <DeploymentsTab app={app} deployments={deployments} />
                 )}
                 {active === 'usage' && <UsageTab app={app} />}
+                {active === 'logs' && <LogsTab app={app} />}
                 {active === 'domains' && (
                     <DomainsTab app={app} server={server} https={https} />
                 )}
