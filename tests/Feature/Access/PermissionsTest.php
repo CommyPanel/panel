@@ -104,6 +104,7 @@ describe('route protection', function () {
         'apps.deploy' => [['post', '/apps/shop/deployments']],
         'apps.nginx' => [['get', '/apps/shop/nginx'], ['put', '/apps/shop/nginx']],
         'apps.volumes' => [['get', '/apps/shop/volumes'], ['get', '/apps/shop/volumes/data/browse'], ['get', '/apps/shop/volumes/data/file'], ['get', '/apps/shop/volumes/data/download']],
+        'apps.terminal' => [['post', '/apps/shop/terminal']],
         'apps.logs' => [['get', '/apps/shop/logs'], ['get', '/apps/shop/logs/download']],
         'apps.control' => [['post', '/apps/shop/stop'], ['post', '/apps/shop/start'], ['post', '/apps/shop/restart']],
         'apps.deactivate' => [['post', '/apps/shop/deactivate'], ['post', '/apps/shop/activate']],

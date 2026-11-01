@@ -189,6 +189,15 @@ interface HostDriver
     public function listContainers(): array;
 
     /**
+     * A single-use ticket that lets one browser open a terminal in one managed
+     * container, from one origin (such as https://panel.example.com). The
+     * ticket is only valid for a few seconds.
+     *
+     * @throws HostOperationFailed
+     */
+    public function createTerminalTicket(string $container, string $origin): string;
+
+    /**
      * The Docker networks CommyPanel created, with what is attached to each.
      *
      * @return list<NetworkInfo>

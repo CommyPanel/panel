@@ -365,6 +365,14 @@ class FakeHostDriver implements HostDriver
         }, $this->containers));
     }
 
+    public function createTerminalTicket(string $container, string $origin): string
+    {
+        ResourceName::assertValid($container);
+        $this->record('createTerminalTicket', ['container' => $container, 'origin' => $origin]);
+
+        return 'fake-ticket-'.count($this->actions);
+    }
+
     public function listNetworks(): array
     {
         $members = [];

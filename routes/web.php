@@ -9,6 +9,7 @@ use App\Http\Controllers\AppNginxController;
 use App\Http\Controllers\AppSetupController;
 use App\Http\Controllers\AppSourceController;
 use App\Http\Controllers\AppStateController;
+use App\Http\Controllers\AppTerminalController;
 use App\Http\Controllers\AppUsageController;
 use App\Http\Controllers\AppVolumeController;
 use App\Http\Controllers\AppVolumeFilesController;
@@ -116,6 +117,9 @@ Route::middleware('auth')->group(function () {
             Route::get('volumes/{name}/file', [AppVolumeFilesController::class, 'file'])->name('volumes.file');
             Route::get('volumes/{name}/download', [AppVolumeFilesController::class, 'download'])->name('volumes.download');
         });
+
+        Route::post('terminal', [AppTerminalController::class, 'ticket'])
+            ->middleware(['can:'.Permissions::APPS_TERMINAL, 'password.confirm', 'throttle:10,1'])->name('terminal');
 
         Route::middleware('can:'.Permissions::APPS_NGINX)->group(function () {
             Route::get('nginx', [AppNginxController::class, 'show'])->name('nginx.show');

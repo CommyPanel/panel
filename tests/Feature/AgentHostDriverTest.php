@@ -304,3 +304,17 @@ it('copes with an older agent that does not report networks, ports or mounts', f
 
     expect(agentDriver()->listContainers()[0])->toMatchObject(['networks' => [], 'ports' => [], 'mounts' => []]);
 });
+
+it('asks the agent for a terminal ticket and checks the answer', function () {
+    Http::fake(['agent/v1/terminal/tickets' => Http::sequence()
+        ->push(['ticket' => 'abc', 'expires_in' => 30])
+        ->push(['expires_in' => 30])
+        ->push(['error' => 'terminals are not enabled on this agent'], 503)]);
+
+    expect(agentDriver()->createTerminalTicket('shop-4', 'https://panel.example.com'))->toBe('abc');
+
+    Http::assertSent(fn ($request) => $request->data() === ['container' => 'shop-4', 'origin' => 'https://panel.example.com']);
+
+    expect(fn () => agentDriver()->createTerminalTicket('shop-4', 'https://panel.example.com'))->toThrow(HostOperationFailed::class, 'ticket')
+        ->and(fn () => agentDriver()->createTerminalTicket('shop-4', 'https://panel.example.com'))->toThrow(HostOperationFailed::class, 'not enabled');
+});

@@ -455,6 +455,20 @@ class AgentHostDriver implements HostDriver
         ), $data['containers'] ?? []));
     }
 
+    public function createTerminalTicket(string $container, string $origin): string
+    {
+        ResourceName::assertValid($container);
+
+        $data = $this->send('post', '/v1/terminal/tickets', ['container' => $container, 'origin' => $origin]);
+        $ticket = $data['ticket'] ?? null;
+
+        if (! is_string($ticket) || $ticket === '') {
+            throw new HostOperationFailed('The agent did not return a terminal ticket.');
+        }
+
+        return $ticket;
+    }
+
     public function listNetworks(): array
     {
         $data = $this->send('get', '/v1/docker/networks');
