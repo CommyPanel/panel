@@ -98,7 +98,7 @@ describe('route protection', function () {
     $routes = [
         'apps.view' => [['get', '/apps']],
         'apps.create' => [['get', '/apps/create'], ['post', '/apps']],
-        'apps.update' => [['patch', '/apps/shop'], ['post', '/apps/shop/deploy-key']],
+        'apps.update' => [['patch', '/apps/shop'], ['post', '/apps/shop/deploy-key'], ['post', '/apps/shop/git-token'], ['delete', '/apps/shop/git-token']],
         'apps.deploy' => [['post', '/apps/shop/deployments']],
         'apps.control' => [['post', '/apps/shop/stop'], ['post', '/apps/shop/start'], ['post', '/apps/shop/restart']],
         'apps.deactivate' => [['post', '/apps/shop/deactivate'], ['post', '/apps/shop/activate']],

@@ -1,7 +1,9 @@
 <?php
 
 use App\Deploy\Source\AccessState;
+use App\Deploy\Source\GitCredentials;
 use App\Deploy\Source\GitProvider;
+use App\Deploy\Source\GitRunner;
 use App\Deploy\Source\RepositoryAccessChecker;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
@@ -73,7 +75,7 @@ describe('scripted git answers', function () {
     it('confirms a working deploy key and tests it over SSH', function () {
         Process::fake(['*ls-remote*' => Process::result("a\trefs/heads/main\n")]);
 
-        $result = accessChecker()->check('https://github.com/acme/shop', 'main', 'PRIVATE-KEY');
+        $result = accessChecker()->check('https://github.com/acme/shop', 'main', GitCredentials::key('PRIVATE-KEY'));
 
         expect($result->state)->toBe(AccessState::KeyWorks);
         Process::assertRan(fn ($process) => str_contains(implode(' ', $process->command), 'git@github.com:acme/shop.git'));
@@ -82,11 +84,50 @@ describe('scripted git answers', function () {
     it('says the key is not accepted yet when the host rejects it', function () {
         Process::fake(['*ls-remote*' => Process::result('', "git@github.com: Permission denied (publickey).\nfatal: Could not read from remote repository.", 128)]);
 
-        $result = accessChecker()->check('git@github.com:acme/shop.git', 'main', 'PRIVATE-KEY');
+        $result = accessChecker()->check('git@github.com:acme/shop.git', 'main', GitCredentials::key('PRIVATE-KEY'));
 
         expect($result->state)->toBe(AccessState::KeyRequired)
             ->and($result->message)->toContain('not accepted yet');
     });
+
+    it('tests an access token over HTTPS, passing it only through the environment', function () {
+        Process::fake(['*ls-remote*' => Process::result("a\trefs/heads/main\n")]);
+
+        $result = accessChecker()->check('git@github.com:acme/shop.git', 'main', GitCredentials::token('x-access-token', 'secret-token-123'));
+
+        expect($result->state)->toBe(AccessState::TokenWorks)
+            ->and($result->message)->toContain('access token works');
+        Process::assertRan(function ($process) {
+            $command = implode(' ', $process->command);
+            $env = $process->environment;
+
+            return str_contains($command, 'https://github.com/acme/shop.git')
+                && ! str_contains($command, 'secret-token-123')
+                && $env['GIT_CONFIG_KEY_0'] === 'http.extraHeader'
+                && $env['GIT_CONFIG_VALUE_0'] === 'Authorization: Basic '.base64_encode('x-access-token:secret-token-123')
+                && $env['GIT_CONFIG_KEY_1'] === 'http.followRedirects'
+                && $env['GIT_CONFIG_VALUE_1'] === 'false'
+                && ! isset($env['GIT_SSH_COMMAND']);
+        });
+    });
+
+    it('says the token is not accepted when the host refuses it', function () {
+        Process::fake(['*ls-remote*' => Process::result('', "fatal: Authentication failed for 'https://gitlab.com/g/p.git/'", 128)]);
+
+        $result = accessChecker()->check('https://gitlab.com/g/p.git', 'main', GitCredentials::token('oauth2', 'glpat-abcdefgh'));
+
+        expect($result->state)->toBe(AccessState::KeyRequired)
+            ->and($result->message)->toContain('access token was not accepted');
+    });
+
+    it('refuses token credentials that could not be sent safely', function (string $username, string $token) {
+        expect(fn () => GitCredentials::token($username, $token))->toThrow(InvalidArgumentException::class);
+    })->with([
+        'colon in username' => ['me:you', 'token-12345'],
+        'newline in token' => ['me', "token\r\nX-Evil: 1"],
+        'space in token' => ['me', 'token 12345'],
+        'too short' => ['me', 'abc'],
+    ]);
 
     it('rejects addresses and branches git must never see', function (string $url, string $branch) {
         Process::fake();
@@ -115,7 +156,7 @@ describe('scripted git answers', function () {
         config(['commypanel.data_path' => storage_path('framework/testing/keys-'.bin2hex(random_bytes(4)))]);
         Process::fake(['*ls-remote*' => Process::result("a\trefs/heads/main\n")]);
 
-        accessChecker()->check('https://github.com/acme/shop', 'main', 'PRIVATE-KEY');
+        accessChecker()->check('https://github.com/acme/shop', 'main', GitCredentials::key('PRIVATE-KEY'));
 
         expect(glob(config('commypanel.data_path').'/tmp/key-*'))->toBe([]);
         File::deleteDirectory(config('commypanel.data_path'));
@@ -143,6 +184,12 @@ describe('a real repository', function () {
     });
 
     afterEach(fn () => File::deleteDirectory($this->dir));
+
+    it('hands the token to the real git through its configuration', function () {
+        $result = app(GitRunner::class)->run(['config', '--get-all', 'http.extraHeader'], GitCredentials::token('x-access-token', 'secret-token-123'), $this->dir);
+
+        expect(trim($result->output()))->toBe('Authorization: Basic '.base64_encode('x-access-token:secret-token-123'));
+    });
 
     it('finds a real branch and reports a missing one', function () {
         expect(accessChecker()->check($this->dir, 'main', null)->state)->toBe(AccessState::Public)

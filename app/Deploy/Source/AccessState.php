@@ -6,10 +6,12 @@ enum AccessState: string
 {
     /** Readable without any credentials. */
     case Public = 'public';
-    /** Not readable yet: private, or the address is wrong. A deploy key is needed. */
+    /** Not readable yet: private, or the address is wrong. A deploy key or access token is needed. */
     case KeyRequired = 'key_required';
     /** The deploy key works. */
     case KeyWorks = 'key_works';
+    /** The access token works. */
+    case TokenWorks = 'token_works';
     /** Readable, but the requested branch does not exist. */
     case BranchMissing = 'branch_missing';
     /** The server could not be reached. */
@@ -19,6 +21,6 @@ enum AccessState: string
 
     public function isReady(): bool
     {
-        return $this === self::Public || $this === self::KeyWorks;
+        return in_array($this, [self::Public, self::KeyWorks, self::TokenWorks], true);
     }
 }

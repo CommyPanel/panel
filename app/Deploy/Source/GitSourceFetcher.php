@@ -35,9 +35,15 @@ class GitSourceFetcher implements SourceFetcher
             throw new DeploymentFailed('The Git branch name is not valid.');
         }
 
+        $credentials = GitCredentials::forApp($app);
+
+        if ($credentials?->isToken()) {
+            $url = $credentials->remote($url) ?? throw new DeploymentFailed('Access tokens work over https://, and this Git address cannot be turned into one.');
+        }
+
         $result = $this->git->run(
             ['clone', '--depth', '1', '--single-branch', '--branch', $app->git_branch, '--', $url, $destination],
-            $app->deploy_key_private,
+            $credentials,
         );
 
         if ($result->failed()) {

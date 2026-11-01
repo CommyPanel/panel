@@ -65,6 +65,22 @@ final class GitUrl
     }
 
     /**
+     * The HTTPS form of a repository URL (access tokens only work over HTTPS),
+     * or null when it cannot be derived.
+     */
+    public static function toHttps(string $url): ?string
+    {
+        if (str_starts_with($url, 'https://')) {
+            return $url;
+        }
+
+        $host = self::host($url);
+        $path = self::path($url);
+
+        return $host !== null && $path !== null ? "https://{$host}/{$path}.git" : null;
+    }
+
+    /**
      * The SSH form of a repository URL (deploy keys only work over SSH), or
      * null when it cannot be derived.
      */

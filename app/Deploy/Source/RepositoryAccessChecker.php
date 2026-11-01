@@ -5,7 +5,7 @@ namespace App\Deploy\Source;
 /**
  * Finds out whether this server can read a repository, using `git ls-remote`.
  * That works for every Git host (including self-hosted ones) without needing
- * any provider API or token, and it is the same access a deployment will use.
+ * any provider API, and it is the same access a deployment will use.
  */
 class RepositoryAccessChecker
 {
@@ -25,7 +25,7 @@ class RepositoryAccessChecker
 
     public function __construct(private readonly GitRunner $git) {}
 
-    public function check(string $url, string $branch, ?string $privateKey): AccessResult
+    public function check(string $url, string $branch, ?GitCredentials $credentials): AccessResult
     {
         $provider = GitProvider::fromUrl($url);
 
@@ -39,21 +39,29 @@ class RepositoryAccessChecker
 
         $sshUrl = GitUrl::toSsh($url);
 
-        if ($privateKey === null) {
+        if ($credentials === null) {
             // SSH addresses cannot be read without a key, so there is nothing to try.
             if (GitUrl::isSsh($url)) {
-                return new AccessResult(AccessState::KeyRequired, 'SSH addresses need a deploy key. Create one below and add it to the repository.', $provider, $sshUrl);
+                return new AccessResult(AccessState::KeyRequired, 'SSH addresses need a deploy key or an access token. Add one below.', $provider, $sshUrl);
             }
 
             return $this->probe($url, $branch, null, $provider, $sshUrl, AccessState::Public);
         }
 
-        return $this->probe($sshUrl ?? $url, $branch, $privateKey, $provider, $sshUrl, AccessState::KeyWorks);
+        if ($credentials->isToken()) {
+            $httpsUrl = $credentials->remote($url);
+
+            return $httpsUrl === null
+                ? new AccessResult(AccessState::Invalid, 'Access tokens work over https://, and this address cannot be turned into one.', $provider, $sshUrl)
+                : $this->probe($httpsUrl, $branch, $credentials, $provider, $sshUrl, AccessState::TokenWorks);
+        }
+
+        return $this->probe($sshUrl ?? $url, $branch, $credentials, $provider, $sshUrl, AccessState::KeyWorks);
     }
 
-    private function probe(string $target, string $branch, ?string $privateKey, GitProvider $provider, ?string $sshUrl, AccessState $success): AccessResult
+    private function probe(string $target, string $branch, ?GitCredentials $credentials, GitProvider $provider, ?string $sshUrl, AccessState $success): AccessResult
     {
-        $result = $this->git->run(['ls-remote', '--heads', '--', $target], $privateKey, timeout: self::TIMEOUT_SECONDS);
+        $result = $this->git->run(['ls-remote', '--heads', '--', $target], $credentials, timeout: self::TIMEOUT_SECONDS);
 
         if ($result->successful()) {
             return $this->branchResult($result->output(), $branch, $provider, $sshUrl, $success);
@@ -68,9 +76,11 @@ class RepositoryAccessChecker
         if ($this->mentionsAny($error, self::REFUSED)) {
             return new AccessResult(
                 AccessState::KeyRequired,
-                $privateKey === null
-                    ? 'This repository cannot be read without credentials. If it is private, add the deploy key below; if not, check the address.'
-                    : 'The deploy key is not accepted yet. Add it to the repository (read-only is enough) and verify again.',
+                match (true) {
+                    $credentials === null => 'This repository cannot be read without credentials. If it is private, add a deploy key or an access token below; if not, check the address.',
+                    $credentials->isToken() => 'The access token was not accepted. Check that it can read this repository, that the username fits it, and that it has not expired.',
+                    default => 'The deploy key is not accepted yet. Add it to the repository (read-only is enough) and verify again.',
+                },
                 $provider,
                 $sshUrl,
             );
@@ -97,7 +107,11 @@ class RepositoryAccessChecker
 
         return new AccessResult(
             $success,
-            $success === AccessState::Public ? 'The repository is public. No key is needed.' : 'The deploy key works. This server can read the repository.',
+            match ($success) {
+                AccessState::Public => 'The repository is public. No key is needed.',
+                AccessState::TokenWorks => 'The access token works. This server can read the repository.',
+                default => 'The deploy key works. This server can read the repository.',
+            },
             $provider,
             $sshUrl,
             $branches,

@@ -13,6 +13,7 @@ use App\Http\Controllers\DeployKeyController;
 use App\Http\Controllers\DeploymentController;
 use App\Http\Controllers\DomainController;
 use App\Http\Controllers\EnvVarController;
+use App\Http\Controllers\GitTokenController;
 use App\Http\Controllers\HttpsController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
@@ -79,6 +80,8 @@ Route::middleware('auth')->group(function () {
 
         Route::middleware('can:'.Permissions::APPS_UPDATE)->group(function () {
             Route::post('deploy-key', [DeployKeyController::class, 'store'])->name('deploy-key.store');
+            Route::post('git-token', [GitTokenController::class, 'store'])->name('git-token.store');
+            Route::delete('git-token', [GitTokenController::class, 'destroy'])->name('git-token.destroy');
             Route::post('source', [AppSourceController::class, 'upload'])->name('source.upload');
         });
 

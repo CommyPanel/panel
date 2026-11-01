@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import AppSetupController from '@/actions/App/Http/Controllers/AppSetupController';
 import DeployKeyController from '@/actions/App/Http/Controllers/DeployKeyController';
+import { AccessTokenCard } from '@/components/apps/access-token-card';
 import { AppDomains } from '@/components/apps/app-domains';
 import { ReleaseCommandInput } from '@/components/apps/app-fields';
 import { SetupSteps } from '@/components/apps/setup-steps';
@@ -140,7 +141,9 @@ function GitStep({
     };
 
     const needsKey =
-        access?.state === 'key_required' || app.deploy_key_public !== null;
+        access?.state === 'key_required' ||
+        app.deploy_key_public !== null ||
+        app.git_token !== null;
 
     return (
         <div className="space-y-6">
@@ -190,6 +193,13 @@ function GitStep({
                     </Alert>
                 )}
             </Card>
+
+            {needsKey && !app.source_verified && (
+                <p className="text-sm text-base-content/70">
+                    A private repository needs a deploy key or an access token.
+                    Use whichever is easier for you.
+                </p>
+            )}
 
             {needsKey && !app.source_verified && (
                 <Card
@@ -253,6 +263,10 @@ function GitStep({
                         </div>
                     )}
                 </Card>
+            )}
+
+            {needsKey && (!app.source_verified || app.git_token !== null) && (
+                <AccessTokenCard app={app} />
             )}
 
             <Footer app={app} canContinue={app.source_verified} />

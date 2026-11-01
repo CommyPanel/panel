@@ -6,6 +6,7 @@ use App\Audit\AuditLogger;
 use App\Deploy\Deployer;
 use App\Deploy\DestroyApp;
 use App\Deploy\EnvParser;
+use App\Deploy\Source\GitCredentials;
 use App\Deploy\Source\GitProvider;
 use App\Deploy\Source\GitUrl;
 use App\Deploy\Source\InvalidArchive;
@@ -73,11 +74,12 @@ class AppSetupController extends Controller
             $app->forceFill(['git_branch' => $data['git_branch'], 'source_verified_at' => null])->save();
         }
 
-        $result = $checker->check((string) $app->git_url, $app->git_branch, $app->deploy_key_private);
+        $credentials = GitCredentials::forApp($app);
+        $result = $checker->check((string) $app->git_url, $app->git_branch, $credentials);
 
-        // Once the deploy key works, deployments should use the SSH address.
-        if ($result->state->value === 'key_works' && $result->sshUrl !== null && $result->sshUrl !== $app->git_url) {
-            $app->git_url = $result->sshUrl;
+        // Deployments should use the address the working credentials need.
+        if ($credentials !== null && $result->state->isReady()) {
+            $app->git_url = $credentials->remote((string) $app->git_url) ?? $app->git_url;
         }
 
         $app->forceFill(['source_verified_at' => $result->state->isReady() ? now() : null])->save();

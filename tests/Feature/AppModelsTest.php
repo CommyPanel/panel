@@ -47,10 +47,10 @@ it('encrypts environment values and deploy keys at rest', function () {
 });
 
 it('never serialises secrets', function () {
-    $app = App::factory()->create(['deploy_key_private' => 'PRIVATE-KEY-MATERIAL']);
+    $app = App::factory()->create(['deploy_key_private' => 'PRIVATE-KEY-MATERIAL', 'git_token' => 'TOKEN-MATERIAL']);
     $var = AppEnvVar::query()->create(['app_id' => $app->id, 'key' => 'A', 'value' => 'secret']);
 
-    expect(json_encode($app))->not->toContain('PRIVATE-KEY-MATERIAL')
+    expect(json_encode($app))->not->toContain('PRIVATE-KEY-MATERIAL')->not->toContain('TOKEN-MATERIAL')
         ->and(json_encode($var))->not->toContain('secret');
 });
 

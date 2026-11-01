@@ -2,9 +2,11 @@
 
 namespace App\Presenters;
 
+use App\Deploy\Source\GitProvider;
 use App\Enums\AppStatus;
 use App\Enums\CertificateStatus;
 use App\Enums\DeploymentStatus;
+use App\Enums\SourceType;
 use App\Models\App;
 use App\Models\Deployment;
 use App\Models\Domain;
@@ -47,6 +49,8 @@ class AppPresenter
             'memory_limit_mb' => $app->memory_limit_mb,
             'cpu_limit' => $app->cpu_limit === null ? null : (float) $app->cpu_limit,
             'deploy_key_public' => $app->deploy_key_public,
+            'git_token' => $app->git_token === null ? null : ['username' => $app->git_token_username],
+            'token_help' => self::tokenHelp($app),
             'release_command' => $app->release_command,
             'deactivated_release' => $app->status() === AppStatus::Deactivated
                 ? $app->deployments()->where('status', DeploymentStatus::Stopped)->max('number')
@@ -118,6 +122,26 @@ class AppPresenter
             $certificate->status === CertificateStatus::Failed => 'failed',
             default => 'none',
         };
+    }
+
+    /**
+     * How to create an access token on the app's Git host, for Git apps.
+     *
+     * @return array<string, mixed>|null
+     */
+    private static function tokenHelp(App $app): ?array
+    {
+        if ($app->source_type !== SourceType::Git || $app->git_url === null) {
+            return null;
+        }
+
+        $provider = GitProvider::fromUrl($app->git_url);
+
+        return [
+            'provider' => $provider->label(),
+            'username' => $provider->tokenUsername(),
+            ...$provider->tokenInstructions($app->git_url),
+        ];
     }
 
     /**

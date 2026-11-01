@@ -29,6 +29,8 @@ use Illuminate\Support\Str;
  * @property string $git_branch
  * @property string|null $deploy_key_private
  * @property string|null $deploy_key_public
+ * @property string|null $git_token
+ * @property string|null $git_token_username
  * @property Carbon|null $source_verified_at
  * @property int $container_port
  * @property string $health_path
@@ -49,7 +51,7 @@ class App extends Model
 
     protected $guarded = [];
 
-    protected $hidden = ['deploy_key_private'];
+    protected $hidden = ['deploy_key_private', 'git_token'];
 
     protected function casts(): array
     {
@@ -61,6 +63,7 @@ class App extends Model
             'stopped_at' => 'datetime',
             'source_type' => SourceType::class,
             'deploy_key_private' => 'encrypted',
+            'git_token' => 'encrypted',
         ];
     }
 

@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import AppController from '@/actions/App/Http/Controllers/AppController';
 import { RuntimeFields, SourceFields } from '@/components/apps/app-fields';
 import type { AppFormData } from '@/components/apps/app-fields';
+import { AccessTokenCard } from '@/components/apps/access-token-card';
 import { DeployKeyCard } from '@/components/apps/deploy-key-card';
 import { UploadSourceCard } from '@/components/apps/upload-source-card';
 import { Button } from '@/components/ui/button';
@@ -67,14 +68,17 @@ export function SettingsTab({ app }: { app: AppSettings }) {
                     Save settings
                 </Button>
             </form>
-            <div className="min-w-0">
+            <div className="min-w-0 space-y-6">
                 {upload ? (
                     <UploadSourceCard slug={app.slug} />
                 ) : (
-                    <DeployKeyCard
-                        slug={app.slug}
-                        publicKey={app.deploy_key_public}
-                    />
+                    <>
+                        <DeployKeyCard
+                            slug={app.slug}
+                            publicKey={app.deploy_key_public}
+                        />
+                        <AccessTokenCard app={app} />
+                    </>
                 )}
             </div>
         </div>

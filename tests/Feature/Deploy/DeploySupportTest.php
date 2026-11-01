@@ -103,6 +103,21 @@ describe('git fetcher', function () {
             ->toThrow(DeploymentFailed::class, 'Could not fetch the repository');
     });
 
+    it('clones over HTTPS with the access token when the app has one', function () {
+        Process::fake(['*' => Process::result('')]);
+        $app = App::factory()->make([
+            'source_type' => SourceType::Git, 'git_url' => 'git@github.com:acme/shop.git', 'git_branch' => 'main',
+            'git_token' => 'secret-token-123', 'git_token_username' => 'x-access-token', 'deploy_key_private' => 'KEY',
+        ]);
+
+        (new GitSourceFetcher(new GitRunner))->fetch($app, $this->dir.'/out');
+
+        Process::assertRan(fn ($process) => in_array('clone', $process->command, true)
+            && in_array('https://github.com/acme/shop.git', $process->command, true)
+            && ! str_contains(implode(' ', $process->command), 'secret-token-123')
+            && str_starts_with($process->environment['GIT_CONFIG_VALUE_0'] ?? '', 'Authorization: Basic '));
+    });
+
     it('refuses local paths unless enabled', function () {
         $app = App::factory()->make(['source_type' => SourceType::Git, 'git_url' => $this->repo]);
 

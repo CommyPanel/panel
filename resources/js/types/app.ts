@@ -18,6 +18,7 @@ export type SourceAccess = {
         | 'public'
         | 'key_required'
         | 'key_works'
+        | 'token_works'
         | 'branch_missing'
         | 'unreachable'
         | 'invalid';
@@ -53,6 +54,8 @@ export type AppSettings = AppSummary & {
     memory_limit_mb: number | null;
     cpu_limit: number | null;
     deploy_key_public: string | null;
+    git_token: { username: string | null } | null;
+    token_help: TokenHelp | null;
     deactivated_release: number | null;
     url: string | null;
     domains: DomainRow[];
@@ -103,3 +106,12 @@ export type DeploymentSummary = {
 };
 
 export type DeploymentDetail = DeploymentSummary & { log: string };
+
+/** How to create a read-only access token on the app's Git host. */
+export type TokenHelp = {
+    provider: string;
+    /** The username the host expects with a token; null when the user must enter it. */
+    username: string | null;
+    url: string | null;
+    steps: string[];
+};
