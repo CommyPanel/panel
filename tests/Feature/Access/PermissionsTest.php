@@ -100,6 +100,7 @@ describe('route protection', function () {
         'apps.create' => [['get', '/apps/create'], ['post', '/apps']],
         'apps.update' => [['patch', '/apps/shop'], ['post', '/apps/shop/deploy-key'], ['post', '/apps/shop/git-token'], ['delete', '/apps/shop/git-token'], ['post', '/apps/shop/webhook'], ['delete', '/apps/shop/webhook']],
         'apps.deploy' => [['post', '/apps/shop/deployments']],
+        'apps.nginx' => [['get', '/apps/shop/nginx'], ['put', '/apps/shop/nginx']],
         'apps.control' => [['post', '/apps/shop/stop'], ['post', '/apps/shop/start'], ['post', '/apps/shop/restart']],
         'apps.deactivate' => [['post', '/apps/shop/deactivate'], ['post', '/apps/shop/activate']],
         'apps.delete' => [['delete', '/apps/shop']],

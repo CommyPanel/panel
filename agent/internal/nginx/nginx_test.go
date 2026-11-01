@@ -49,7 +49,7 @@ func TestRenderHTTPOnly(t *testing.T) {
 	for _, want := range []string{
 		"server_name demo.example.com www.example.com;",
 		"proxy_pass http://127.0.0.1:20001;",
-		"location /.well-known/acme-challenge/",
+		"location ^~ /.well-known/acme-challenge/",
 	} {
 		if !strings.Contains(conf, want) {
 			t.Errorf("config missing %q:\n%s", want, conf)

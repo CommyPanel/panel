@@ -3,12 +3,13 @@ import {
     ExternalLink,
     Globe,
     Layers,
+    FileCode,
     Rocket,
     Settings,
     SlidersHorizontal,
     Variable,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import AppController from '@/actions/App/Http/Controllers/AppController';
 import DeploymentController from '@/actions/App/Http/Controllers/DeploymentController';
 import { AppPower } from '@/components/apps/app-power';
@@ -16,6 +17,7 @@ import { AdvancedTab } from '@/components/apps/tabs/advanced-tab';
 import { DeploymentsTab } from '@/components/apps/tabs/deployments-tab';
 import { DomainsTab } from '@/components/apps/tabs/domains-tab';
 import { EnvironmentTab } from '@/components/apps/tabs/environment-tab';
+import { NginxTab } from '@/components/apps/tabs/nginx-tab';
 import { SettingsTab } from '@/components/apps/tabs/settings-tab';
 import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
@@ -45,6 +47,7 @@ type TabId =
     | 'deployments'
     | 'domains'
     | 'environment'
+    | 'nginx'
     | 'settings'
     | 'advanced';
 
@@ -52,6 +55,7 @@ const TAB_IDS: TabId[] = [
     'deployments',
     'domains',
     'environment',
+    'nginx',
     'settings',
     'advanced',
 ];
@@ -84,9 +88,21 @@ export default function Show({
     const can = useCan();
     const [deploying, setDeploying] = useState(false);
     const [tab, setTab] = useState<TabId>(initialTab);
+    // The nginx editor reports unsaved changes, so switching tabs can warn first.
+    const nginxDirty = useRef(false);
+    const canNginx = can('apps.nginx');
+    const active: TabId = tab === 'nginx' && !canNginx ? 'deployments' : tab;
 
     // Keep the tab in the address so a reload or a shared link lands on it.
     const select = (id: TabId) => {
+        if (
+            nginxDirty.current &&
+            id !== 'nginx' &&
+            !window.confirm('You have unsaved nginx changes. Discard them?')
+        ) {
+            return;
+        }
+
         setTab(id);
         try {
             const url = new URL(window.location.href);
@@ -138,6 +154,15 @@ export default function Show({
             icon: <Variable className="size-4" aria-hidden />,
             badge: <Count value={env_keys.length} />,
         },
+        ...(canNginx
+            ? [
+                  {
+                      id: 'nginx' as const,
+                      label: 'Nginx',
+                      icon: <FileCode className="size-4" aria-hidden />,
+                  },
+              ]
+            : []),
         {
             id: 'settings',
             label: 'Settings',
@@ -205,25 +230,33 @@ export default function Show({
 
             <Tabs
                 tabs={tabs}
-                active={tab}
+                active={active}
                 onChange={select}
                 label="App sections"
             />
 
-            <div {...tabPanelProps(tab)} className="outline-none">
-                {tab === 'deployments' && (
+            <div {...tabPanelProps(active)} className="outline-none">
+                {active === 'deployments' && (
                     <DeploymentsTab app={app} deployments={deployments} />
                 )}
-                {tab === 'domains' && (
+                {active === 'domains' && (
                     <DomainsTab app={app} server={server} https={https} />
                 )}
-                {tab === 'environment' && (
+                {active === 'nginx' && (
+                    <NginxTab
+                        slug={app.slug}
+                        onDirtyChange={(dirty) => {
+                            nginxDirty.current = dirty;
+                        }}
+                    />
+                )}
+                {active === 'environment' && (
                     <EnvironmentTab slug={app.slug} keys={env_keys} />
                 )}
-                {tab === 'settings' && (
+                {active === 'settings' && (
                     <SettingsTab app={app} webhook={webhook} />
                 )}
-                {tab === 'advanced' && <AdvancedTab app={app} />}
+                {active === 'advanced' && <AdvancedTab app={app} />}
             </div>
         </AppLayout>
     );

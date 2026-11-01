@@ -30,6 +30,10 @@ type Site struct {
 	// Redirects send some of the site's domains to another one of them,
 	// for example example.com to www.example.com.
 	Redirects []Redirect `json:"redirects,omitempty"`
+	// Custom is the user's extra directives for the serving server block. It
+	// is parsed and checked against an allow-list (see custom.go) and rendered
+	// from the parsed result, never embedded as typed.
+	Custom string `json:"custom,omitempty"`
 }
 
 // Redirect is a permanent redirect between two of a site's domains.
@@ -72,9 +76,12 @@ func (s Site) Validate() error {
 		return err
 	}
 	if s.Certificate != "" {
-		return validate.Name(s.Certificate)
+		if err := validate.Name(s.Certificate); err != nil {
+			return err
+		}
 	}
-	return nil
+	_, err := CheckCustom(s.Custom)
+	return err
 }
 
 func (s Site) validateRedirects() error {
@@ -151,7 +158,8 @@ server {
     listen [::]:80;
     server_name {{.ServerNames}};
 
-    location /.well-known/acme-challenge/ {
+    location ^~ /.well-known/acme-challenge/ {
+        allow all;
         root {{.Webroot}};
     }
 {{if .CertDir}}
@@ -170,13 +178,18 @@ server {
     ssl_certificate_key {{.CertDir}}/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
 {{end}}
+    # Shared by the app's location / and by locations added as custom directives.
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    set $commypanel_upstream http://127.0.0.1:{{.Port}};
+{{if .Custom}}
+    # Custom directives, edited in CommyPanel. Checked before they are written.
+{{.Custom}}{{end}}
     location / {
         proxy_pass http://127.0.0.1:{{.Port}};
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 {{range .Redirects}}
@@ -185,7 +198,7 @@ server {
     listen [::]:80;
     server_name {{.From}};
 
-    location /.well-known/acme-challenge/ {
+    location ^~ /.well-known/acme-challenge/ {
         root {{$.Webroot}};
     }
 
@@ -260,16 +273,21 @@ func (m *Manager) Render(s Site) (string, error) {
 	if err := s.Validate(); err != nil {
 		return "", err
 	}
+	custom, err := CheckCustom(s.Custom)
+	if err != nil {
+		return "", err
+	}
 	data := struct {
-		ServerNames, Webroot, CertDir string
-		Port                          int
-		ModernHTTP2                   bool
-		Redirects                     []Redirect
+		ServerNames, Webroot, CertDir, Custom string
+		Port                                  int
+		ModernHTTP2                           bool
+		Redirects                             []Redirect
 	}{
 		ServerNames: strings.Join(s.served(), " "),
 		Redirects:   s.Redirects,
 		Webroot:     filepath.Join(m.cfg.DataDir, "acme-webroot"),
 		Port:        s.UpstreamPort,
+		Custom:      custom,
 	}
 	if s.Certificate != "" {
 		data.ModernHTTP2 = m.modernHTTP2() // only HTTPS sites use HTTP/2

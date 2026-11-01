@@ -21,6 +21,25 @@ class AppRouting
      */
     public function sync(App $app, ?Deployment $target = null): void
     {
+        $site = $this->siteFor($app, $target);
+
+        if ($site === null) {
+            $this->host->removeNginxSite($app->slug);
+
+            return;
+        }
+
+        $this->host->applyNginxSite($site);
+    }
+
+    /**
+     * The nginx site the app should have right now, or null when it should
+     * have none (no domain, or no live deployment to send visitors to).
+     *
+     * @param  Deployment|null  $target  the deployment about to go live, when it is not recorded as active yet
+     */
+    public function siteFor(App $app, ?Deployment $target = null): ?NginxSite
+    {
         $live = $target ?? $app->activeDeployment()->first();
         $rows = $app->domains()->orderBy('name')->get();
         $domains = array_values(array_map(fn (mixed $name): string => (string) $name, $rows->pluck('name')->all()));
@@ -39,14 +58,12 @@ class AppRouting
         }
 
         if ($live === null || $live->host_port === null || $domains === []) {
-            $this->host->removeNginxSite($app->slug);
-
-            return;
+            return null;
         }
 
         $certificate = $app->certificate()->first();
         $https = $certificate !== null && $certificate->status === CertificateStatus::Active && $certificate->isUsable();
 
-        $this->host->applyNginxSite(new NginxSite($app->slug, $domains, $live->host_port, $https ? $app->slug : null, $redirects));
+        return new NginxSite($app->slug, $domains, $live->host_port, $https ? $app->slug : null, $redirects, $app->nginx_custom);
     }
 }

@@ -209,7 +209,25 @@ class AgentHostDriver implements HostDriver
 
     public function applyNginxSite(NginxSite $site): void
     {
-        $this->send('put', '/v1/nginx/sites', array_filter([
+        $this->send('put', '/v1/nginx/sites', $this->siteBody($site));
+    }
+
+    public function renderNginxSite(NginxSite $site): string
+    {
+        return (string) ($this->send('post', '/v1/nginx/render', $this->siteBody($site))['config'] ?? '');
+    }
+
+    public function checkNginxCustom(string $custom): void
+    {
+        $this->send('post', '/v1/nginx/custom/check', ['custom' => $custom]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function siteBody(NginxSite $site): array
+    {
+        return array_filter([
             'name' => $site->name,
             'domains' => $site->domains,
             'upstream_port' => $site->upstreamPort,
@@ -219,7 +237,8 @@ class AgentHostDriver implements HostDriver
                 array_keys($site->redirects),
                 array_values($site->redirects),
             ),
-        ], fn ($value) => $value !== null));
+            'custom' => $site->custom === '' ? null : $site->custom,
+        ], fn ($value) => $value !== null);
     }
 
     public function removeNginxSite(string $name): void

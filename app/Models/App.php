@@ -33,6 +33,7 @@ use Illuminate\Support\Str;
  * @property string|null $git_token_username
  * @property string|null $webhook_id
  * @property string|null $webhook_secret
+ * @property string|null $nginx_custom
  * @property Carbon|null $source_verified_at
  * @property int $container_port
  * @property string $health_path

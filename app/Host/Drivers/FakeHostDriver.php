@@ -208,6 +208,19 @@ class FakeHostDriver implements HostDriver
         $this->sites[$site->name] = $site;
     }
 
+    public function renderNginxSite(NginxSite $site): string
+    {
+        $this->record('renderNginxSite', ['site' => $site]);
+
+        return "# [fake] nginx site {$site->name} for ".implode(' ', $site->domains)." -> 127.0.0.1:{$site->upstreamPort}\n"
+            .($site->custom === null ? '' : "# [fake] custom directives:\n{$site->custom}\n");
+    }
+
+    public function checkNginxCustom(string $custom): void
+    {
+        $this->record('checkNginxCustom', ['custom' => $custom]);
+    }
+
     public function removeNginxSite(string $name): void
     {
         ResourceName::assertValid($name);

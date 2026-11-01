@@ -106,6 +106,21 @@ interface HostDriver
     public function applyNginxSite(NginxSite $site): void;
 
     /**
+     * The config a site would get, without writing or reloading anything.
+     *
+     * @throws HostOperationFailed
+     */
+    public function renderNginxSite(NginxSite $site): string;
+
+    /**
+     * Check custom nginx directives on their own, without a site. Does nothing
+     * when they are acceptable.
+     *
+     * @throws HostOperationFailed with the reason and line numbers when they are refused
+     */
+    public function checkNginxCustom(string $custom): void;
+
+    /**
      * @throws HostOperationFailed
      */
     public function removeNginxSite(string $name): void;

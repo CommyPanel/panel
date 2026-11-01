@@ -34,6 +34,13 @@ func (f *fakeNginx) Apply(_ context.Context, s nginx.Site) error {
 	return f.err
 }
 
+func (f *fakeNginx) Render(s nginx.Site) (string, error) {
+	if err := s.Validate(); err != nil {
+		return "", err
+	}
+	return "# rendered " + s.Name + "\n" + s.Custom, nil
+}
+
 func (f *fakeNginx) Status(context.Context) nginx.Status {
 	return nginx.Status{Available: true, Running: true, Version: "1.26.0", ConfigOK: true, ConfigOutput: "ok", Sites: []nginx.SiteFile{{Name: "demo", Domains: []string{"demo.example.com"}}}}
 }
@@ -528,5 +535,53 @@ func TestSystemUsage(t *testing.T) {
 
 	if rec := do(t, New(Options{Nginx: &fakeNginx{}, Docker: &fakeDocker{}, Authorize: AllowAll()}), "GET", "/v1/system/usage", ""); rec.Code != http.StatusNotImplemented {
 		t.Errorf("without a sampler: %d", rec.Code)
+	}
+}
+
+func TestCustomCheckRoute(t *testing.T) {
+	s := New(Options{Nginx: &fakeNginx{}, Docker: &fakeDocker{}, Authorize: AllowAll()})
+
+	rec := do(t, s, "POST", "/v1/nginx/custom/check", `{"custom":"# big uploads\nclient_max_body_size 50m;"}`)
+	var got struct {
+		OK     bool   `json:"ok"`
+		Custom string `json:"custom"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil || rec.Code != 200 || !got.OK {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	if got.Custom != "    # big uploads\n    client_max_body_size 50m;\n" {
+		t.Errorf("canonical = %q", got.Custom)
+	}
+
+	rec = do(t, s, "POST", "/v1/nginx/custom/check", `{"custom":"gzip on;\nroot /;"}`)
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "line 2") || !strings.Contains(rec.Body.String(), "root") {
+		t.Errorf("refusal: %d %s", rec.Code, rec.Body)
+	}
+
+	if rec := do(t, s, "POST", "/v1/nginx/custom/check", `{"custom":"","extra":1}`); rec.Code != http.StatusBadRequest {
+		t.Errorf("unknown field: %d", rec.Code)
+	}
+}
+
+func TestRenderRoute(t *testing.T) {
+	s := New(Options{Nginx: &fakeNginx{}, Docker: &fakeDocker{}, Authorize: AllowAll()})
+
+	rec := do(t, s, "POST", "/v1/nginx/render", `{"name":"shop","domains":["shop.example.com"],"upstream_port":20007,"custom":"gzip on;"}`)
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `# rendered shop\ngzip on;`) {
+		t.Errorf("render: %d %s", rec.Code, rec.Body)
+	}
+	rec = do(t, s, "POST", "/v1/nginx/render", `{"name":"shop","domains":["shop.example.com"],"upstream_port":20007,"custom":"alias /;"}`)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("a refused site must not render: %d", rec.Code)
+	}
+}
+
+func TestApplySiteRefusesBadCustomDirectives(t *testing.T) {
+	f := &fakeNginx{}
+	s := New(Options{Nginx: f, Docker: &fakeDocker{}, Authorize: AllowAll()})
+
+	rec := do(t, s, "PUT", "/v1/nginx/sites", `{"name":"shop","domains":["shop.example.com"],"upstream_port":20007,"custom":"include /etc/passwd;"}`)
+	if rec.Code != http.StatusBadRequest || len(f.applied) != 0 {
+		t.Errorf("%d applied=%d", rec.Code, len(f.applied))
 	}
 }

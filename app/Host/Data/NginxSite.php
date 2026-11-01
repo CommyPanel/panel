@@ -9,6 +9,7 @@ final readonly class NginxSite
     /**
      * @param  list<string>  $domains
      * @param  array<string, string>  $redirects  domain => the domain it permanently redirects to
+     * @param  string|null  $custom  the user's extra directives; the agent checks them against an allow-list
      */
     public function __construct(
         public string $name,
@@ -16,6 +17,7 @@ final readonly class NginxSite
         public int $upstreamPort,
         public ?string $certificate = null,
         public array $redirects = [],
+        public ?string $custom = null,
     ) {
         ResourceName::assertValid($name);
 

@@ -89,6 +89,28 @@ it('reports resource usage from the real sampler', function () {
         ->and($usage->hostHistory)->toBeArray();
 });
 
+it('checks custom nginx directives and renders them into the site', function () {
+    $this->driver->checkNginxCustom("# uploads\nclient_max_body_size 50m;\nlocation /api/ { proxy_pass \$commypanel_upstream; }");
+
+    $site = new NginxSite('demo', ['demo.example.com'], 20001, custom: "client_max_body_size 50m;\nlocation /api/ { proxy_read_timeout 300s; }");
+    $config = $this->driver->renderNginxSite($site);
+
+    expect($config)->toContain('set $commypanel_upstream http://127.0.0.1:20001;')
+        ->toContain("    client_max_body_size 50m;\n    location /api/ {\n        proxy_read_timeout 300s;\n    }")
+        ->and($this->dir.'/sites/commypanel-demo.conf')->not->toBeFile();
+
+    $this->driver->applyNginxSite($site);
+    expect(file_get_contents($this->dir.'/sites/commypanel-demo.conf'))->toContain('client_max_body_size 50m;');
+});
+
+it('refuses dangerous custom nginx directives with the reason', function () {
+    expect(fn () => $this->driver->checkNginxCustom("gzip on;\nalias /etc/;"))
+        ->toThrow(HostOperationFailed::class, 'line 2');
+    expect(fn () => $this->driver->applyNginxSite(new NginxSite('demo', ['demo.example.com'], 20001, custom: 'include /etc/passwd;')))
+        ->toThrow(HostOperationFailed::class, 'not supported');
+    expect($this->dir.'/sites/commypanel-demo.conf')->not->toBeFile();
+});
+
 it('applies and removes an nginx site', function () {
     $this->driver->applyNginxSite(new NginxSite('demo', ['demo.example.com'], 20001));
 

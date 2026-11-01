@@ -24,6 +24,7 @@ const maxBody = 64 << 10
 // Nginx is the part of the nginx manager the server needs.
 type Nginx interface {
 	Apply(ctx context.Context, s nginx.Site) error
+	Render(s nginx.Site) (string, error)
 	Remove(ctx context.Context, name string) error
 	Status(ctx context.Context) nginx.Status
 	Test(ctx context.Context) (bool, string)
@@ -103,6 +104,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/docker/restart", s.dockerRestart)
 	mux.HandleFunc("GET /v1/docker/images", s.listImages)
 	mux.HandleFunc("PUT /v1/nginx/sites", s.applySite)
+	mux.HandleFunc("POST /v1/nginx/render", s.renderSite)
+	mux.HandleFunc("POST /v1/nginx/custom/check", s.checkCustom)
 	mux.HandleFunc("DELETE /v1/nginx/sites/{name}", s.removeSite)
 	mux.HandleFunc("POST /v1/certificates/issue", s.issueCertificate)
 	mux.HandleFunc("GET /v1/certificates/{name}", s.certificateInfo)
@@ -246,6 +249,38 @@ func (s *Server) applySite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.respond(w, s.opts.Nginx.Apply(r.Context(), site))
+}
+
+// renderSite returns the config a site would get, without writing anything,
+// so the panel can show the generated file next to the custom directives.
+func (s *Server) renderSite(w http.ResponseWriter, r *http.Request) {
+	var site nginx.Site
+	if !decode(w, r, &site) {
+		return
+	}
+	conf, err := s.opts.Nginx.Render(site)
+	if err != nil {
+		s.respond(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"config": conf})
+}
+
+// checkCustom validates custom directives on their own (no site needed), so a
+// refusal can be explained before anything is saved.
+func (s *Server) checkCustom(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Custom string `json:"custom"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	canonical, err := nginx.CheckCustom(body.Custom)
+	if err != nil {
+		s.respond(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "custom": canonical})
 }
 
 func (s *Server) removeSite(w http.ResponseWriter, r *http.Request) {
