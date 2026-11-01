@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // Info is a summary of the Docker daemon for the panel's Server page. When
@@ -27,6 +28,18 @@ type Info struct {
 	Images        int    `json:"images"`
 	CPUs          int    `json:"cpus"`
 	MemTotal      uint64 `json:"mem_total_bytes"`
+}
+
+// Ping reports whether the daemon answers. A socket file alone proves
+// nothing: with systemd socket activation it exists while dockerd is down.
+// In dry-run mode Docker is never contacted and counts as available.
+func (m *Manager) Ping(ctx context.Context) error {
+	if m.cfg.DryRun {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	return m.engine.doJSON(ctx, "GET", "/_ping", nil, nil, nil)
 }
 
 // Info asks the daemon for its version and counters.

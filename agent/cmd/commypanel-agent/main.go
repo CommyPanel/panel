@@ -92,7 +92,8 @@ func run() error {
 		BuildMemoryMB: *buildMem, BuildCPUs: *buildCPUs,
 	}, docker.NewUnixEngine(*dockerSock))
 	certMgr := certs.NewManager(certs.Config{DataDir: *dataDir, DryRun: *dryRun, UserAgent: "commypanel-agent/" + version})
-	srv := server.New(server.Options{Nginx: mgr, Docker: dockerMgr, Certs: certMgr, Authorize: authorize, Version: version, DryRun: *dryRun,
+	srv := server.New(server.Options{Nginx: mgr, Docker: dockerMgr, Certs: certMgr, Unit: system.NewDockerUnit(*dryRun),
+		Authorize: authorize, Version: version, DryRun: *dryRun,
 		System: func() system.Status { return system.Collect(*dataDir) },
 		Info:   system.NewReader(*dataDir).Info,
 	})

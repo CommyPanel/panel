@@ -5,6 +5,7 @@ export const fortify = {
     logout: '/logout',
     twoFactorChallenge: '/two-factor-challenge',
     confirmPassword: '/user/confirm-password',
+    confirmedPasswordStatus: '/user/confirmed-password-status',
     password: '/user/password',
     twoFactor: '/user/two-factor-authentication',
     twoFactorConfirm: '/user/confirmed-two-factor-authentication',

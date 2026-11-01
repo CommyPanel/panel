@@ -6,6 +6,7 @@ use App\Host\Data\CertificateInfo;
 use App\Host\Data\CertificateRequest;
 use App\Host\Data\ContainerInfo;
 use App\Host\Data\ContainerSpec;
+use App\Host\Data\DockerDiagnosis;
 use App\Host\Data\DockerInfo;
 use App\Host\Data\HostInfo;
 use App\Host\Data\ImageBuildSpec;
@@ -16,6 +17,7 @@ use App\Host\Data\NginxTestResult;
 use App\Host\Data\ResourceName;
 use App\Host\Data\SystemStatus;
 use App\Host\Data\TaskSpec;
+use App\Host\Exceptions\DockerUnavailable;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
 use DateTimeImmutable;
@@ -48,9 +50,17 @@ class FakeHostDriver implements HostDriver
 
     private int $taskExitCode = 0;
 
+    private bool $dockerDown = false;
+
+    /** Actions that need the Docker daemon; they fail while it is down. */
+    private const DOCKER_ACTIONS = [
+        'buildImage', 'runContainer', 'runTask', 'stopContainer', 'startContainer', 'restartContainer',
+        'removeContainer', 'containerLogs', 'pruneDanglingImages', 'removeImage',
+    ];
+
     public function systemStatus(): SystemStatus
     {
-        return new SystemStatus(dockerAvailable: true, nginxAvailable: true, diskFreeBytes: 50 * 1024 ** 3);
+        return new SystemStatus(dockerAvailable: ! $this->dockerDown, nginxAvailable: true, diskFreeBytes: 50 * 1024 ** 3);
     }
 
     public function systemInfo(): HostInfo
@@ -69,6 +79,10 @@ class FakeHostDriver implements HostDriver
 
     public function dockerInfo(): DockerInfo
     {
+        if ($this->dockerDown) {
+            return new DockerInfo(available: false, error: 'docker is not available');
+        }
+
         $running = count($this->containers);
 
         return new DockerInfo(
@@ -76,6 +90,29 @@ class FakeHostDriver implements HostDriver
             kernelVersion: '6.8.0-fake', storageDriver: 'overlay2', cgroupDriver: 'systemd',
             containers: $running, running: $running, images: count($this->images), cpus: 4, memTotalBytes: 4 * 1024 ** 3,
         );
+    }
+
+    public function dockerDiagnosis(): DockerDiagnosis
+    {
+        return $this->dockerDown
+            ? new DockerDiagnosis(false, 'docker is not available', 'failed', 'active', "[fake] dockerd: failed to start daemon\n[fake] docker.service: Failed with result 'exit-code'.")
+            : new DockerDiagnosis(true, null, 'active', 'active', '[fake] dockerd: API listen on /run/docker.sock');
+    }
+
+    public function restartDocker(): void
+    {
+        $this->record('restartDocker', []);
+        $this->dockerDown = false;
+    }
+
+    /**
+     * Simulate a stopped or broken Docker daemon until restartDocker().
+     */
+    public function dockerGoesDown(): static
+    {
+        $this->dockerDown = true;
+
+        return $this;
     }
 
     public function listImages(): array
@@ -304,6 +341,10 @@ class FakeHostDriver implements HostDriver
      */
     private function record(string $action, array $args): void
     {
+        if ($this->dockerDown && in_array($action, self::DOCKER_ACTIONS, true)) {
+            throw new DockerUnavailable('Agent error: docker is not available');
+        }
+
         if ($this->failOn === $action) {
             $this->failOn = null;
 

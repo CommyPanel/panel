@@ -114,6 +114,8 @@ Route::middleware('auth')->group(function () {
             Route::get('docker/containers/{name}/logs', [ServerDockerController::class, 'logs'])
                 ->where('name', '[a-z0-9][a-z0-9-]*')->name('docker.logs');
             Route::post('docker/prune', [ServerDockerController::class, 'prune'])->name('docker.prune');
+            Route::post('docker/restart', [ServerDockerController::class, 'restart'])
+                ->middleware('password.confirm')->name('docker.restart');
             Route::post('nginx/test', [ServerNginxController::class, 'test'])->name('nginx.test');
             Route::post('nginx/reload', [ServerNginxController::class, 'reload'])->name('nginx.reload');
         });

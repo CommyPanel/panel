@@ -121,6 +121,17 @@ it('streams a dry-run build', function () {
     expect($lines)->toBe(['[dry-run] would build commypanel/demo:r1']);
 });
 
+it('reports Docker as up, diagnoses and restarts it in dry-run mode', function () {
+    expect($this->driver->systemStatus()->dockerAvailable)->toBeTrue();
+
+    $diagnosis = $this->driver->dockerDiagnosis();
+    expect($diagnosis->available)->toBeTrue()
+        ->and($diagnosis->service)->toBe('unknown')
+        ->and($diagnosis->journal)->toContain('dry-run');
+
+    $this->driver->restartDocker();
+});
+
 it('starts and restarts containers in dry-run mode', function () {
     $this->driver->startContainer('demo-1');
     $this->driver->restartContainer('demo-1');

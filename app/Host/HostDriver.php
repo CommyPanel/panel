@@ -6,6 +6,7 @@ use App\Host\Data\CertificateInfo;
 use App\Host\Data\CertificateRequest;
 use App\Host\Data\ContainerInfo;
 use App\Host\Data\ContainerSpec;
+use App\Host\Data\DockerDiagnosis;
 use App\Host\Data\DockerInfo;
 use App\Host\Data\HostInfo;
 use App\Host\Data\ImageBuildSpec;
@@ -39,6 +40,22 @@ interface HostDriver
      *                             unreachable Docker daemon is reported in the result instead
      */
     public function dockerInfo(): DockerInfo;
+
+    /**
+     * Whether Docker answers and, from systemd, why not: unit states and the
+     * daemon's latest log lines.
+     *
+     * @throws HostOperationFailed when the agent cannot be reached
+     */
+    public function dockerDiagnosis(): DockerDiagnosis;
+
+    /**
+     * Restart the Docker daemon. Every container stops and comes back through
+     * its restart policy, so apps are briefly unavailable.
+     *
+     * @throws HostOperationFailed
+     */
+    public function restartDocker(): void;
 
     /**
      * The images CommyPanel built (the commypanel/ namespace), newest first.

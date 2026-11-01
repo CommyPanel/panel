@@ -1,5 +1,5 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { FileText, Trash } from 'lucide-react';
+import { FileText, RotateCw, Trash } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import AppController from '@/actions/App/Http/Controllers/AppController';
 import ServerDockerController from '@/actions/App/Http/Controllers/ServerDockerController';
@@ -8,8 +8,11 @@ import { StateMark, toneOfContainer } from '@/components/server/state-mark';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { Modal } from '@/components/ui/modal';
+import { useConfirmedAction } from '@/hooks/use-confirmed-action';
 import { formatBytes, formatDate, timeAgo } from '@/lib/format';
+import { useCan } from '@/lib/permissions';
 
 type Container = {
     name: string;
@@ -41,9 +44,106 @@ type Props = {
         cpus: number;
         mem_total: number;
     } | null;
+    diagnosis: Diagnosis | null;
     containers: Container[];
     images: { tags: string[]; size: number; created: number }[];
 };
+
+type Diagnosis = {
+    error: string | null;
+    service: string;
+    socket: string;
+    journal: string;
+};
+
+/** Why Docker is down, from systemd, and a way to bring it back. */
+function DockerDown({
+    error,
+    diagnosis,
+}: {
+    error: string | null;
+    diagnosis: Diagnosis | null;
+}) {
+    const can = useCan();
+    const confirmed = useConfirmedAction();
+    const [asking, setAsking] = useState(false);
+    const [restarting, setRestarting] = useState(false);
+
+    const restart = () =>
+        confirmed.run(() =>
+            router.post(
+                ServerDockerController.restart(),
+                {},
+                {
+                    preserveScroll: true,
+                    onStart: () => setRestarting(true),
+                    onFinish: () => {
+                        setRestarting(false);
+                        setAsking(false);
+                    },
+                },
+            ),
+        );
+
+    return (
+        <Card
+            title="Docker is not running"
+            description="Apps cannot be built, started or reached until Docker is back. The panel and nginx keep working."
+        >
+            {error && (
+                <p className="text-sm">
+                    <span className="text-base-content/70">Error: </span>
+                    <span className="font-mono break-all">{error}</span>
+                </p>
+            )}
+            {diagnosis && (
+                <>
+                    <dl className="grid gap-1 text-sm sm:grid-cols-[10rem_1fr]">
+                        <dt className="text-base-content/70">docker.service</dt>
+                        <dd className="font-mono">{diagnosis.service}</dd>
+                        <dt className="text-base-content/70">docker.socket</dt>
+                        <dd className="font-mono">{diagnosis.socket}</dd>
+                    </dl>
+                    {diagnosis.journal && (
+                        <div className="space-y-1">
+                            <p className="text-sm font-medium">
+                                Latest Docker log lines
+                            </p>
+                            <pre className="max-h-80 overflow-auto rounded-box bg-base-200 p-3 font-mono text-xs whitespace-pre-wrap">
+                                {diagnosis.journal}
+                            </pre>
+                        </div>
+                    )}
+                </>
+            )}
+            {can('server.manage') && (
+                <div>
+                    <Button
+                        variant="warning"
+                        onClick={() => setAsking(true)}
+                        loading={restarting}
+                    >
+                        <RotateCw className="size-4" aria-hidden />
+                        Restart Docker
+                    </Button>
+                </div>
+            )}
+            <ConfirmModal
+                open={asking}
+                title="Restart Docker?"
+                confirmLabel="Restart Docker"
+                loading={restarting}
+                onConfirm={restart}
+                onClose={() => setAsking(false)}
+            >
+                Every container stops and starts again, so all apps are
+                unavailable for a moment. If Docker keeps failing, the log lines
+                above usually say why.
+            </ConfirmModal>
+            {confirmed.modal}
+        </Card>
+    );
+}
 
 function Stat({ label, value }: { label: string; value: string }) {
     return (
@@ -121,7 +221,13 @@ function LogsModal({
     );
 }
 
-export default function Docker({ error, docker, containers, images }: Props) {
+export default function Docker({
+    error,
+    docker,
+    diagnosis,
+    containers,
+    images,
+}: Props) {
     const { errors } = usePage().props;
     const [logsFor, setLogsFor] = useState<string | null>(null);
     const [pruning, setPruning] = useState(false);
@@ -142,15 +248,7 @@ export default function Docker({ error, docker, containers, images }: Props) {
             {errors.docker && <Alert variant="error">{errors.docker}</Alert>}
 
             {docker && !docker.available && (
-                <Alert variant="error">
-                    <span>
-                        Docker is not reachable
-                        {docker.error ? `: ${docker.error}` : '.'} Apps cannot
-                        be built or started until it is back; the panel and
-                        nginx keep working. Check the Docker service on the
-                        Overview tab.
-                    </span>
-                </Alert>
+                <DockerDown error={docker.error} diagnosis={diagnosis} />
             )}
 
             {docker?.available && (

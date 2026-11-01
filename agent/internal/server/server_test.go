@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -212,6 +213,8 @@ func (f *fakeDocker) PruneImages(context.Context) (uint64, error) { return 99, f
 func (f *fakeDocker) Info(context.Context) (docker.Info, error) {
 	return docker.Info{Available: true, ServerVersion: "27.0.1", Containers: 3, Running: 2}, f.err
 }
+
+func (f *fakeDocker) Ping(context.Context) error { return f.err }
 
 func (f *fakeDocker) ListImages(context.Context) ([]docker.ImageInfo, error) {
 	return []docker.ImageInfo{{Tags: []string{"commypanel/demo:1"}, Size: 1234}}, f.err
@@ -450,5 +453,49 @@ func TestServerPageEndpointsNeedAuthorization(t *testing.T) {
 		if rec := do(t, s, "GET", path, ""); rec.Code != http.StatusForbidden {
 			t.Errorf("GET %s = %d, want 403", path, rec.Code)
 		}
+	}
+}
+
+type fakeUnit struct {
+	restarted int
+	err       error
+}
+
+func (f *fakeUnit) Diagnose(context.Context) system.DockerDiagnosis {
+	return system.DockerDiagnosis{Service: "failed", Socket: "active", Journal: "boom"}
+}
+func (f *fakeUnit) Restart(context.Context) error {
+	f.restarted++
+	return f.err
+}
+
+func TestStatusAsksDockerWhetherItAnswers(t *testing.T) {
+	s := New(Options{Nginx: &fakeNginx{}, Docker: &fakeDocker{err: fmt.Errorf("%w: dial", docker.ErrUnavailable)}, Authorize: AllowAll()})
+	if rec := do(t, s, "GET", "/v1/status", ""); !strings.Contains(rec.Body.String(), `"docker_available":false`) {
+		t.Errorf("down: %s", rec.Body)
+	}
+	s = New(Options{Nginx: &fakeNginx{}, Docker: &fakeDocker{}, Authorize: AllowAll()})
+	if rec := do(t, s, "GET", "/v1/status", ""); !strings.Contains(rec.Body.String(), `"docker_available":true`) {
+		t.Errorf("up: %s", rec.Body)
+	}
+}
+
+func TestDockerDiagnoseAndRestart(t *testing.T) {
+	unit := &fakeUnit{}
+	s := New(Options{Nginx: &fakeNginx{}, Docker: &fakeDocker{err: errors.New("docker is not available: dial")}, Unit: unit, Authorize: AllowAll()})
+
+	rec := do(t, s, "GET", "/v1/docker/diagnose", "")
+	var got map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &got)
+	if got["available"] != false || got["service"] != "failed" || got["socket"] != "active" || got["journal"] != "boom" || got["error"] == nil {
+		t.Errorf("diagnose = %v", got)
+	}
+
+	if rec := do(t, s, "POST", "/v1/docker/restart", ""); rec.Code != 200 || unit.restarted != 1 {
+		t.Errorf("restart: %d %d", rec.Code, unit.restarted)
+	}
+	unit.err = errors.New("restarting Docker failed: Job for docker.service failed.")
+	if rec := do(t, s, "POST", "/v1/docker/restart", ""); rec.Code != 500 || !strings.Contains(rec.Body.String(), "Job for docker.service failed") {
+		t.Errorf("failed restart: %d %s", rec.Code, rec.Body)
 	}
 }

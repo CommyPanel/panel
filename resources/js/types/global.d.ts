@@ -12,6 +12,8 @@ declare module '@inertiajs/core' {
             name: string;
             auth: Auth;
             flash: { status: string | null; warning: string | null };
+            /** Whether the agent and Docker answer; null when signed out. */
+            hostHealth: { agent: boolean; docker: boolean } | null;
             sidebarOpen: boolean;
             [key: string]: unknown;
         };

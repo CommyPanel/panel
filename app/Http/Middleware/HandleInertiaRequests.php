@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Auth\UserAccess;
+use App\Host\HostHealth;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -39,6 +40,8 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            // Lazy, so partial reloads that do not ask for it never contact the agent.
+            'hostHealth' => fn () => $request->user() === null ? null : app(HostHealth::class)->status(),
             'flash' => [
                 'status' => $request->session()->get('status'),
                 'warning' => $request->session()->get('warning'),

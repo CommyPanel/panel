@@ -6,6 +6,7 @@ use App\Host\Data\CertificateInfo;
 use App\Host\Data\CertificateRequest;
 use App\Host\Data\ContainerInfo;
 use App\Host\Data\ContainerSpec;
+use App\Host\Data\DockerDiagnosis;
 use App\Host\Data\DockerInfo;
 use App\Host\Data\HostInfo;
 use App\Host\Data\ImageBuildSpec;
@@ -36,7 +37,8 @@ class AgentHostDriver implements HostDriver
 
     public function systemStatus(): SystemStatus
     {
-        $data = $this->send('get', '/v1/status');
+        // Every page asks for this (see HostHealth), so a hung agent must not stall them.
+        $data = $this->handle($this->request(fn () => $this->client(timeout: 6)->get('/v1/status')));
 
         return new SystemStatus(
             dockerAvailable: (bool) ($data['docker_available'] ?? false),
@@ -93,6 +95,24 @@ class AgentHostDriver implements HostDriver
             cpus: (int) ($d['cpus'] ?? 0),
             memTotalBytes: (int) ($d['mem_total_bytes'] ?? 0),
         );
+    }
+
+    public function dockerDiagnosis(): DockerDiagnosis
+    {
+        $d = $this->send('get', '/v1/docker/diagnose');
+
+        return new DockerDiagnosis(
+            available: (bool) ($d['available'] ?? false),
+            error: isset($d['error']) ? (string) $d['error'] : null,
+            service: (string) ($d['service'] ?? 'unknown'),
+            socket: (string) ($d['socket'] ?? 'unknown'),
+            journal: (string) ($d['journal'] ?? ''),
+        );
+    }
+
+    public function restartDocker(): void
+    {
+        $this->handle($this->request(fn () => $this->client(timeout: 150)->post('/v1/docker/restart')));
     }
 
     public function listImages(): array

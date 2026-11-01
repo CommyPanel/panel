@@ -8,6 +8,7 @@ use App\Host\Data\ImageInfo;
 use App\Host\Data\ResourceName;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
+use App\Host\HostHealth;
 use App\Models\Deployment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -28,6 +29,16 @@ class ServerDockerController extends Controller
             $info = null;
             $containers = $images = [];
             $error = $e->getMessage();
+        }
+
+        $diagnosis = null;
+
+        if ($info !== null && ! $info->available) {
+            try {
+                $diagnosis = $host->dockerDiagnosis();
+            } catch (HostOperationFailed) {
+                // The outage itself is already shown; the details are a bonus.
+            }
         }
 
         // Which app each container belongs to, from the deployments that started them.
@@ -54,6 +65,12 @@ class ServerDockerController extends Controller
                 'images' => $info->images,
                 'cpus' => $info->cpus,
                 'mem_total' => $info->memTotalBytes,
+            ],
+            'diagnosis' => $diagnosis === null ? null : [
+                'error' => $diagnosis->error,
+                'service' => $diagnosis->service,
+                'socket' => $diagnosis->socket,
+                'journal' => $diagnosis->journal,
             ],
             'containers' => array_map(fn (ContainerInfo $c) => [
                 'name' => $c->name,
@@ -83,6 +100,27 @@ class ServerDockerController extends Controller
         $audit->record('docker.images_pruned', null, ['reclaimed_bytes' => $reclaimed]);
 
         return back()->with('status', 'Unused images removed ('.round($reclaimed / 1024 ** 2, 1).' MB freed).');
+    }
+
+    /**
+     * Restart the Docker daemon, for when it is down or misbehaving. Every app
+     * goes down briefly, so it needs a recent password confirmation.
+     */
+    public function restart(HostDriver $host, HostHealth $health, AuditLogger $audit): RedirectResponse
+    {
+        try {
+            $host->restartDocker();
+        } catch (HostOperationFailed $e) {
+            $audit->record('docker.restart_failed', null, ['reason' => $e->getMessage()]);
+
+            return back()->withErrors(['docker' => $e->getMessage()]);
+        } finally {
+            $health->forget();
+        }
+
+        $audit->record('docker.restarted', null);
+
+        return back()->with('status', 'Docker was restarted. Apps come back as their containers start.');
     }
 
     public function logs(HostDriver $host, string $name): JsonResponse

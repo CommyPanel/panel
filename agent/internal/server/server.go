@@ -45,6 +45,7 @@ type Docker interface {
 	PruneImages(ctx context.Context) (uint64, error)
 	RemoveImage(ctx context.Context, tag string) error
 	Info(ctx context.Context) (docker.Info, error)
+	Ping(ctx context.Context) error
 	ListImages(ctx context.Context) ([]docker.ImageInfo, error)
 }
 
@@ -55,6 +56,12 @@ type Certificates interface {
 	Remove(name string) error
 }
 
+// DockerUnit is the Docker daemon's systemd unit.
+type DockerUnit interface {
+	Diagnose(ctx context.Context) system.DockerDiagnosis
+	Restart(ctx context.Context) error
+}
+
 // Authorizer decides whether the caller of a request may use the agent.
 type Authorizer func(r *http.Request) bool
 
@@ -62,6 +69,7 @@ type Options struct {
 	Nginx     Nginx
 	Docker    Docker
 	Certs     Certificates
+	Unit      DockerUnit
 	Authorize Authorizer
 	Version   string
 	DryRun    bool
@@ -83,6 +91,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/nginx/test", s.nginxTest)
 	mux.HandleFunc("POST /v1/nginx/reload", s.nginxReload)
 	mux.HandleFunc("GET /v1/docker/info", s.dockerInfo)
+	mux.HandleFunc("GET /v1/docker/diagnose", s.dockerDiagnose)
+	mux.HandleFunc("POST /v1/docker/restart", s.dockerRestart)
 	mux.HandleFunc("GET /v1/docker/images", s.listImages)
 	mux.HandleFunc("PUT /v1/nginx/sites", s.applySite)
 	mux.HandleFunc("DELETE /v1/nginx/sites/{name}", s.removeSite)
@@ -137,7 +147,7 @@ func AllowUIDs(uids ...uint32) Authorizer {
 // AllowAll is only for dry-run development on platforms without peer credentials.
 func AllowAll() Authorizer { return func(*http.Request) bool { return true } }
 
-func (s *Server) status(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 	var sys system.Status
 	if s.opts.System != nil {
 		sys = s.opts.System()
@@ -146,9 +156,31 @@ func (s *Server) status(w http.ResponseWriter, _ *http.Request) {
 		"version":          s.opts.Version,
 		"dry_run":          s.opts.DryRun,
 		"nginx_available":  sys.NginxAvailable,
-		"docker_available": sys.DockerAvailable,
+		"docker_available": s.opts.Docker != nil && s.opts.Docker.Ping(r.Context()) == nil,
 		"disk_free_bytes":  sys.DiskFreeBytes,
 	})
+}
+
+// dockerDiagnose says whether the daemon answers and, from systemd, why not.
+func (s *Server) dockerDiagnose(w http.ResponseWriter, r *http.Request) {
+	out := map[string]any{"available": true}
+	if err := s.opts.Docker.Ping(r.Context()); err != nil {
+		out["available"] = false
+		out["error"] = err.Error()
+	}
+	if s.opts.Unit != nil {
+		d := s.opts.Unit.Diagnose(r.Context())
+		out["service"], out["socket"], out["journal"] = d.Service, d.Socket, d.Journal
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) dockerRestart(w http.ResponseWriter, r *http.Request) {
+	if s.opts.Unit == nil {
+		writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "restarting Docker is not available"})
+		return
+	}
+	s.respond(w, s.opts.Unit.Restart(r.Context()))
 }
 
 func (s *Server) systemInfo(w http.ResponseWriter, r *http.Request) {

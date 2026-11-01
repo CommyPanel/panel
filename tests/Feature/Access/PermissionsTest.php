@@ -108,7 +108,7 @@ describe('route protection', function () {
         'domains.manage' => [['post', '/apps/shop/domains'], ['post', '/apps/shop/certificate']],
         'domains.settings' => [['get', '/welcome'], ['put', '/settings/https'], ['put', '/settings/server-address'], ['post', '/settings/server-address/detect']],
         'server.view' => [['get', '/server'], ['get', '/server/docker'], ['get', '/server/nginx']],
-        'server.manage' => [['post', '/server/nginx/reload'], ['post', '/server/nginx/test'], ['post', '/server/docker/prune'], ['get', '/server/docker/containers/shop-1/logs']],
+        'server.manage' => [['post', '/server/nginx/reload'], ['post', '/server/nginx/test'], ['post', '/server/docker/prune'], ['get', '/server/docker/containers/shop-1/logs'], ['post', '/server/docker/restart']],
         'users.view' => [['get', '/users']],
         'users.create' => [['get', '/users/create'], ['post', '/users']],
         'users.update' => [['get', '/users/1/edit'], ['put', '/users/1']],

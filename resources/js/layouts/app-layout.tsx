@@ -23,6 +23,7 @@ import { Brand } from '@/components/brand';
 import { ThemeMenu } from '@/components/theme-menu';
 import { Alert } from '@/components/ui/alert';
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
+import { HostBanner } from '@/components/host-banner';
 import { fortify } from '@/lib/fortify';
 import { cn } from '@/lib/utils';
 
@@ -370,6 +371,7 @@ export default function AppLayout({ title, children }: Props) {
                     </header>
 
                     <main className="min-w-0 space-y-6 p-4 sm:p-6 lg:p-8">
+                        <HostBanner />
                         {flash.status && (
                             <Alert variant="success">{flash.status}</Alert>
                         )}
