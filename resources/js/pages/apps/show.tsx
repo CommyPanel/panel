@@ -3,6 +3,7 @@ import {
     Activity,
     ExternalLink,
     Globe,
+    HardDrive,
     Layers,
     FileCode,
     Rocket,
@@ -18,6 +19,7 @@ import { AppPower } from '@/components/apps/app-power';
 import { AdvancedTab } from '@/components/apps/tabs/advanced-tab';
 import { DeploymentsTab } from '@/components/apps/tabs/deployments-tab';
 import { DomainsTab } from '@/components/apps/tabs/domains-tab';
+import { VolumesTab } from '@/components/apps/tabs/volumes-tab';
 import { LogsTab } from '@/components/apps/tabs/logs-tab';
 import { EnvironmentTab } from '@/components/apps/tabs/environment-tab';
 import { NginxTab } from '@/components/apps/tabs/nginx-tab';
@@ -51,6 +53,7 @@ type TabId =
     | 'deployments'
     | 'usage'
     | 'logs'
+    | 'volumes'
     | 'domains'
     | 'environment'
     | 'nginx'
@@ -61,6 +64,7 @@ const TAB_IDS: TabId[] = [
     'deployments',
     'usage',
     'logs',
+    'volumes',
     'domains',
     'environment',
     'nginx',
@@ -100,8 +104,11 @@ export default function Show({
     const nginxDirty = useRef(false);
     const canNginx = can('apps.nginx');
     const canLogs = can('apps.logs');
+    const canVolumes = can('apps.volumes');
     const active: TabId =
-        (tab === 'nginx' && !canNginx) || (tab === 'logs' && !canLogs)
+        (tab === 'nginx' && !canNginx) ||
+        (tab === 'logs' && !canLogs) ||
+        (tab === 'volumes' && !canVolumes)
             ? 'deployments'
             : tab;
 
@@ -165,6 +172,16 @@ export default function Show({
                       id: 'logs' as const,
                       label: 'Logs',
                       icon: <ScrollText className="size-4" aria-hidden />,
+                  },
+              ]
+            : []),
+        ...(canVolumes
+            ? [
+                  {
+                      id: 'volumes' as const,
+                      label: 'Volumes',
+                      icon: <HardDrive className="size-4" aria-hidden />,
+                      badge: <Count value={app.volumes.length} />,
                   },
               ]
             : []),
@@ -267,6 +284,7 @@ export default function Show({
                 )}
                 {active === 'usage' && <UsageTab app={app} />}
                 {active === 'logs' && <LogsTab app={app} />}
+                {active === 'volumes' && <VolumesTab app={app} />}
                 {active === 'domains' && (
                     <DomainsTab app={app} server={server} https={https} />
                 )}

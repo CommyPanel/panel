@@ -41,6 +41,14 @@ Everything an app writes inside its container is gone when the next deployment r
 - **Remove** stops mounting a path but leaves its files on the server. **Deleting the app deletes them.**
 - Up to 8 volumes per app. `/proc`, `/sys` and `/dev` cannot be used.
 
+### Looking at volumes
+
+The **Volumes** tab shows how much space each volume uses (with a bar to compare them) and lets you **browse** its files, read only: folders, sizes and dates, a preview of text files (the first 256 KB) and a download for anything up to 25 MB. Links and special files inside a volume are listed but never opened, because the app that wrote them is not trusted and could point them at the server's own files.
+
+Volume files are private data (databases, uploads), so browsing needs its own permission, `apps.volumes`. **Roles you made yourself do not have it** until you grant it; the built-in admin role and the super user do. Every download is recorded in the audit log.
+
+A volume you removed from Settings shows as **Not attached**, with its files. **Delete data** removes them (it asks for your password first, and is recorded). The agent refuses while any container still has that volume mounted, so deploy the app again first.
+
 The folder is writable for whichever user the app runs as, since that differs from image to image. It cannot be reached from anywhere else on the server, because the folders above it belong to root and are closed to everybody else.
 
 ## Logs
