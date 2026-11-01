@@ -1,6 +1,7 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Boxes,
+    CircleArrowUp,
     Globe,
     ChevronsLeft,
     ChevronsRight,
@@ -21,6 +22,7 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Brand } from '@/components/brand';
 import { ThemeMenu } from '@/components/theme-menu';
+import { UpdateBadge } from '@/components/update-badge';
 import { Alert } from '@/components/ui/alert';
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
 import { HostBanner } from '@/components/host-banner';
@@ -102,6 +104,12 @@ const NAV: { heading: string; items: NavItem[] }[] = [
                 icon: ScrollText,
                 permission: 'audit.view',
             },
+            {
+                href: '/settings/updates',
+                label: 'Updates',
+                icon: CircleArrowUp,
+                permission: 'server.view',
+            },
         ],
     },
 ];
@@ -124,7 +132,8 @@ type SidebarProps = {
 };
 
 function Sidebar({ collapsed, url, name, onNavigate }: SidebarProps) {
-    const { permissions } = usePage().props.auth;
+    const { auth, update } = usePage().props;
+    const { permissions } = auth;
     // Only what the user may open; a group with nothing left disappears.
     const visibleNav = NAV.map((group) => ({
         ...group,
@@ -196,6 +205,19 @@ function Sidebar({ collapsed, url, name, onNavigate }: SidebarProps) {
                                             >
                                                 {item.label}
                                             </span>
+                                            {item.href ===
+                                                '/settings/updates' &&
+                                                update && (
+                                                    <span
+                                                        className={cn(
+                                                            'ml-auto size-2 rounded-full bg-primary',
+                                                            collapsed &&
+                                                                'lg:hidden',
+                                                        )}
+                                                        role="img"
+                                                        aria-label="A newer version is available"
+                                                    />
+                                                )}
                                         </Link>
                                     </li>
                                 );
@@ -319,6 +341,7 @@ export default function AppLayout({ title, children }: Props) {
                         </button>
 
                         <div className="ml-auto flex items-center gap-1">
+                            <UpdateBadge />
                             <ThemeMenu />
                             <Dropdown
                                 label="Account menu"

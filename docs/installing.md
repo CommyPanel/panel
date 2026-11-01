@@ -58,6 +58,17 @@ sudo commypanel upgrade
 
 An upgrade downloads and verifies the new release, backs up the panel databases (the five newest backups are kept in `/var/lib/commypanel/backups`), migrates them, switches over and restarts the services. If the new version does not come up healthy, the previous release is started again. Running the installer again does the same thing.
 
+## Update notifications
+
+When someone signs in, CommyPanel looks in the background for a newer release. If there is one, an **Update** badge appears in the top bar for people who can see the server, with a tooltip, and it leads to **Settings > Updates**. That page explains why to upgrade, the steps, what happens to your server while it upgrades, and shows the release notes of every release you have missed, pulled from GitHub.
+
+- **What is sent.** CommyPanel asks GitHub for this project's list of releases, at most once every 6 hours (and again 30 minutes after a failure). GitHub sees the server's address and the CommyPanel version number in the request. Nothing else is sent, and nothing that identifies your apps, domains or users.
+- **What is shown.** Only stable releases. Pre-releases and drafts are never offered. Release notes are rendered without raw HTML, scripts or remote images.
+- **Switching it off.** The page has a switch for the automatic check (a manual **Check now** still works, for people who can manage the server). To stop every check, set `COMMYPANEL_UPDATE_CHECK=false` in `/etc/commypanel/env`; then nothing is ever sent, not even by hand.
+- **Development checkouts** have no version and never check.
+
+The page does not upgrade anything: you still run `sudo commypanel upgrade` on the server.
+
 ## Command line
 
 ```

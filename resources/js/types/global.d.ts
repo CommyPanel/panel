@@ -14,6 +14,8 @@ declare module '@inertiajs/core' {
             flash: { status: string | null; warning: string | null };
             /** Whether the agent and Docker answer; null when signed out. */
             hostHealth: { agent: boolean; docker: boolean } | null;
+            /** Set while a newer release exists and the user can see the server; null otherwise. */
+            update: { current: string; latest: string } | null;
             sidebarOpen: boolean;
             [key: string]: unknown;
         };

@@ -26,6 +26,7 @@ use App\Http\Controllers\ServerDockerController;
 use App\Http\Controllers\ServerNginxController;
 use App\Http\Controllers\ServerUsageController;
 use App\Http\Controllers\SetupController;
+use App\Http\Controllers\UpdateController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WelcomeController;
 use Illuminate\Support\Facades\Route;
@@ -154,6 +155,15 @@ Route::middleware('auth')->group(function () {
     Route::middleware('can:'.Permissions::DOMAINS_MANAGE)->group(function () {
         Route::post('domains/{domain}/check', [DomainController::class, 'check'])->name('domains.check');
         Route::delete('domains/{domain}', [DomainController::class, 'destroy'])->name('domains.destroy');
+    });
+
+    // Anyone who can see the server sees whether it is up to date; checking by hand and
+    // switching the automatic check on or off is server management.
+    Route::get('/settings/updates', [UpdateController::class, 'show'])
+        ->middleware('can:'.Permissions::SERVER_VIEW)->name('settings.updates');
+    Route::middleware('can:'.Permissions::SERVER_MANAGE)->group(function () {
+        Route::post('/settings/updates/check', [UpdateController::class, 'check'])->name('settings.updates.check');
+        Route::put('/settings/updates', [UpdateController::class, 'update'])->name('settings.updates.update');
     });
 
     Route::get('/settings/audit-log', [AuditLogController::class, 'index'])

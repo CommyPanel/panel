@@ -52,6 +52,31 @@ return [
     |--------------------------------------------------------------------------
     */
 
+    'updates' => [
+        // Whether the panel may ask GitHub for new releases at all. The UI has
+        // its own switch; this one is for people who want no outbound calls.
+        'check' => (bool) env('COMMYPANEL_UPDATE_CHECK', true),
+
+        // Where releases are published.
+        'repository' => 'emrecanful/commypanel',
+
+        // A successful answer is reused for this long; after a failure the
+        // next attempt waits for the retry delay.
+        'ttl_hours' => 6,
+        'retry_minutes' => 30,
+        'timeout' => 8,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Version
+    |--------------------------------------------------------------------------
+    | The release tarball carries a VERSION file; a checkout does not, and
+    | reports "dev" (which switches update checks off).
+    */
+
+    'version' => is_file(base_path('VERSION')) ? trim((string) file_get_contents(base_path('VERSION'))) : 'dev',
+
     'deploy' => [
         // Host ports (bound on 127.0.0.1) handed to app containers.
         'port_range_start' => (int) env('DEPLOY_PORT_START', 20000),

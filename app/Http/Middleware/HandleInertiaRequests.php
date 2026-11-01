@@ -2,8 +2,10 @@
 
 namespace App\Http\Middleware;
 
+use App\Auth\Permissions;
 use App\Auth\UserAccess;
 use App\Host\HostHealth;
+use App\Updates\UpdateChecker;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -42,6 +44,10 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             // Lazy, so partial reloads that do not ask for it never contact the agent.
             'hostHealth' => fn () => $request->user() === null ? null : app(HostHealth::class)->status(),
+            // Read from what is already remembered; this never contacts GitHub.
+            'update' => fn () => $request->user()?->can(Permissions::SERVER_VIEW)
+                ? app(UpdateChecker::class)->status()->summary()
+                : null,
             'flash' => [
                 'status' => $request->session()->get('status'),
                 'warning' => $request->session()->get('warning'),

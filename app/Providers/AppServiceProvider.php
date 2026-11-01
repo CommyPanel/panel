@@ -16,8 +16,11 @@ use App\Dns\SystemDnsResolver;
 use App\Host\Drivers\AgentHostDriver;
 use App\Host\Drivers\FakeHostDriver;
 use App\Host\HostDriver;
+use App\Jobs\CheckForUpdates;
 use App\Models\User;
+use App\Updates\UpdateChecker;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
@@ -28,6 +31,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use RuntimeException;
+use Throwable;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -72,6 +76,20 @@ class AppServiceProvider extends ServiceProvider
         $this->configureDefaults();
 
         Event::subscribe(AuditEventSubscriber::class);
+
+        // Looking for a newer release happens in the background after someone
+        // signs in, and only when it is due (see UpdateChecker). Whatever goes
+        // wrong here (a broken cache, a full queue) is logged and must never
+        // stop anyone from signing in.
+        Event::listen(Login::class, function (): void {
+            try {
+                if (app(UpdateChecker::class)->shouldCheck()) {
+                    CheckForUpdates::dispatch();
+                }
+            } catch (Throwable $e) {
+                report($e);
+            }
+        });
 
         // Push webhooks are public; a sender cannot make the panel do much
         // without the secret, but it should not be able to keep it busy either.
