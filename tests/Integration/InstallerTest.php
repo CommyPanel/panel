@@ -143,6 +143,19 @@ it('gives the panel its own PHP-FPM pool owned by the panel user', function () {
         ->toContain('expose_php');
 });
 
+it('hardens the panel pool against the PHP2Shell request paths', function (string $version, string $line) {
+    ($this->setup)([], ['COMMYPANEL_PHP_VERSION' => $version]);
+
+    $pool = ($this->read)("/etc/php/{$version}/fpm/pool.d/commypanel.conf");
+
+    expect($pool)->toContain("\nphp_admin_value[session.upload_progress.enabled] = 0\n")
+        ->toContain("\n{$line}php_admin_value[fatal_error_backtraces] = 0\n")
+        ->not->toContain('@@');
+})->with([
+    'PHP 8.5 has the setting, so it is switched off' => ['8.5', ''],
+    'PHP 8.4 has no such setting, so the line is a comment' => ['8.4', ';'],
+]);
+
 it('honours a custom panel port everywhere', function () {
     ($this->setup)(['--panel-port', '9443']);
 
