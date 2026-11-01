@@ -46,6 +46,7 @@ type Docker interface {
 	RunTask(ctx context.Context, s docker.TaskSpec, onLine func(string)) (int, error)
 	PruneImages(ctx context.Context) (uint64, error)
 	RemoveImage(ctx context.Context, tag string) error
+	RemoveVolumes(ctx context.Context, app, name string) error
 	Info(ctx context.Context) (docker.Info, error)
 	Ping(ctx context.Context) error
 	ListImages(ctx context.Context) ([]docker.ImageInfo, error)
@@ -121,6 +122,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/docker/images/build", s.buildImage)
 	mux.HandleFunc("POST /v1/docker/images/prune", s.pruneImages)
 	mux.HandleFunc("POST /v1/docker/images/remove", s.removeImage)
+	mux.HandleFunc("POST /v1/volumes/remove", s.removeVolumes)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s.opts.Authorize == nil || !s.opts.Authorize(r) {
@@ -376,6 +378,17 @@ func (s *Server) removeImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.respond(w, s.opts.Docker.RemoveImage(r.Context(), body.Tag))
+}
+
+func (s *Server) removeVolumes(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		App  string `json:"app"`
+		Name string `json:"name"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	s.respond(w, s.opts.Docker.RemoveVolumes(r.Context(), body.App, body.Name))
 }
 
 func (s *Server) pruneImages(w http.ResponseWriter, r *http.Request) {

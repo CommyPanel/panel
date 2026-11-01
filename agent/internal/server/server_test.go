@@ -147,17 +147,18 @@ func TestRemoveSite(t *testing.T) {
 }
 
 type fakeDocker struct {
-	ran           []docker.ContainerSpec
-	stopped       []string
-	started       []string
-	restarted     []string
-	removed       []string
-	tasks         []docker.TaskSpec
-	taskCode      int
-	err           error
-	buildErr      error
-	buildLogs     []string
-	removedImages []string
+	ran            []docker.ContainerSpec
+	stopped        []string
+	started        []string
+	restarted      []string
+	removed        []string
+	tasks          []docker.TaskSpec
+	taskCode       int
+	err            error
+	buildErr       error
+	buildLogs      []string
+	removedImages  []string
+	removedVolumes []string
 }
 
 func (f *fakeDocker) Run(_ context.Context, s docker.ContainerSpec) error {
@@ -233,6 +234,14 @@ func (f *fakeDocker) RemoveImage(_ context.Context, tag string) error {
 		return &validate.InputError{Msg: "only commypanel/ images can be removed"}
 	}
 	f.removedImages = append(f.removedImages, tag)
+	return f.err
+}
+
+func (f *fakeDocker) RemoveVolumes(_ context.Context, app, name string) error {
+	if err := validate.Name(app); err != nil {
+		return err
+	}
+	f.removedVolumes = append(f.removedVolumes, app+"/"+name)
 	return f.err
 }
 
@@ -361,6 +370,20 @@ func TestRemoveImageRoute(t *testing.T) {
 	}
 	if rec := do(t, s, "POST", "/v1/docker/images/remove", `{"tag":"library/alpine"}`); rec.Code != 400 {
 		t.Errorf("foreign image: %d, want 400", rec.Code)
+	}
+}
+
+func TestRemoveVolumesRoute(t *testing.T) {
+	f := &fakeDocker{}
+	s := newDockerServer(f)
+	if rec := do(t, s, "POST", "/v1/volumes/remove", `{"app":"shop","name":"uploads"}`); rec.Code != 200 || f.removedVolumes[0] != "shop/uploads" {
+		t.Errorf("remove one: %d %v", rec.Code, f.removedVolumes)
+	}
+	if rec := do(t, s, "POST", "/v1/volumes/remove", `{"app":"shop"}`); rec.Code != 200 || f.removedVolumes[1] != "shop/" {
+		t.Errorf("remove all: %d %v", rec.Code, f.removedVolumes)
+	}
+	if rec := do(t, s, "POST", "/v1/volumes/remove", `{"app":"../etc"}`); rec.Code != 400 {
+		t.Errorf("bad app: %d, want 400", rec.Code)
 	}
 }
 

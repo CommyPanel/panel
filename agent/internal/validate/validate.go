@@ -4,6 +4,7 @@ package validate
 
 import (
 	"fmt"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -20,8 +21,9 @@ func invalid(format string, args ...any) error {
 }
 
 var (
-	nameRe  = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$`)
-	labelRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+	nameRe       = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$`)
+	volumeNameRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$`)
+	labelRe      = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 )
 
 // Name checks a resource name (site, container, certificate).
@@ -92,6 +94,35 @@ func EnvValue(s string) error {
 func ContainerPath(s string) error {
 	if len(s) > 255 || !ctrPathRe.MatchString(s) || strings.Contains(s, "..") || strings.Contains(s, "//") {
 		return invalid("invalid container path %q", s)
+	}
+	return nil
+}
+
+// reservedMounts are container locations a volume must never cover: they would
+// hide the container's own root, devices or kernel interfaces.
+var reservedMounts = []string{"/proc", "/sys", "/dev"}
+
+// VolumeTarget checks where a persistent volume is mounted inside a container.
+func VolumeTarget(s string) error {
+	if err := ContainerPath(s); err != nil {
+		return err
+	}
+	clean := path.Clean(s)
+	if clean == "/" {
+		return invalid("a volume cannot be mounted at the root of the container")
+	}
+	for _, r := range reservedMounts {
+		if clean == r || strings.HasPrefix(clean, r+"/") {
+			return invalid("a volume cannot be mounted under %s", r)
+		}
+	}
+	return nil
+}
+
+// VolumeName checks the name of one of an app's volumes (a folder name).
+func VolumeName(s string) error {
+	if !volumeNameRe.MatchString(s) {
+		return invalid("invalid volume name %q", s)
 	}
 	return nil
 }

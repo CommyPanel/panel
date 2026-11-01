@@ -9,7 +9,6 @@ import (
 	"io"
 	"log/slog"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 
@@ -143,7 +142,7 @@ func (m *Manager) Validate(s ContainerSpec) error {
 		if _, err := validate.ResolveUnder(m.volumesDir(), v.Source); err != nil {
 			return err
 		}
-		if err := validate.ContainerPath(v.Target); err != nil {
+		if err := validate.VolumeTarget(v.Target); err != nil {
 			return err
 		}
 	}
@@ -230,7 +229,7 @@ func (m *Manager) Run(ctx context.Context, s ContainerSpec) error {
 		return err
 	}
 	for _, v := range s.Volumes {
-		if err := os.MkdirAll(v.Source, 0o755); err != nil {
+		if err := ensureVolumeDir(v.Source); err != nil {
 			return fmt.Errorf("create volume dir: %w", err)
 		}
 	}

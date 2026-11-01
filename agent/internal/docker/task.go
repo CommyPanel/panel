@@ -9,7 +9,6 @@ import (
 	"io"
 	"log/slog"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -115,7 +114,7 @@ func (m *Manager) RunTask(ctx context.Context, s TaskSpec, onLine func(string)) 
 		return -1, err
 	}
 	for _, v := range s.Volumes {
-		if err := os.MkdirAll(v.Source, 0o755); err != nil {
+		if err := ensureVolumeDir(v.Source); err != nil {
 			return -1, fmt.Errorf("create volume dir: %w", err)
 		}
 	}
