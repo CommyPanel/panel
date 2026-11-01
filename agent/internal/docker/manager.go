@@ -406,14 +406,16 @@ func (m *Manager) Logs(ctx context.Context, name string, tail int) (string, erro
 		return "", err
 	}
 	defer resp.Body.Close()
-	return demux(io.LimitReader(resp.Body, maxLogBytes*2)), nil
+	return demux(io.LimitReader(resp.Body, maxLogBytes*8)), nil
 }
 
-// demux strips Docker's 8-byte stream headers from a non-TTY log stream.
+// demux strips Docker's 8-byte stream headers from a non-TTY log stream. When
+// the output is larger than maxLogBytes it keeps the end, because the newest
+// lines are the ones people look for.
 func demux(r io.Reader) string {
 	var out bytes.Buffer
 	header := make([]byte, 8)
-	for out.Len() < maxLogBytes {
+	for {
 		if _, err := io.ReadFull(r, header); err != nil {
 			break
 		}
@@ -422,7 +424,15 @@ func demux(r io.Reader) string {
 			break
 		}
 	}
-	return out.String()
+	data := out.Bytes()
+	if len(data) > maxLogBytes {
+		data = data[len(data)-maxLogBytes:]
+		// Start on a whole line.
+		if i := bytes.IndexByte(data, '\n'); i >= 0 && i+1 < len(data) {
+			data = data[i+1:]
+		}
+	}
+	return string(data)
 }
 
 // PruneImages removes dangling images and reports the space reclaimed.

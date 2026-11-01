@@ -422,3 +422,41 @@ func TestListImagesKeepsOnlyOurNamespaceNewestFirst(t *testing.T) {
 		t.Errorf("foreign tags must be dropped: %+v", images[1].Tags)
 	}
 }
+
+func logFrame(stream byte, text string) []byte {
+	frame := make([]byte, 8, 8+len(text))
+	frame[0] = stream
+	binary.BigEndian.PutUint32(frame[4:], uint32(len(text)))
+	return append(frame, text...)
+}
+
+func TestDemuxJoinsBothStreams(t *testing.T) {
+	var in bytes.Buffer
+	in.Write(logFrame(1, "out line\n"))
+	in.Write(logFrame(2, "err line\n"))
+
+	if got := demux(&in); got != "out line\nerr line\n" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestDemuxKeepsTheNewestLinesWhenTooLarge(t *testing.T) {
+	var in bytes.Buffer
+	line := strings.Repeat("x", 99) + "\n" // 100 bytes
+	total := maxLogBytes/len(line) + 500
+	for i := 0; i < total; i++ {
+		in.Write(logFrame(1, line))
+	}
+	in.Write(logFrame(1, "the newest line\n"))
+
+	got := demux(&in)
+	if len(got) > maxLogBytes {
+		t.Fatalf("kept %d bytes, limit %d", len(got), maxLogBytes)
+	}
+	if !strings.HasSuffix(got, "the newest line\n") {
+		t.Fatal("the newest line was cut off")
+	}
+	if !strings.HasPrefix(got, "x") || strings.Index(got, "\n") != 99 {
+		t.Fatal("output does not start on a whole line")
+	}
+}
