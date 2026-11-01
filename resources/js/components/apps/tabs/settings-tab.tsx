@@ -5,6 +5,7 @@ import { RuntimeFields, SourceFields } from '@/components/apps/app-fields';
 import type { AppFormData } from '@/components/apps/app-fields';
 import { AccessTokenCard } from '@/components/apps/access-token-card';
 import { DeployKeyCard } from '@/components/apps/deploy-key-card';
+import { VolumesCard } from '@/components/apps/volumes-card';
 import { UploadSourceCard } from '@/components/apps/upload-source-card';
 import { WebhookCard } from '@/components/apps/webhook-card';
 import { Button } from '@/components/ui/button';
@@ -44,37 +45,40 @@ export function SettingsTab({
 
     return (
         <div className="grid items-start gap-6 xl:grid-cols-3">
-            <form onSubmit={submit} className="min-w-0 space-y-6 xl:col-span-2">
-                {upload ? (
-                    <Card title="Name">
-                        <Input
-                            label="App name"
-                            required
-                            value={form.data.name}
-                            onChange={(e) =>
-                                form.setData('name', e.target.value)
-                            }
-                            error={form.errors.name}
-                        />
-                    </Card>
-                ) : (
+            <div className="min-w-0 space-y-6 xl:col-span-2">
+                <form onSubmit={submit} className="space-y-6">
+                    {upload ? (
+                        <Card title="Name">
+                            <Input
+                                label="App name"
+                                required
+                                value={form.data.name}
+                                onChange={(e) =>
+                                    form.setData('name', e.target.value)
+                                }
+                                error={form.errors.name}
+                            />
+                        </Card>
+                    ) : (
+                        <Card
+                            title="Source"
+                            description="Where the code comes from."
+                        >
+                            <SourceFields {...fields} />
+                        </Card>
+                    )}
                     <Card
-                        title="Source"
-                        description="Where the code comes from."
+                        title="Runtime"
+                        description="How the app runs. Changes apply from the next deployment."
                     >
-                        <SourceFields {...fields} />
+                        <RuntimeFields {...fields} />
                     </Card>
-                )}
-                <Card
-                    title="Runtime"
-                    description="How the app runs. Changes apply from the next deployment."
-                >
-                    <RuntimeFields {...fields} />
-                </Card>
-                <Button type="submit" loading={form.processing}>
-                    Save settings
-                </Button>
-            </form>
+                    <Button type="submit" loading={form.processing}>
+                        Save settings
+                    </Button>
+                </form>
+                <VolumesCard slug={app.slug} volumes={app.volumes} />
+            </div>
             <div className="min-w-0 space-y-6">
                 {upload ? (
                     <UploadSourceCard slug={app.slug} />

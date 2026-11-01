@@ -141,6 +141,14 @@ class App extends Model
     }
 
     /**
+     * @return HasMany<AppVolume, $this>
+     */
+    public function volumes(): HasMany
+    {
+        return $this->hasMany(AppVolume::class);
+    }
+
+    /**
      * @return HasMany<AppEnvVar, $this>
      */
     public function envVars(): HasMany

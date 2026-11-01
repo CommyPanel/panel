@@ -52,6 +52,7 @@ class AppPresenter
             'git_token' => $app->git_token === null ? null : ['username' => $app->git_token_username],
             'token_help' => self::tokenHelp($app),
             'release_command' => $app->release_command,
+            'volumes' => $app->volumes()->orderBy('id')->get()->map(fn ($v) => ['id' => $v->id, 'name' => $v->name, 'path' => $v->path])->all(),
             'deactivated_release' => $app->status() === AppStatus::Deactivated
                 ? $app->deployments()->where('status', DeploymentStatus::Stopped)->max('number')
                 : null,

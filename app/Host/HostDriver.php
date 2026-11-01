@@ -189,6 +189,14 @@ interface HostDriver
     public function containerLogs(string $name, int $tail = 200): string;
 
     /**
+     * Delete the data of one of an app's volumes, or of all of them when no name
+     * is given. Nothing may still mount it.
+     *
+     * @throws HostOperationFailed
+     */
+    public function removeVolumes(string $app, ?string $name = null): void;
+
+    /**
      * Remove dangling images and return the bytes reclaimed.
      *
      * @throws HostOperationFailed

@@ -42,6 +42,7 @@ class DeployApp
         private readonly PortAllocator $ports,
         private readonly AuditLogger $audit,
         private readonly TlsPlanner $tls,
+        private readonly AppVolumes $volumes,
     ) {}
 
     public function __invoke(Deployment $deployment): void
@@ -168,6 +169,7 @@ class DeployApp
             env: $this->environment($app),
             memoryLimitMb: $app->memory_limit_mb,
             cpuLimit: $app->cpu_limit === null ? null : (float) $app->cpu_limit,
+            volumes: $this->volumes->mounts($app),
         ));
 
         return true;
@@ -197,6 +199,7 @@ class DeployApp
             env: $this->environment($app),
             memoryLimitMb: $app->memory_limit_mb,
             cpuLimit: $app->cpu_limit === null ? null : (float) $app->cpu_limit,
+            volumes: $this->volumes->mounts($app),
             timeoutSeconds: $timeout,
         ), $log->line(...));
 

@@ -8,7 +8,7 @@ use App\Host\HostDriver;
 use App\Models\App;
 
 /**
- * Removes an app's containers and images, then the app itself.
+ * Removes an app's containers, images and volume data, then the app itself.
  */
 class DestroyApp
 {
@@ -36,6 +36,13 @@ class DestroyApp
             } catch (HostOperationFailed $e) {
                 $problems[] = "Image {$tag}: {$e->getMessage()}";
             }
+        }
+
+        // After the containers: nothing may still have the folders mounted.
+        try {
+            $this->host->removeVolumes($app->slug);
+        } catch (HostOperationFailed $e) {
+            $problems[] = "Volume data: {$e->getMessage()}";
         }
 
         try {

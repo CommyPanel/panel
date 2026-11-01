@@ -9,6 +9,7 @@ use App\Http\Controllers\AppSetupController;
 use App\Http\Controllers\AppSourceController;
 use App\Http\Controllers\AppStateController;
 use App\Http\Controllers\AppUsageController;
+use App\Http\Controllers\AppVolumeController;
 use App\Http\Controllers\AppWebhookController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\CertificateController;
@@ -94,6 +95,8 @@ Route::middleware('auth')->group(function () {
             Route::post('webhook', [AppWebhookController::class, 'store'])->name('webhook.store');
             Route::delete('webhook', [AppWebhookController::class, 'destroy'])->name('webhook.destroy');
             Route::post('source', [AppSourceController::class, 'upload'])->name('source.upload');
+            Route::post('volumes', [AppVolumeController::class, 'store'])->name('volumes.store');
+            Route::delete('volumes/{volume}', [AppVolumeController::class, 'destroy'])->name('volumes.destroy');
         });
 
         Route::middleware('can:'.Permissions::APPS_LOGS)->group(function () {

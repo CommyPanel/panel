@@ -446,6 +446,13 @@ class AgentHostDriver implements HostDriver
         return (string) ($data['logs'] ?? '');
     }
 
+    public function removeVolumes(string $app, ?string $name = null): void
+    {
+        ResourceName::assertValid($app);
+
+        $this->send('post', '/v1/volumes/remove', ['app' => $app, 'name' => $name ?? '']);
+    }
+
     public function pruneDanglingImages(): int
     {
         $data = $this->send('post', '/v1/docker/images/prune');

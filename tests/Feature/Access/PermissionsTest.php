@@ -93,12 +93,14 @@ describe('route protection', function () {
     beforeEach(function () {
         $shop = App::factory()->create(['slug' => 'shop']);
         Domain::query()->create(['name' => 'shop.example.com', 'app_id' => $shop->id]);
+        // Bound by id, so it has to exist for the route to reach its permission check.
+        $shop->volumes()->create(['name' => 'data', 'path' => '/data']);
     });
 
     $routes = [
         'apps.view' => [['get', '/apps'], ['get', '/apps/shop/usage']],
         'apps.create' => [['get', '/apps/create'], ['post', '/apps']],
-        'apps.update' => [['patch', '/apps/shop'], ['post', '/apps/shop/deploy-key'], ['post', '/apps/shop/git-token'], ['delete', '/apps/shop/git-token'], ['post', '/apps/shop/webhook'], ['delete', '/apps/shop/webhook']],
+        'apps.update' => [['patch', '/apps/shop'], ['post', '/apps/shop/deploy-key'], ['post', '/apps/shop/git-token'], ['delete', '/apps/shop/git-token'], ['post', '/apps/shop/webhook'], ['delete', '/apps/shop/webhook'], ['post', '/apps/shop/volumes'], ['delete', '/apps/shop/volumes/1']],
         'apps.deploy' => [['post', '/apps/shop/deployments']],
         'apps.nginx' => [['get', '/apps/shop/nginx'], ['put', '/apps/shop/nginx']],
         'apps.logs' => [['get', '/apps/shop/logs'], ['get', '/apps/shop/logs/download']],

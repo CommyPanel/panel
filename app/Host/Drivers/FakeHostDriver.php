@@ -350,6 +350,12 @@ class FakeHostDriver implements HostDriver
         return "[fake] logs for {$name}\n";
     }
 
+    public function removeVolumes(string $app, ?string $name = null): void
+    {
+        ResourceName::assertValid($app);
+        $this->record('removeVolumes', ['app' => $app, 'name' => $name]);
+    }
+
     public function pruneDanglingImages(): int
     {
         $this->record('pruneDanglingImages', []);

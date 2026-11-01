@@ -25,7 +25,8 @@ export function DeleteAppModal({ slug, open, onClose }: Props) {
             <form onSubmit={submit} className="space-y-4">
                 <p className="text-sm">
                     This stops the app, removes its containers and images and
-                    deletes its settings and variables. It cannot be undone.
+                    deletes its settings, variables and the files in its
+                    persistent volumes. It cannot be undone.
                 </p>
                 <Input
                     label={`Type ${slug} to confirm`}

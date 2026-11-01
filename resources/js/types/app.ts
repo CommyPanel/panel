@@ -47,10 +47,13 @@ export type AppSummary = {
     last_deployed_at: string | null;
 };
 
+export type AppVolume = { id: number; name: string; path: string };
+
 export type AppSettings = AppSummary & {
     container_port: number;
     health_path: string;
     release_command: string | null;
+    volumes: AppVolume[];
     memory_limit_mb: number | null;
     cpu_limit: number | null;
     deploy_key_public: string | null;

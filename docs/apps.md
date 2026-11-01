@@ -30,6 +30,19 @@ The **Container** menu on the app page restarts or stops the live version. A sto
 
 This differs from **Deactivate** (Advanced tab), which removes the container and takes the domains offline until you activate the app again.
 
+## Persistent volumes
+
+Everything an app writes inside its container is gone when the next deployment replaces the container. To keep files (uploads, a SQLite database), add a **persistent volume** in **Settings**: the path inside the container, such as `/app/data`. The files are stored on the server under `/var/lib/commypanel/volumes/<app>/<folder>`.
+
+- A change applies from the **next deployment**, to the app and to its release command.
+- The old and the new container **share** a volume while a deployment switches over, so both can read and write it. Make sure two versions can run against the same files for a moment.
+- A **rollback does not roll back volume data.** The files stay as the running version left them.
+- Whatever the image has at that path is **hidden** by the volume, which starts empty.
+- **Remove** stops mounting a path but leaves its files on the server. **Deleting the app deletes them.**
+- Up to 8 volumes per app. `/proc`, `/sys` and `/dev` cannot be used.
+
+The folder is writable for whichever user the app runs as, since that differs from image to image. It cannot be reached from anywhere else on the server, because the folders above it belong to root and are closed to everybody else.
+
 ## Logs
 
 The **Logs** tab shows what the running container printed, newest at the bottom. Choose how many lines to load (200 to 5,000). **Follow** refreshes every 3 seconds and keeps the view at the end; switch it off to read in peace. Search the log with the box above it, or press Cmd/Ctrl+F while the log is focused: matches are highlighted, and Enter and Shift+Enter move between them. **Download** saves the last 5,000 lines as a text file.
