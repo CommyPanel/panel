@@ -23,10 +23,11 @@ import type { ReactNode } from 'react';
 import { Brand } from '@/components/brand';
 import { ThemeMenu } from '@/components/theme-menu';
 import { UpdateBadge } from '@/components/update-badge';
-import { Alert } from '@/components/ui/alert';
+import { Toaster } from '@/components/ui/toaster';
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
 import { HostBanner } from '@/components/host-banner';
 import { fortify } from '@/lib/fortify';
+import { notify } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 
 type NavItem = {
@@ -238,6 +239,14 @@ export default function AppLayout({ title, children }: Props) {
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [collapsed, setCollapsed] = useState(readCollapsed);
 
+    // The server's one-off messages ("saved", "removed", ...) arrive as flash
+    // data on the next page. Every response carries a new object, so the same
+    // message after a second action shows again.
+    useEffect(() => {
+        if (flash.status) notify.success(flash.status);
+        if (flash.warning) notify.warning(flash.warning);
+    }, [flash]);
+
     useEffect(() => {
         if (!drawerOpen) return;
 
@@ -395,14 +404,9 @@ export default function AppLayout({ title, children }: Props) {
 
                     <main className="min-w-0 space-y-6 p-4 sm:p-6 lg:p-8">
                         <HostBanner />
-                        {flash.status && (
-                            <Alert variant="success">{flash.status}</Alert>
-                        )}
-                        {flash.warning && (
-                            <Alert variant="warning">{flash.warning}</Alert>
-                        )}
                         {children}
                     </main>
+                    <Toaster />
                 </div>
             </div>
         </>
