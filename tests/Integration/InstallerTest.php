@@ -120,6 +120,7 @@ it('serves the panel over TLS and only ever runs index.php', function () {
         ->toContain('ssl_certificate /etc/commypanel/tls/panel.crt;')
         ->toContain('fastcgi_pass unix:/run/php/commypanel.sock;')
         ->toContain('fastcgi_buffer_size 16k;')
+        ->toContain('fastcgi_buffers 8 16k;')
         ->toContain('$realpath_root')
         ->toContain('location ~ ^/index\.php(/|$)')
         ->toContain('return 404;')
