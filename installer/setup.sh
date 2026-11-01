@@ -15,6 +15,8 @@ set -Eeuo pipefail
 
 RELEASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEMPLATES="$RELEASE_DIR/installer/templates"
+# shellcheck source=installer/php-security.sh
+. "$RELEASE_DIR/installer/php-security.sh"
 
 ROOT="${COMMYPANEL_ROOT:-}"
 PREFIX="/opt/commypanel"
@@ -248,6 +250,13 @@ mkd() {
 # Escape a value for use on the right-hand side of a sed substitution.
 sed_escape() { printf '%s' "$1" | sed -e 's/[\\&#]/\\&/g'; }
 
+# For a php-fpm setting that only exists from PHP 8.5: nothing on 8.5 and newer,
+# and a comment marker on older versions, which turns the line into a comment.
+php85_only() {
+    if php_version_ge "${PHP_VER:-0}" 8.5; then return 0; fi
+    printf ';'
+}
+
 # render SRC DEST MODE: fill in the @@PLACEHOLDERS@@ of a template.
 render() {
     local src=$1 dest=$2 mode=$3
@@ -260,6 +269,7 @@ render() {
         -e "s#@@PANEL_INTERNAL_PORT@@#$(sed_escape "$PANEL_INTERNAL_PORT")#g" \
         -e "s#@@PANEL_UID@@#$(sed_escape "${PANEL_UID:-}")#g" \
         -e "s#@@PHP_BIN@@#$(sed_escape "${PHP_BIN:-}")#g" \
+        -e "s#@@PHP85_ONLY@@#$(sed_escape "$(php85_only)")#g" \
         -e "s#@@APP_KEY@@#$(sed_escape "${APP_KEY:-}")#g" \
         -e "s#@@APP_URL@@#$(sed_escape "${APP_URL:-}")#g" \
         "$src" > "$dest.tmp"
@@ -409,6 +419,13 @@ install_docker() {
     fi
 }
 
+# The PHP packages that are installed, one per line. A pattern such as 'php*'
+# given to apt would also name every uninstalled package that matches, and apt
+# would report each one as skipped.
+installed_php_packages() {
+    dpkg-query -W -f='${db:Status-Abbrev} ${binary:Package}\n' 'php*' 2>/dev/null | awk '$1 == "ii" { print $2 }'
+}
+
 install_packages() {
     if [ "$SYSTEM" != 1 ]; then return 0; fi
 
@@ -418,6 +435,16 @@ install_packages() {
     apt-get install -y -qq --no-install-recommends \
         nginx php-cli php-fpm php-sqlite3 php-mbstring php-xml php-curl php-zip php-intl \
         git openssh-client curl ca-certificates gnupg sqlite3 openssl unzip iproute2 util-linux
+    # Installing the php-cli and php-fpm meta-packages leaves an older php8.x-cli
+    # and php8.x-fpm alone when the meta-packages are current. Bring every PHP
+    # package on the server up to what the distribution offers: that is how
+    # security fixes arrive (see installer/php-security.conf).
+    local php_packages
+    php_packages="$(installed_php_packages)"
+    if [ -n "$php_packages" ]; then
+        # shellcheck disable=SC2086
+        apt-get install -y -qq --only-upgrade $php_packages
+    fi
     if [ "$SKIP_DOCKER" = 0 ]; then install_docker; fi
 }
 
@@ -434,6 +461,33 @@ detect_php() {
         || die "PHP 8.3 or newer is required, but this server has PHP $PHP_VER."
     "$PHP_BIN" -r 'foreach (["intl", "mbstring", "pdo_sqlite", "curl", "xml", "zip", "pcntl"] as $e) { if (!extension_loaded($e)) { fwrite(STDERR, "missing PHP extension: $e\n"); exit(1); } }' \
         || die "A required PHP extension is missing."
+}
+
+# Refuses a PHP without the fix for a critical flaw listed in
+# installer/php-security.conf (the upgrade in install_packages has already pulled
+# in whatever fix the distribution has published). An upgrade only warns: the
+# server is no safer for refusing it, and the release carries pool hardening.
+check_php_security() {
+    if [ "$SYSTEM" != 1 ]; then return 0; fi
+
+    local version gaps advice
+    version="$("$PHP_BIN" -r 'echo PHP_VERSION;')"
+    gaps="$(php_security_gaps "$RELEASE_DIR/installer/php-security.conf" "$version" "/usr/share/doc/php$PHP_VER-common/changelog.Debian.gz" | tr '\n' ' ')"
+    gaps="${gaps% }"
+
+    if [ -z "$gaps" ]; then
+        log "PHP $version has the security fixes this release checks for."
+        return 0
+    fi
+
+    advice="PHP $version has no fix for $gaps (critical: remote code execution without logging in). Update it with: sudo apt-get update && sudo apt-get upgrade. If that changes nothing, your distribution has not published the fix yet."
+    if [ "${COMMYPANEL_ALLOW_VULNERABLE_PHP:-0}" = 1 ]; then
+        warn "$advice Continuing because COMMYPANEL_ALLOW_VULNERABLE_PHP=1."
+    elif [ "${UPGRADE:-0}" = 1 ]; then
+        warn "$advice The upgrade continues, but this server stays exposed until PHP is updated."
+    else
+        die "$advice Not installing on a vulnerable PHP. (Set COMMYPANEL_ALLOW_VULNERABLE_PHP=1 to install anyway, at your own risk.)"
+    fi
 }
 
 # --------------------------------------------------------- users and folders
@@ -722,6 +776,7 @@ prune_releases() {
 packages_and_php() {
     install_packages
     detect_php
+    check_php_security
 }
 
 prepare_system() {

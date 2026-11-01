@@ -58,6 +58,25 @@ sudo commypanel upgrade
 
 An upgrade downloads and verifies the new release, backs up the panel databases (the five newest backups are kept in `/var/lib/commypanel/backups`), migrates them, switches over and restarts the services. If the new version does not come up healthy, the previous release is started again. Running the installer again does the same thing.
 
+## PHP security updates
+
+CommyPanel runs on the PHP that your distribution provides, so PHP security fixes come from `apt`, not from CommyPanel. Ubuntu and Debian ship fixes without changing PHP's version number, so a patched server can still say `PHP 8.5.4` in `php -v`; what matters is the package build.
+
+- **The installer updates PHP.** It brings every PHP package that is installed up to what the distribution offers, instead of only installing the `php-cli` and `php-fpm` meta-packages, which would leave an older `php8.x-fpm` in place.
+- **The installer checks that PHP has the fix** for the critical flaws listed in `installer/php-security.conf`. A PHP counts as fixed when it is at least the first upstream release with the fix, or when the package's changelog names the CVE, or when the installed package is at least the distribution's fixed build (Ubuntu keeps the upstream version `8.5.4`; only the package revision, `8.5.4-0ubuntu1.5`, shows the fix).
+- **A fresh install on a PHP without the fix is refused**, with the command to update it. If your distribution has not published the fix yet, wait for it, or set `COMMYPANEL_ALLOW_VULNERABLE_PHP=1` to install anyway, at your own risk. An **upgrade** only warns and goes on, because refusing would leave the server exposed just the same and the release carries extra hardening.
+- **The panel's own PHP pool is hardened** against the two request paths named for PHP2Shell (`session.upload_progress.enabled=0`, and `fatal_error_backtraces=0` on PHP 8.5). The panel uses neither. This is a precaution, not a substitute for the update: PHP's own release notice says there is no complete mitigation.
+
+The current entry is **PHP2Shell** (CVE-2026-109618 and CVE-2026-109619, unauthenticated remote code execution, exploited in the wild). Fixed upstream in PHP 8.3.36, 8.4.27 and 8.5.12; in the distributions as Debian 13 `8.4.27-1~deb13u1`, Ubuntu 26.04 `8.5.4-0ubuntu1.5` and Ubuntu 24.04 `8.3.6-0ubuntu0.24.04.13`.
+
+To check a server by hand:
+
+```bash
+zcat /usr/share/doc/php8.5-common/changelog.Debian.gz | grep -c CVE-2026-109618   # use your PHP version; 0 means no fix
+sudo apt-get update && sudo apt-get upgrade
+sudo systemctl restart php8.5-fpm commypanel-queue@1 commypanel-queue@2 commypanel-scheduler
+```
+
 ## Command line
 
 ```
