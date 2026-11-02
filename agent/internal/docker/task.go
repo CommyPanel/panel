@@ -39,13 +39,14 @@ type TaskSpec struct {
 	MemoryMB       int               `json:"memory_mb,omitempty"`
 	CPUs           float64           `json:"cpus,omitempty"`
 	Network        string            `json:"network,omitempty"`
+	Networks       []NetworkAttach   `json:"networks,omitempty"`
 	TimeoutSeconds int               `json:"timeout_seconds,omitempty"`
 }
 
 func (s TaskSpec) container() ContainerSpec {
 	return ContainerSpec{
 		Name: s.Name, Image: s.Image, Env: s.Env, Volumes: s.Volumes,
-		MemoryMB: s.MemoryMB, CPUs: s.CPUs, Network: s.Network,
+		MemoryMB: s.MemoryMB, CPUs: s.CPUs, Network: s.Network, Networks: s.Networks,
 	}
 }
 
@@ -113,6 +114,11 @@ func (m *Manager) RunTask(ctx context.Context, s TaskSpec, onLine func(string)) 
 	if err := m.ensureNetwork(ctx, network); err != nil {
 		return -1, err
 	}
+	for _, n := range s.Networks {
+		if err := m.ensureNetwork(ctx, n.Name); err != nil {
+			return -1, err
+		}
+	}
 	for _, v := range s.Volumes {
 		if err := m.prepareMount(v.Source); err != nil {
 			return -1, fmt.Errorf("create volume dir: %w", err)
@@ -128,6 +134,16 @@ func (m *Manager) RunTask(ctx context.Context, s TaskSpec, onLine func(string)) 
 	defer func() {
 		_ = m.engine.doJSON(cleanup, "DELETE", "/containers/"+s.Name, url.Values{"force": {"true"}}, nil, nil)
 	}()
+
+	for _, n := range s.Networks {
+		attach := map[string]any{"Container": s.Name}
+		if len(n.Aliases) > 0 {
+			attach["EndpointConfig"] = map[string]any{"Aliases": n.Aliases}
+		}
+		if err := m.engine.doJSON(ctx, "POST", "/networks/"+url.PathEscape(n.Name)+"/connect", nil, attach, nil); err != nil {
+			return -1, err
+		}
+	}
 
 	slog.Info("task started", "name", s.Name, "image", s.Image)
 	if err := m.engine.doJSON(ctx, "POST", "/containers/"+s.Name+"/start", nil, nil, nil); err != nil {

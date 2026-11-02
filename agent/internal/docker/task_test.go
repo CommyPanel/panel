@@ -130,3 +130,22 @@ func isInputError(err error) bool {
 	var input *validate.InputError
 	return errors.As(err, &input)
 }
+
+func TestATaskJoinsTheLinkNetworksOfItsApp(t *testing.T) {
+	m, d, _ := setup(t)
+	spec := taskSpec()
+	spec.Network = "commypanel-shop"
+	spec.Networks = []NetworkAttach{{Name: "commypanel-link-d4"}}
+
+	if _, err := m.RunTask(context.Background(), spec, func(string) {}); err != nil {
+		t.Fatal(err)
+	}
+	if len(d.connected) != 1 || d.connected[0] != "commypanel-link-d4" {
+		t.Errorf("the task joined %v", d.connected)
+	}
+
+	spec.Networks = []NetworkAttach{{Name: "host"}}
+	if _, err := m.RunTask(context.Background(), spec, func(string) {}); err == nil {
+		t.Error("a task must not be able to join host")
+	}
+}
