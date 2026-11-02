@@ -235,6 +235,11 @@ it('rejects a certificate request the agent finds invalid', function () {
 });
 
 it('installs the catch-all port 80 site for ACME challenges at start-up', function () {
+    // The agent opens its socket first and writes this site a moment later.
+    for ($i = 0; $i < 50 && ! file_exists($this->dir.'/sites/00-commypanel-default.conf'); $i++) {
+        usleep(100_000);
+    }
+
     expect($this->dir.'/sites/00-commypanel-default.conf')->toBeFile()
         ->and(file_get_contents($this->dir.'/sites/00-commypanel-default.conf'))->toContain('default_server');
 });
