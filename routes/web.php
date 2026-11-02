@@ -17,6 +17,7 @@ use App\Http\Controllers\AppVolumeController;
 use App\Http\Controllers\AppVolumeFilesController;
 use App\Http\Controllers\AppWebhookController;
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\BackupController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DatabaseServerController;
@@ -222,6 +223,15 @@ Route::middleware('auth')->group(function () {
 
     // Anyone who can see the server sees whether it is up to date; checking by hand and
     // switching the automatic check on or off is server management.
+    Route::get('/settings/backups', [BackupController::class, 'index'])
+        ->middleware('can:'.Permissions::BACKUPS_VIEW)->name('settings.backups');
+    Route::middleware('can:'.Permissions::BACKUPS_MANAGE)->group(function () {
+        $name = '[a-z0-9.-]+';
+        Route::post('/settings/backups', [BackupController::class, 'store'])->name('settings.backups.store');
+        Route::get('/settings/backups/{name}', [BackupController::class, 'download'])->where('name', $name)->middleware('password.confirm')->name('settings.backups.download');
+        Route::delete('/settings/backups/{name}', [BackupController::class, 'destroy'])->where('name', $name)->middleware('password.confirm')->name('settings.backups.destroy');
+    });
+
     Route::get('/settings/updates', [UpdateController::class, 'show'])
         ->middleware('can:'.Permissions::SERVER_VIEW)->name('settings.updates');
     Route::middleware('can:'.Permissions::SERVER_MANAGE)->group(function () {

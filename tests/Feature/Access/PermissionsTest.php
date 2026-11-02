@@ -114,6 +114,8 @@ describe('route protection', function () {
         'apps.volumes' => [['get', '/apps/shop/volumes'], ['get', '/apps/shop/volumes/data'], ['get', '/apps/shop/volumes/data/file'], ['get', '/apps/shop/volumes/data/download']],
         'apps.terminal' => [['post', '/apps/shop/terminal']],
         'apps.links' => [['get', '/apps/shop/links'], ['post', '/apps/shop/links/database'], ['post', '/apps/shop/links/app'], ['delete', '/apps/shop/links/database/1'], ['delete', '/apps/shop/links/app/1']],
+        'backups.view' => [['get', '/settings/backups']],
+        'backups.manage' => [['post', '/settings/backups'], ['get', '/settings/backups/panel-20260101-000000.sqlite.gz'], ['delete', '/settings/backups/panel-20260101-000000.sqlite.gz']],
         'databases.view' => [['get', '/databases'], ['get', '/databases/main']],
         'databases.manage' => [['post', '/databases'], ['post', '/databases/main/start'], ['post', '/databases/main/stop'], ['post', '/databases/main/restart'], ['post', '/databases/main/retry'], ['delete', '/databases/main'], ['post', '/databases/main/databases'], ['delete', '/databases/main/databases/1'], ['post', '/databases/main/databases/1/password']],
         'databases.credentials' => [['get', '/databases/main/databases/1/credentials']],

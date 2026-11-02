@@ -30,6 +30,8 @@ Usage: sudo commypanel <command>
   status               Show the version, services and panel address
   logs                 Follow the logs of all CommyPanel services
   upgrade [--version X]  Upgrade to the latest (or a given) release
+  backup               Back up the panel's database now (also done daily)
+  restore FILE         Replace the panel's database with a backup (stops the panel briefly)
   version              Print the installed version
   artisan ...          Run a panel console command (advanced)
 USAGE
@@ -62,6 +64,31 @@ case "$command" in
     upgrade)
         require_root upgrade "$@"
         exec "$PREFIX/current/installer/install.sh" --upgrade "$@"
+        ;;
+    backup)
+        require_root backup
+        artisan commypanel:backup
+        ;;
+    restore)
+        require_root restore "$@"
+        [ "$#" -ge 1 ] || die "Usage: sudo commypanel restore FILE   (a file in $DATA_DIR/backups/panel, or the name of one)"
+        file="$1"
+        # The panel user has to read it: copy a file from elsewhere into the backup folder.
+        if [ -f "$file" ] && [ "$(dirname "$(readlink -f "$file")")" != "$DATA_DIR/backups/panel" ]; then
+            mkdir -p "$DATA_DIR/backups/panel"
+            cp "$file" "$DATA_DIR/backups/panel/imported-$$.sqlite.gz"
+            chown commypanel:commypanel "$DATA_DIR/backups/panel/imported-$$.sqlite.gz"
+            file="$DATA_DIR/backups/panel/imported-$$.sqlite.gz"
+        fi
+        printf 'Stopping the panel services...\n'
+        systemctl stop commypanel-scheduler commypanel-queue@1 commypanel-queue@2
+        status=0
+        ( cd "$PREFIX/current" && runuser -u commypanel -- env LARAVEL_STORAGE_PATH="$DATA_DIR/storage" "$PHP_BIN" artisan commypanel:restore "$file" --force ) || status=$?
+        printf 'Starting the panel services...\n'
+        systemctl start commypanel-queue@1 commypanel-queue@2 commypanel-scheduler
+        systemctl restart 'php*-fpm' 2>/dev/null || true
+        [ "$status" -eq 0 ] || die "The restore failed; the database was not changed."
+        printf 'Done. The panel is running on the restored database.\n'
         ;;
     version)
         cat "$PREFIX/current/VERSION"

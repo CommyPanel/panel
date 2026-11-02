@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Audit\AuditEventSubscriber;
 use App\Audit\AuditLogger;
+use App\Backups\DatabaseSnapshotter;
+use App\Backups\SqliteSnapshotter;
 use App\Deploy\Health\AssumeHealthyChecker;
 use App\Deploy\Health\HealthChecker;
 use App\Deploy\Health\HttpHealthChecker;
@@ -40,6 +42,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bind(DatabaseSnapshotter::class, SqliteSnapshotter::class);
         $this->app->scoped(AuditLogger::class);
         $this->app->bind(DnsResolver::class, SystemDnsResolver::class);
         $this->app->bind(SourceFetcher::class, CompositeSourceFetcher::class);

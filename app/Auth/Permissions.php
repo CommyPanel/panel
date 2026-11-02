@@ -47,6 +47,10 @@ final class Permissions
 
     public const APPS_LINKS = 'apps.links';
 
+    public const BACKUPS_VIEW = 'backups.view';
+
+    public const BACKUPS_MANAGE = 'backups.manage';
+
     public const SERVER_VIEW = 'server.view';
 
     public const SERVER_MANAGE = 'server.manage';
@@ -92,6 +96,8 @@ final class Permissions
             self::DATABASES_MANAGE => ['group' => 'Databases', 'label' => 'Manage databases', 'description' => 'Create, start, stop and delete database servers, and create, drop and change the password of databases on them. Deleting a server deletes the data of every database on it.'],
             self::DATABASES_CREDENTIALS => ['group' => 'Databases', 'label' => 'See database passwords', 'description' => 'Show a database\'s password and connection string. Asks for the password unless it was confirmed recently, and every time it is shown is recorded in the audit log.'],
             self::APPS_LINKS => ['group' => 'Apps', 'label' => 'Link apps to databases and other apps', 'description' => 'Let an app reach a database, or another app, over a private network made for that link. A linked app can use the database it is given, and its connection details are added to its environment variables.'],
+            self::BACKUPS_VIEW => ['group' => 'Server', 'label' => 'View backups', 'description' => 'See the list of the panel\'s backups, when they were made and how big they are.'],
+            self::BACKUPS_MANAGE => ['group' => 'Server', 'label' => 'Manage backups', 'description' => 'Take a backup now, download one and delete one. A backup holds everything in the panel\'s database, including the encrypted secrets of apps and databases, so downloading asks for the password and is recorded in the audit log.'],
             self::SERVER_VIEW => ['group' => 'Server', 'label' => 'View the server', 'description' => 'See host resources, service states, Docker and nginx status.'],
             self::SERVER_MANAGE => ['group' => 'Server', 'label' => 'Manage Docker and nginx', 'description' => 'Reload nginx, test its configuration, remove unused images and read container logs.'],
             self::USERS_VIEW => ['group' => 'Users', 'label' => 'View users', 'description' => 'See the list of user accounts and their roles.'],

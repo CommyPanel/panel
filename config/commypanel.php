@@ -147,4 +147,9 @@ return [
         // How long a new server may take to answer its first query.
         'ready_timeout' => (int) env('DATABASE_READY_TIMEOUT', 240),
     ],
+
+    'backups' => [
+        // How many panel backups are kept; the oldest go first.
+        'keep' => (int) env('BACKUPS_KEEP', 7),
+    ],
 ];

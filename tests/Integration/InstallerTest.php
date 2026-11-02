@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 
@@ -213,7 +214,7 @@ it('installs a command line tool that offers the documented commands', function 
 
     $cli = ($this->read)('/usr/local/bin/commypanel');
 
-    foreach (['setup-url', 'admin:reset', 'status', 'logs', 'upgrade', 'version', 'artisan'] as $command) {
+    foreach (['setup-url', 'admin:reset', 'status', 'logs', 'upgrade', 'backup', 'restore', 'version', 'artisan'] as $command) {
         expect($cli)->toContain("{$command})");
     }
     expect($cli)->toContain('Run this as root')
@@ -395,4 +396,23 @@ it('writes the panel\'s own nginx site again after an upgrade, once the panel an
     expect($setup)->toContain('commypanel:sync-panel-site')
         ->and(strpos($setup, "step \"Waiting for the panel to answer\" confirm_healthy\n    refresh_panel_site"))->not->toBeFalse()
         ->and($setup)->toMatch('/refresh_panel_site\(\) \{\s+if \[ "\$SYSTEM" != 1 \] \|\| \[ "\$UPGRADE" != 1 \]; then return 0; fi/');
+});
+
+it('restores the database with the panel\'s services stopped, and starts them again even if the restore fails', function () {
+    ($this->setup)();
+    $cli = ($this->read)('/usr/local/bin/commypanel');
+
+    expect($cli)->toContain('systemctl stop commypanel-scheduler commypanel-queue@1 commypanel-queue@2')
+        ->toContain('commypanel:restore "$file" --force')
+        ->toContain('systemctl start commypanel-queue@1 commypanel-queue@2 commypanel-scheduler')
+        ->and(strpos($cli, 'systemctl start commypanel-queue@1'))->toBeGreaterThan(strpos($cli, 'commypanel:restore'))
+        // A failed restore must not skip the restart: the status is kept and checked after it.
+        ->and($cli)->toContain('|| status=$?')
+        ->and(strpos($cli, '|| die "The restore failed'))->toBeGreaterThan(strpos($cli, 'systemctl start commypanel-queue@1'));
+});
+
+it('backs the panel database up every night', function () {
+    $schedule = Artisan::call('schedule:list');
+
+    expect(Artisan::output())->toContain('commypanel:backup');
 });

@@ -2,6 +2,7 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Boxes,
     Database,
+    DatabaseBackup,
     CircleArrowUp,
     Globe,
     ChevronsLeft,
@@ -111,6 +112,12 @@ const NAV: { heading: string; items: NavItem[] }[] = [
                 label: 'Audit log',
                 icon: ScrollText,
                 permission: 'audit.view',
+            },
+            {
+                href: '/settings/backups',
+                label: 'Backups',
+                icon: DatabaseBackup,
+                permission: 'backups.view',
             },
             {
                 href: '/settings/updates',

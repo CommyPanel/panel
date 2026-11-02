@@ -11,3 +11,5 @@ Artisan::command('inspire', function () {
 Schedule::command('commypanel:check-domains')->everyFiveMinutes()->withoutOverlapping();
 
 Schedule::command('commypanel:renew-certificates')->dailyAt('03:17')->withoutOverlapping();
+
+Schedule::command('commypanel:backup')->dailyAt('03:30')->withoutOverlapping();
