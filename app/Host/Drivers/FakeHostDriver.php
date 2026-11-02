@@ -66,7 +66,7 @@ class FakeHostDriver implements HostDriver
     /** Actions that need the Docker daemon; they fail while it is down. */
     private const DOCKER_ACTIONS = [
         'buildImage', 'runContainer', 'runTask', 'stopContainer', 'startContainer', 'restartContainer',
-        'removeContainer', 'containerLogs', 'pruneDanglingImages', 'removeImage',
+        'removeContainer', 'containerLogs', 'pruneDanglingImages', 'removeImage', 'removeNetwork',
     ];
 
     public function systemStatus(): SystemStatus
@@ -363,6 +363,12 @@ class FakeHostDriver implements HostDriver
                 ], $spec->volumes),
             );
         }, $this->containers));
+    }
+
+    public function removeNetwork(string $name): void
+    {
+        ResourceName::assertValid($name);
+        $this->record('removeNetwork', ['name' => $name]);
     }
 
     public function createTerminalTicket(string $container, string $origin): string

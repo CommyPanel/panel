@@ -26,6 +26,17 @@ type AppContainer = {
 
 type Payload = { containers: AppContainer[]; networks: DockerNetwork[] };
 
+// Before per-app networks, every app's containers joined one network called "commypanel".
+const SHARED_NETWORK = 'commypanel';
+
+function usesSharedNetwork(containers: AppContainer[]): boolean {
+    return containers.some(
+        (c) =>
+            c.state === 'running' &&
+            c.networks.some((n) => n.name === SHARED_NETWORK),
+    );
+}
+
 /**
  * The app's containers (the live release, and an older one while it drains),
  * what they are attached to, and what else is on their networks.
@@ -86,6 +97,13 @@ export function AppContainersCard({ slug }: { slug: string }) {
                 <p className="text-sm text-base-content/70">
                     This app has no containers right now.
                 </p>
+            )}
+            {data && usesSharedNetwork(data.containers) && (
+                <Alert variant="warning">
+                    This app still runs on the old shared network, where other
+                    apps&apos; containers can reach it. Deploy it again to move
+                    it to its own network, <code>commypanel-{slug}</code>.
+                </Alert>
             )}
             {data && data.containers.length > 0 && (
                 <>

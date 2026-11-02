@@ -170,6 +170,7 @@ class DeployApp
             memoryLimitMb: $app->memory_limit_mb,
             cpuLimit: $app->cpu_limit === null ? null : (float) $app->cpu_limit,
             volumes: $this->volumes->mounts($app),
+            network: $app->networkName(),
         ));
 
         return true;
@@ -200,6 +201,7 @@ class DeployApp
             memoryLimitMb: $app->memory_limit_mb,
             cpuLimit: $app->cpu_limit === null ? null : (float) $app->cpu_limit,
             volumes: $this->volumes->mounts($app),
+            network: $app->networkName(),
             timeoutSeconds: $timeout,
         ), $log->line(...));
 

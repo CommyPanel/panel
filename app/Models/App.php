@@ -143,6 +143,16 @@ class App extends Model
     }
 
     /**
+     * The Docker network this app's containers join, and only them: apps do not
+     * share a network, so one app cannot reach another's containers. The agent
+     * creates it with the app's first container.
+     */
+    public function networkName(): string
+    {
+        return 'commypanel-'.$this->slug;
+    }
+
+    /**
      * A locked app cannot be deleted. Locking guards against a slip, not against
      * a determined administrator: anyone who may change the app can unlock it.
      */

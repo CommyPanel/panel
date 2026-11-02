@@ -29,8 +29,9 @@ export function NetworkList({ networks }: { networks: DockerNetwork[] }) {
                     {appsOn(network) > 1 && (
                         <Alert variant="info">
                             {appsOn(network)} apps share this network, so their
-                            containers can reach each other directly. Keep that
-                            in mind if one of them is not fully trusted.
+                            containers can reach each other directly. This is
+                            the old shared network: deploy each app again to
+                            give it a network of its own.
                         </Alert>
                     )}
                     {network.containers.length === 0 ? (

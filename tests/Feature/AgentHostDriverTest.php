@@ -318,3 +318,16 @@ it('asks the agent for a terminal ticket and checks the answer', function () {
     expect(fn () => agentDriver()->createTerminalTicket('shop-4', 'https://panel.example.com'))->toThrow(HostOperationFailed::class, 'ticket')
         ->and(fn () => agentDriver()->createTerminalTicket('shop-4', 'https://panel.example.com'))->toThrow(HostOperationFailed::class, 'not enabled');
 });
+
+it('asks the agent to remove an app\'s network', function () {
+    Http::fake(['agent/v1/docker/networks/remove' => Http::sequence()
+        ->push(['ok' => true])
+        ->push(['error' => 'network "commypanel-shop" still has containers attached'], 400)]);
+
+    agentDriver()->removeNetwork('commypanel-shop');
+
+    Http::assertSent(fn ($request) => $request->data() === ['name' => 'commypanel-shop']);
+
+    expect(fn () => agentDriver()->removeNetwork('commypanel-shop'))->toThrow(HostOperationFailed::class, 'still has containers')
+        ->and(fn () => agentDriver()->removeNetwork('../x'))->toThrow(InvalidArgumentException::class);
+});

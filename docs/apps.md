@@ -65,6 +65,18 @@ Volume files are private data (databases, uploads), so browsing needs its own pe
 
 A volume you removed shows as **Not attached**, with its files. **Delete data** removes them (it asks for your password first, and is recorded). The agent refuses while any container still has that volume mounted, so deploy the app again first.
 
+## Containers and networks
+
+The **Usage** tab lists the app's containers: the live release and, for a moment during a deployment, the previous one. For each it shows the state, the release, the network and address it has, the ports it publishes (only on the server's loopback address; nginx is what reaches them) and the volumes mounted into it. Below that are the networks those containers are on and everything attached to them. **Server > Docker** shows the same for every container, plus all networks CommyPanel created.
+
+### Each app has its own network
+
+Every app's containers join a Docker network of their own, `commypanel-<app>`, created with its first container and removed when the app is deleted. Containers of different apps are on different networks, so one app cannot reach another's containers. The old and the new release of the same app share their network, so a deployment switch needs no change. nginx reaches the app through a port published on the server's loopback address, which does not depend on the network.
+
+Apps deployed before this existed stay on the old shared network, called `commypanel`, until their next deployment. The Usage tab says so, and both pages warn when a network holds more than one app. Deploy those apps again to move them. The old network stays as an empty entry afterwards.
+
+What this does not do: a container can still reach the internet, and the host's own services that listen on all addresses (such as the panel's port or SSH) through the network's gateway address. Services that listen only on `127.0.0.1`, including the ports the apps are published on, cannot be reached from a container.
+
 ## Logs
 
 The **Logs** tab shows what the running container printed, newest at the bottom. Choose how many lines to load (200 to 5,000). **Follow** refreshes every 3 seconds and keeps the view at the end; switch it off to read in peace. Search the log with the box above it, or press Cmd/Ctrl+F while the log is focused: matches are highlighted, and Enter and Shift+Enter move between them. **Download** saves the last 5,000 lines as a text file.

@@ -162,5 +162,5 @@ it('deletes the volume data together with the app', function () {
 
     expect($removed['args'])->toBe(['app' => 'shop', 'name' => null])
         // After the containers, because nothing may still have the folders mounted.
-        ->and($this->host->actionNames())->toBe(['removeVolumes', 'removeNginxSite', 'removeCertificate']);
+        ->and($this->host->actionNames())->toBe(['removeNetwork', 'removeVolumes', 'removeNginxSite', 'removeCertificate']);
 });

@@ -53,6 +53,13 @@ class DestroyApp
             }
         }
 
+        // After the containers: a network cannot go while something is attached.
+        try {
+            $this->host->removeNetwork($app->networkName());
+        } catch (HostOperationFailed $e) {
+            $problems[] = "Network {$app->networkName()}: {$e->getMessage()}";
+        }
+
         foreach ($deployments->where('image_available', true)->pluck('image_tag')->filter()->unique() as $tag) {
             try {
                 $this->host->removeImage($tag);

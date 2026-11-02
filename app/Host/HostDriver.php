@@ -189,6 +189,14 @@ interface HostDriver
     public function listContainers(): array;
 
     /**
+     * Delete an app's own network once nothing is attached to it. A network that
+     * is already gone is not an error.
+     *
+     * @throws HostOperationFailed
+     */
+    public function removeNetwork(string $name): void;
+
+    /**
      * A single-use ticket that lets one browser open a terminal in one managed
      * container, from one origin (such as https://panel.example.com). The
      * ticket is only valid for a few seconds.

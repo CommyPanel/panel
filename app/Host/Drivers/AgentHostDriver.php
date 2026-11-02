@@ -455,6 +455,13 @@ class AgentHostDriver implements HostDriver
         ), $data['containers'] ?? []));
     }
 
+    public function removeNetwork(string $name): void
+    {
+        ResourceName::assertValid($name);
+
+        $this->send('post', '/v1/docker/networks/remove', ['name' => $name]);
+    }
+
     public function createTerminalTicket(string $container, string $origin): string
     {
         ResourceName::assertValid($container);
