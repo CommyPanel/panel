@@ -76,6 +76,7 @@ class DeployApp
             $this->stage($deployment, DeploymentStage::Switch);
             $log->step('Switching traffic to the new version.');
             $this->traffic->switchTo($deployment);
+            $this->moveLinkNames($app, $deployment, $previous, $log);
             $app->forceFill(['active_deployment_id' => $deployment->id, 'stopped_at' => null])->save();
             $deployment->forceFill(['status' => DeploymentStatus::Active, 'stage' => DeploymentStage::Done, 'finished_at' => now()])->save();
 
@@ -173,7 +174,8 @@ class DeployApp
             cpuLimit: $app->cpu_limit === null ? null : (float) $app->cpu_limit,
             volumes: $this->volumes->mounts($app),
             network: $app->networkName(),
-            networks: $this->links->attachments($app),
+            // The name other apps call this one by is added once it has traffic, see moveLinkNames().
+            networks: $this->links->attachments($app, providing: false),
         ));
 
         return true;
@@ -246,6 +248,39 @@ class DeployApp
         }
 
         throw new DeploymentFailed("The app did not answer on port {$app->container_port} within {$timeout} seconds. Check that it listens on the PORT environment variable.");
+    }
+
+    /**
+     * Hand the name other apps call this app by from the old release to the new one.
+     * The new release joins first, so the name never points at nothing; the old one
+     * leaves right after, so it does not keep answering while it drains.
+     */
+    private function moveLinkNames(App $app, Deployment $deployment, ?Deployment $previous, DeployLogger $log): void
+    {
+        $networks = $this->links->providedNetworks($app);
+
+        if ($networks === []) {
+            return;
+        }
+
+        $log->step('Moving the name other apps use for this app to the new version.');
+
+        foreach ($networks as $network) {
+            $this->host->connectNetwork((string) $deployment->container_name, $network->name, $network->aliases);
+        }
+
+        if ($previous === null || $previous->container_name === null) {
+            return;
+        }
+
+        foreach ($networks as $network) {
+            try {
+                $this->host->disconnectNetwork($previous->container_name, $network->name);
+            } catch (HostOperationFailed $e) {
+                // It keeps the name until it stops a few seconds from now; not worth failing over.
+                $log->line("Warning: could not take the old version off {$network->name}: ".$e->getMessage());
+            }
+        }
     }
 
     private function retire(?Deployment $previous, DeployLogger $log): void

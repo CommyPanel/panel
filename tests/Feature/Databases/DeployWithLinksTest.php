@@ -100,17 +100,29 @@ it('lets the release command reach the database too', function () {
         ->and($task->env)->toHaveKey('DATABASE_URL');
 });
 
-it('starts a provider app with its name on the link network', function () {
+it('gives a provider app its name on the link network only once it has traffic', function () {
     $api = App::factory()->create(['slug' => 'api', 'stack' => null, 'container_port' => 3000, 'health_path' => '/health']);
     $link = app(AppLinks::class)->linkApp($this->shop, $api, 'API');
 
     app(Deployer::class)->deploy($api);
 
-    $spec = startedSpec();
+    expect(startedSpec()->name)->toBe('api-1')
+        ->and(startedSpec()->networks)->toBe([])
+        ->and($this->host->connections()[$link->networkName()])->toBe(['api-1' => ['api']]);
+});
 
-    expect($spec->name)->toBe('api-1')
-        ->and($spec->networks[0]->name)->toBe($link->networkName())
-        ->and($spec->networks[0]->aliases)->toBe(['api']);
+it('moves the name from the old release to the new one, so only one answers to it', function () {
+    $api = App::factory()->create(['slug' => 'api', 'stack' => null, 'container_port' => 3000, 'health_path' => '/health']);
+    $link = app(AppLinks::class)->linkApp($this->shop, $api, 'API');
+
+    app(Deployer::class)->deploy($api);
+    app(Deployer::class)->deploy($api->fresh());
+
+    $names = $this->host->connections()[$link->networkName()];
+
+    expect($names)->toHaveKey('api-2')
+        ->and($names['api-2'])->toBe(['api'])
+        ->and($names)->not->toHaveKey('api-1');
 });
 
 it('puts an app without links on its own network only', function () {

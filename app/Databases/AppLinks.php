@@ -185,7 +185,7 @@ class AppLinks
      *
      * @return list<NetworkAttachment>
      */
-    public function attachments(App $app): array
+    public function attachments(App $app, bool $providing = true): array
     {
         $out = [];
 
@@ -197,7 +197,24 @@ class AppLinks
             $out[] = new NetworkAttachment($link->networkName());
         }
 
-        // Other apps reach this one on these, by this app's name.
+        if ($providing) {
+            $out = [...$out, ...$this->providedNetworks($app)];
+        }
+
+        return $out;
+    }
+
+    /**
+     * The networks other apps reach this one on, by this app's name. A new release
+     * joins these only once it is healthy and has traffic (see DeployApp), so that the
+     * old and the new release never answer to the name at the same time for long.
+     *
+     * @return list<NetworkAttachment>
+     */
+    public function providedNetworks(App $app): array
+    {
+        $out = [];
+
         foreach ($app->linkedFrom()->get() as $link) {
             $out[] = new NetworkAttachment($link->networkName(), [$app->slug]);
         }
