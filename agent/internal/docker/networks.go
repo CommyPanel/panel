@@ -3,9 +3,13 @@ package docker
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"log/slog"
 	"net/url"
 	"sort"
 	"strings"
+
+	"commypanel/agent/internal/validate"
 )
 
 // NetworkInfo is a Docker network the agent created, with what is attached to it.
@@ -73,4 +77,42 @@ func (m *Manager) Networks(ctx context.Context) ([]NetworkInfo, error) {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
+}
+
+// RemoveNetwork deletes one of the per-app networks the agent created, once
+// nothing is attached to it. The shared network from earlier releases, networks
+// that did not come from the agent and anything else are refused, and a network
+// that no longer exists is not an error.
+func (m *Manager) RemoveNetwork(ctx context.Context, name string) error {
+	if err := validate.Network(name); err != nil {
+		return err
+	}
+	if name == defaultNetwork {
+		return &validate.InputError{Msg: "the shared network is not removed here"}
+	}
+	if m.cfg.DryRun {
+		slog.Info("dry-run: would remove network", "name", name)
+		return nil
+	}
+	var inspect struct {
+		Labels map[string]string `json:"Labels"`
+	}
+	err := m.engine.doJSON(ctx, "GET", "/networks/"+url.PathEscape(name), nil, nil, &inspect)
+	if isStatus(err, 404) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if inspect.Labels[ManagedLabel] != "true" {
+		return &validate.InputError{Msg: fmt.Sprintf("network %q was not created by CommyPanel", name)}
+	}
+	err = m.engine.doJSON(ctx, "DELETE", "/networks/"+url.PathEscape(name), nil, nil, nil)
+	if isStatus(err, 404) {
+		return nil
+	}
+	if isStatus(err, 403) || isStatus(err, 409) {
+		return &validate.InputError{Msg: fmt.Sprintf("network %q still has containers attached", name)}
+	}
+	return err
 }

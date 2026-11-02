@@ -20,18 +20,21 @@ import (
 
 // fakeDaemon is a tiny stand-in for the Docker Engine API.
 type fakeDaemon struct {
-	mu         sync.Mutex
-	requests   []string
-	created    map[string]any
-	labels     map[string]string // labels returned by inspect; nil = container missing
-	buildTar   []string
-	buildReply string
-	waitCode   int
-	mounts     []string // sources mounted by the container the list reports
-	execStatus int
-	execBody   map[string]any
-	resized    string
-	upgrade    string
+	mu              sync.Mutex
+	requests        []string
+	created         map[string]any
+	labels          map[string]string // labels returned by inspect; nil = container missing
+	buildTar        []string
+	buildReply      string
+	waitCode        int
+	mounts          []string // sources mounted by the container the list reports
+	execStatus      int
+	execBody        map[string]any
+	resized         string
+	netMissing      bool // the per-app network does not exist yet
+	netForeign      bool // it exists but was not created by the agent
+	netDeleteStatus int
+	upgrade         string
 }
 
 func (f *fakeDaemon) handler() http.Handler {
@@ -82,6 +85,24 @@ func (f *fakeDaemon) handler() http.Handler {
 			w.Write([]byte(`{"Name":"commypanel","Driver":"bridge","Internal":false,
 				"IPAM":{"Config":[{"Subnet":"172.20.0.0/16","Gateway":"172.20.0.1"}]},
 				"Containers":{"b":{"Name":"shop-2","IPv4Address":"172.20.0.3/16"},"a":{"Name":"shop-1","IPv4Address":"172.20.0.2/16"}}}`))
+		case r.Method == "GET" && strings.HasPrefix(r.URL.Path, "/networks/commypanel-"):
+			if f.netMissing {
+				w.WriteHeader(404)
+				w.Write([]byte(`{"message":"no such network"}`))
+				return
+			}
+			labels := map[string]string{ManagedLabel: "true"}
+			if f.netForeign {
+				labels = map[string]string{"other": "x"}
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"Labels": labels})
+		case r.Method == "DELETE" && strings.HasPrefix(r.URL.Path, "/networks/"):
+			if f.netDeleteStatus != 0 {
+				w.WriteHeader(f.netDeleteStatus)
+				w.Write([]byte(`{"message":"network has active endpoints"}`))
+				return
+			}
+			w.WriteHeader(204)
 		case r.Method == "GET" && strings.HasPrefix(r.URL.Path, "/networks/"):
 			w.WriteHeader(200)
 			w.Write([]byte(`{}`))

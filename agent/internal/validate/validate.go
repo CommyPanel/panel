@@ -34,6 +34,24 @@ func Name(s string) error {
 	return nil
 }
 
+// NetworkPrefix starts the name of every network the agent creates: the shared
+// one from earlier releases ("commypanel") and one per app ("commypanel-<app>").
+const NetworkPrefix = "commypanel"
+
+// Network checks the name of a Docker network for a container. Only networks of
+// our own are accepted, so a request can never name "host" (the host's own
+// network stack), "bridge" (shared with everything else Docker runs), "none" or
+// another container's namespace.
+func Network(s string) error {
+	if s == NetworkPrefix {
+		return nil
+	}
+	if !strings.HasPrefix(s, NetworkPrefix+"-") || !nameRe.MatchString(s) {
+		return invalid("invalid network %q", s)
+	}
+	return nil
+}
+
 // Domain checks a lowercase DNS hostname with at least two labels.
 func Domain(s string) error {
 	if len(s) == 0 || len(s) > 253 {

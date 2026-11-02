@@ -43,6 +43,7 @@ type Docker interface {
 	Remove(ctx context.Context, name string) error
 	List(ctx context.Context) ([]docker.ContainerInfo, error)
 	Networks(ctx context.Context) ([]docker.NetworkInfo, error)
+	RemoveNetwork(ctx context.Context, name string) error
 	Logs(ctx context.Context, name string, tail int) (string, error)
 	ValidateBuild(s docker.BuildSpec) error
 	Build(ctx context.Context, s docker.BuildSpec, onLine func(string)) error
@@ -142,6 +143,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/docker/images/prune", s.pruneImages)
 	mux.HandleFunc("POST /v1/docker/images/remove", s.removeImage)
 	mux.HandleFunc("GET /v1/docker/networks", s.networks)
+	mux.HandleFunc("POST /v1/docker/networks/remove", s.removeNetwork)
 	mux.HandleFunc("POST /v1/terminal/tickets", s.terminalTicket)
 	mux.HandleFunc("POST /v1/volumes/remove", s.removeVolumes)
 	mux.HandleFunc("GET /v1/volumes/{app}", s.listVolumes)
@@ -403,6 +405,16 @@ func (s *Server) terminalTicket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ticket": ticket, "expires_in": int(terminal.TicketTTL.Seconds())})
+}
+
+func (s *Server) removeNetwork(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Name string `json:"name"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	s.respond(w, s.opts.Docker.RemoveNetwork(r.Context(), body.Name))
 }
 
 func (s *Server) networks(w http.ResponseWriter, r *http.Request) {

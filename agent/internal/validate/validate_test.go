@@ -138,3 +138,16 @@ func TestResolveUnder(t *testing.T) {
 		}
 	}
 }
+
+func TestNetwork(t *testing.T) {
+	for _, ok := range []string{"commypanel", "commypanel-shop", "commypanel-my-app-2"} {
+		if err := Network(ok); err != nil {
+			t.Errorf("Network(%q) = %v", ok, err)
+		}
+	}
+	for _, bad := range []string{"", "host", "bridge", "none", "default", "container:abc", "commypanel-", "commypanelx", "commypanel_shop", "Commypanel-shop", "commypanel-Shop", "commypanel-shop-", "other-shop", "commypanel-" + strings.Repeat("a", 60), "commypanel-a b", "commypanel/x"} {
+		if err := Network(bad); err == nil {
+			t.Errorf("Network(%q) must fail", bad)
+		}
+	}
+}

@@ -180,7 +180,7 @@ func (m *Manager) Validate(s ContainerSpec) error {
 		return &validate.InputError{Msg: "invalid cpus"}
 	}
 	if s.Network != "" {
-		return validate.Name(s.Network)
+		return validate.Network(s.Network)
 	}
 	return nil
 }

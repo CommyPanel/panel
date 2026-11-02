@@ -151,18 +151,19 @@ func TestRemoveSite(t *testing.T) {
 }
 
 type fakeDocker struct {
-	ran            []docker.ContainerSpec
-	stopped        []string
-	started        []string
-	restarted      []string
-	removed        []string
-	tasks          []docker.TaskSpec
-	taskCode       int
-	err            error
-	buildErr       error
-	buildLogs      []string
-	removedImages  []string
-	removedVolumes []string
+	ran             []docker.ContainerSpec
+	stopped         []string
+	started         []string
+	restarted       []string
+	removed         []string
+	tasks           []docker.TaskSpec
+	taskCode        int
+	err             error
+	buildErr        error
+	buildLogs       []string
+	removedImages   []string
+	removedVolumes  []string
+	removedNetworks []string
 }
 
 func (f *fakeDocker) Run(_ context.Context, s docker.ContainerSpec) error {
@@ -243,6 +244,14 @@ func (f *fakeDocker) RemoveImage(_ context.Context, tag string) error {
 
 func (f *fakeDocker) Networks(context.Context) ([]docker.NetworkInfo, error) {
 	return []docker.NetworkInfo{{Name: "commypanel", Driver: "bridge", Subnet: "172.20.0.0/16", Containers: []docker.NetworkMember{{Name: "shop-1", IP: "172.20.0.2"}}}}, f.err
+}
+
+func (f *fakeDocker) RemoveNetwork(_ context.Context, name string) error {
+	if err := validate.Network(name); err != nil {
+		return err
+	}
+	f.removedNetworks = append(f.removedNetworks, name)
+	return f.err
 }
 
 func (f *fakeDocker) RemoveVolumes(_ context.Context, app, name string) error {
@@ -389,6 +398,19 @@ func TestNetworksRoute(t *testing.T) {
 	}
 	if rec := do(t, newDockerServer(&fakeDocker{err: docker.ErrUnavailable}), "GET", "/v1/docker/networks", ""); rec.Code != 503 {
 		t.Errorf("docker down: %d, want 503", rec.Code)
+	}
+}
+
+func TestRemoveNetworkRoute(t *testing.T) {
+	f := &fakeDocker{}
+	s := newDockerServer(f)
+	if rec := do(t, s, "POST", "/v1/docker/networks/remove", `{"name":"commypanel-shop"}`); rec.Code != 200 || f.removedNetworks[0] != "commypanel-shop" {
+		t.Errorf("remove: %d %v", rec.Code, f.removedNetworks)
+	}
+	for _, bad := range []string{`{"name":"host"}`, `{"name":"bridge"}`, `{"name":""}`, `{"name":"commypanel-shop","x":1}`} {
+		if rec := do(t, s, "POST", "/v1/docker/networks/remove", bad); rec.Code != 400 {
+			t.Errorf("%s: %d, want 400", bad, rec.Code)
+		}
 	}
 }
 
