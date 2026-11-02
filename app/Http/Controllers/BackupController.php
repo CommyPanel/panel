@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Audit\AuditLogger;
 use App\Backups\BackupFailed;
 use App\Backups\PanelBackups;
+use App\Backups\Remote\RemoteSettings;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -13,7 +14,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class BackupController extends Controller
 {
-    public function index(PanelBackups $backups): Response
+    public function index(PanelBackups $backups, RemoteSettings $remote): Response
     {
         return Inertia::render('settings/backups', [
             'backups' => array_map(fn (array $b) => [
@@ -23,6 +24,7 @@ class BackupController extends Controller
             ], $backups->all()),
             'keep' => (int) config('commypanel.backups.keep'),
             'folder' => $backups->directory(),
+            'remote' => $remote->toArray(),
         ]);
     }
 

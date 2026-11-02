@@ -2,6 +2,7 @@
 
 namespace App\Databases;
 
+use App\Backups\Remote\RemoteBackups;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
 use App\Models\DatabaseServer;
@@ -53,6 +54,7 @@ class DatabaseBackups
 
         @chmod($dir.'/'.$name, 0600);
         $this->prune($server, $database->name, (int) config('commypanel.backups.keep_databases'));
+        app(RemoteBackups::class)->queue('databases/'.$server->slug, $dir.'/'.$name);
 
         return $this->describe($server, $name);
     }

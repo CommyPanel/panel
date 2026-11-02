@@ -2,6 +2,7 @@ import { router, usePage } from '@inertiajs/react';
 import { DatabaseBackup, Download, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import BackupController from '@/actions/App/Http/Controllers/BackupController';
+import { RemoteBackupCard } from '@/components/backups/remote-backup-card';
 import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -11,11 +12,16 @@ import { useConfirmedAction } from '@/hooks/use-confirmed-action';
 import AppLayout from '@/layouts/app-layout';
 import { formatBytes, formatDate, timeAgo } from '@/lib/format';
 import { useCan } from '@/lib/permissions';
-import type { PanelBackup } from '@/types';
+import type { PanelBackup, RemoteBackupSettings } from '@/types';
 
-type Props = { backups: PanelBackup[]; keep: number; folder: string };
+type Props = {
+    backups: PanelBackup[];
+    keep: number;
+    folder: string;
+    remote: RemoteBackupSettings;
+};
 
-export default function Backups({ backups, keep, folder }: Props) {
+export default function Backups({ backups, keep, folder, remote }: Props) {
     const can = useCan();
     const { errors } = usePage().props;
     const confirmed = useConfirmedAction();
@@ -153,6 +159,8 @@ export default function Backups({ backups, keep, folder }: Props) {
                     </div>
                 )}
             </Card>
+
+            <RemoteBackupCard remote={remote} manage={manage} />
 
             <Card title="What a backup holds, and what it does not">
                 <ul className="list-disc space-y-2 pl-5 text-sm text-base-content/80">

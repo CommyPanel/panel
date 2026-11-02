@@ -2,6 +2,7 @@
 
 namespace App\Backups;
 
+use App\Backups\Remote\RemoteBackups;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
 use App\Models\App;
@@ -48,6 +49,7 @@ class VolumeBackups
 
         @chmod($dir.'/'.$name, 0600);
         $this->prune($app, $volume, (int) config('commypanel.backups.keep_volumes'));
+        app(RemoteBackups::class)->queue('volumes/'.$app->slug, $dir.'/'.$name);
 
         return $this->describe($app, $name);
     }

@@ -2,6 +2,7 @@
 
 namespace App\Backups;
 
+use App\Backups\Remote\RemoteBackups;
 use PDO;
 use Throwable;
 
@@ -58,6 +59,7 @@ class PanelBackups
 
         @chmod($final, 0600);
         $this->prune((int) config('commypanel.backups.keep'));
+        app(RemoteBackups::class)->queue('panel', $this->directory().'/'.$name);
 
         return $this->describe($name);
     }

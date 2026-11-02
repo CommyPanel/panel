@@ -19,6 +19,7 @@ use App\Http\Controllers\AppVolumeFilesController;
 use App\Http\Controllers\AppWebhookController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\BackupController;
+use App\Http\Controllers\BackupRemoteController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DatabaseBackupController;
@@ -238,6 +239,9 @@ Route::middleware('auth')->group(function () {
     Route::middleware('can:'.Permissions::BACKUPS_MANAGE)->group(function () {
         $name = '[a-z0-9.-]+';
         Route::post('/settings/backups', [BackupController::class, 'store'])->name('settings.backups.store');
+        Route::put('/settings/backups/remote', [BackupRemoteController::class, 'update'])->middleware('password.confirm')->name('settings.backups.remote.update');
+        Route::post('/settings/backups/remote/test', [BackupRemoteController::class, 'test'])->middleware('throttle:6,1')->name('settings.backups.remote.test');
+        Route::delete('/settings/backups/remote', [BackupRemoteController::class, 'destroy'])->middleware('password.confirm')->name('settings.backups.remote.destroy');
         Route::get('/settings/backups/{name}', [BackupController::class, 'download'])->where('name', $name)->middleware('password.confirm')->name('settings.backups.download');
         Route::delete('/settings/backups/{name}', [BackupController::class, 'destroy'])->where('name', $name)->middleware('password.confirm')->name('settings.backups.destroy');
     });
