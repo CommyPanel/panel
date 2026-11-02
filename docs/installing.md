@@ -96,6 +96,14 @@ When someone signs in, CommyPanel looks in the background for a newer release. I
 
 The page does not upgrade anything: you still run `sudo commypanel upgrade` on the server.
 
+## Backing up and restoring the panel
+
+The panel's own database (apps, domains, users, the audit log, database servers and their encrypted secrets) is backed up every night at 03:30, and the newest 7 are kept in `/var/lib/commypanel/backups/panel`. **Settings > Backups** lists them, takes one now, and downloads or deletes one (downloading asks for your password and is audited). `sudo commypanel backup` takes one from the command line.
+
+A backup does **not** hold the encryption key, `APP_KEY` in `/etc/commypanel/env`: without it the encrypted values in a restored database (environment variables, tokens, database passwords) cannot be read. Keep a copy of the key somewhere safe, apart from the backups. It also does not hold files: the files in apps' volumes, the data of database servers and built images. Copy backups off the server, since one on the same disk is lost with it.
+
+To restore, on the server: `sudo commypanel restore FILE`, with the name of a backup in that folder or the path of a file you downloaded. The panel's queue workers and scheduler stop, the file is checked (it must be a healthy CommyPanel database), the current database is kept as a backup marked `-before`, the database is replaced, and everything starts again. To restore onto a new server, install CommyPanel there first and put the old `APP_KEY` into its `/etc/commypanel/env` before restoring.
+
 ## Command line
 
 ```
@@ -104,6 +112,8 @@ sudo commypanel admin:reset EMAIL  new random password for an admin, and turns o
 sudo commypanel status             version, services and panel address
 sudo commypanel logs               follow the logs
 sudo commypanel upgrade            upgrade
+sudo commypanel backup             back up the panel's database now
+sudo commypanel restore FILE       replace the panel's database with a backup
 ```
 
 If you lose access to your admin account, `admin:reset` is the way back in.
