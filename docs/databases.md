@@ -32,6 +32,10 @@ Apps are separate from each other by default: every app has its own Docker netwo
 
 Linking needs the `apps.links` permission. Linking a database lets that app use it, and only that one.
 
+## A database on another server
+
+A database the panel does not run, such as one on another machine in your private network, is used like any outside service: put its address in the app's environment variables, for example `DATABASE_URL=postgresql://user:pass@10.0.0.5:5432/shop`, and deploy again. Apps can reach other machines; only other apps are kept out. The database must listen on its private address and allow the **panel server's** address (the app's traffic leaves through the server, so the database never sees the container's own address). The panel does not list, back up or show credentials for such a database.
+
 ## Backups
 
 - **Databases.** Every database on a running server is dumped each night at 04:00, and from the **Back up** button next to it, with the engine's own tool, to one compressed file in `/var/lib/commypanel/backups/databases/<server>/`. The newest 7 of each are kept (`BACKUPS_KEEP_DATABASES`). The server page lists them; download and delete need a recent password, and downloads are audited. To load a dump back, on the server: `gunzip -c FILE | docker exec -i db-<server> psql -U postgres -d NAME` for PostgreSQL, or `gunzip -c FILE | docker exec -i db-<server> sh -c 'mariadb -uroot -p"$MARIADB_ROOT_PASSWORD" NAME'` (`mysql` and `MYSQL_ROOT_PASSWORD` for MySQL) after creating an empty database `NAME`.
