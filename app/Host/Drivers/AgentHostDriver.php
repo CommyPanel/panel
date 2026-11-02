@@ -527,6 +527,36 @@ class AgentHostDriver implements HostDriver
         }
     }
 
+    public function backupVolume(string $app, string $name, string $toPath): void
+    {
+        ResourceName::assertValid($app);
+        ResourceName::assertValid($name);
+        $partial = $toPath.'.part';
+
+        try {
+            $response = $this->request(fn () => $this->client(timeout: 3700)->sink($partial)
+                ->post('/v1/volumes/backup', ['app' => $app, 'name' => $name]));
+
+            if ($response->failed()) {
+                // The agent answered with a JSON error, which went into the file.
+                $error = json_decode((string) @file_get_contents($partial), true);
+                $this->throwFor($response->status(), is_array($error) ? ($error['error'] ?? null) : null);
+            }
+
+            if ((string) @file_get_contents($partial, false, null, 0, 2) !== "\x1f\x8b") {
+                throw new HostOperationFailed('The agent did not send an archive.');
+            }
+
+            if (! @rename($partial, $toPath)) {
+                throw new HostOperationFailed('The archive could not be saved.');
+            }
+        } finally {
+            if (file_exists($partial)) {
+                @unlink($partial);
+            }
+        }
+    }
+
     public function restoreDatabase(DatabaseTarget $server, string $database, string $user, string $serverSlug, string $file): void
     {
         ResourceName::assertValid($serverSlug);

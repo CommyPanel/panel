@@ -159,5 +159,7 @@ return [
         'keep' => (int) env('BACKUPS_KEEP', 7),
         // How many dumps are kept of each database.
         'keep_databases' => (int) env('BACKUPS_KEEP_DATABASES', 7),
+        // How many archives are kept of each volume. They hold whole folders, so the default is small.
+        'keep_volumes' => (int) env('BACKUPS_KEEP_VOLUMES', 3),
     ],
 ];

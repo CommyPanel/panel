@@ -251,6 +251,14 @@ interface HostDriver
     public function restoreDatabase(DatabaseTarget $server, string $database, string $user, string $serverSlug, string $file): void;
 
     /**
+     * Write a volume as a gzipped tar to `$toPath`. The agent skips links and
+     * special files and keeps owners as numbers.
+     *
+     * @throws HostOperationFailed
+     */
+    public function backupVolume(string $app, string $name, string $toPath): void;
+
+    /**
      * Delete the data folder of a database server, which must have no container.
      *
      * @throws HostOperationFailed

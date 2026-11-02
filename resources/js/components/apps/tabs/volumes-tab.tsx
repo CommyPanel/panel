@@ -18,6 +18,7 @@ import {
     AddVolumeModal,
     RemoveVolumeModal,
 } from '@/components/apps/volume-dialogs';
+import { VolumeBackupsCard } from '@/components/apps/volume-backups-card';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -260,6 +261,15 @@ export function VolumesTab({ app }: { app: AppSettings }) {
                     </>
                 )}
             </Card>
+
+            {overview.volumes.some((v) => v.attached && v.exists) && (
+                <VolumeBackupsCard
+                    app={app.slug}
+                    volumes={overview.volumes
+                        .filter((v) => v.attached && v.exists)
+                        .map((v) => v.name)}
+                />
+            )}
 
             <AddVolumeModal
                 slug={app.slug}

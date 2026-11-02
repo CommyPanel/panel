@@ -373,3 +373,24 @@ it('asks the agent to load one of its dumps into a database, and passes its refu
         ->and(fn () => agentDriver()->restoreDatabase($target, 'shop2', 'shop2', '../x', 'f'))
         ->toThrow(InvalidArgumentException::class);
 });
+
+it('writes a volume archive the agent sends to a file, and only keeps a real one', function () {
+    $dir = storage_path('framework/testing/vol-'.bin2hex(random_bytes(4)));
+    mkdir($dir, 0700, true);
+
+    Http::fake(['agent/v1/volumes/backup' => Http::sequence()
+        ->push(gzencode('tar bytes'), 200)
+        ->push(['error' => 'the volume is too big to back up in one piece'], 400)
+        ->push('not gzip', 200)]);
+
+    agentDriver()->backupVolume('shop', 'uploads', "{$dir}/ok.tar.gz");
+
+    expect(gzdecode((string) file_get_contents("{$dir}/ok.tar.gz")))->toBe('tar bytes');
+
+    expect(fn () => agentDriver()->backupVolume('shop', 'uploads', "{$dir}/big.tar.gz"))->toThrow(HostOperationFailed::class, 'too big')
+        ->and(fn () => agentDriver()->backupVolume('shop', 'uploads', "{$dir}/odd.tar.gz"))->toThrow(HostOperationFailed::class, 'did not send an archive')
+        ->and(fn () => agentDriver()->backupVolume('../x', 'uploads', "{$dir}/x.tar.gz"))->toThrow(InvalidArgumentException::class);
+
+    expect(glob("{$dir}/*"))->toBe(["{$dir}/ok.tar.gz"]);
+    File::deleteDirectory($dir);
+});

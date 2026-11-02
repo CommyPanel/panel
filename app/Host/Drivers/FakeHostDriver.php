@@ -84,7 +84,7 @@ class FakeHostDriver implements HostDriver
     private const DOCKER_ACTIONS = [
         'buildImage', 'runContainer', 'runTask', 'stopContainer', 'startContainer', 'restartContainer',
         'removeContainer', 'containerLogs', 'pruneDanglingImages', 'removeImage', 'removeNetwork',
-        'pullImage', 'databaseReady', 'dumpDatabase', 'restoreDatabase', 'createDatabase', 'dropDatabase', 'setDatabasePassword', 'connectNetwork', 'disconnectNetwork', 'pruneLinkNetworks',
+        'pullImage', 'databaseReady', 'dumpDatabase', 'restoreDatabase', 'backupVolume', 'createDatabase', 'dropDatabase', 'setDatabasePassword', 'connectNetwork', 'disconnectNetwork', 'pruneLinkNetworks',
     ];
 
     /**
@@ -466,6 +466,15 @@ class FakeHostDriver implements HostDriver
         }
 
         file_put_contents($toPath, gzencode("-- fake dump of {$database}\n"));
+    }
+
+    public function backupVolume(string $app, string $name, string $toPath): void
+    {
+        ResourceName::assertValid($app);
+        ResourceName::assertValid($name);
+        $this->record('backupVolume', ['app' => $app, 'name' => $name]);
+
+        file_put_contents($toPath, gzencode("fake archive of {$app}/{$name}"));
     }
 
     public function restoreDatabase(DatabaseTarget $server, string $database, string $user, string $serverSlug, string $file): void

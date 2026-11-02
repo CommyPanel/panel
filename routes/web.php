@@ -13,6 +13,7 @@ use App\Http\Controllers\AppSourceController;
 use App\Http\Controllers\AppStateController;
 use App\Http\Controllers\AppTerminalController;
 use App\Http\Controllers\AppUsageController;
+use App\Http\Controllers\AppVolumeBackupController;
 use App\Http\Controllers\AppVolumeController;
 use App\Http\Controllers\AppVolumeFilesController;
 use App\Http\Controllers\AppWebhookController;
@@ -133,6 +134,10 @@ Route::middleware('auth')->group(function () {
             Route::get('volumes/{name}', [AppVolumeFilesController::class, 'show'])->name('volumes.show');
             Route::get('volumes/{name}/file', [AppVolumeFilesController::class, 'file'])->name('volumes.file');
             Route::get('volumes/{name}/download', [AppVolumeFilesController::class, 'download'])->name('volumes.download');
+            Route::get('volume-backups', [AppVolumeBackupController::class, 'index'])->name('volume-backups.index');
+            Route::post('volumes/{name}/backup', [AppVolumeBackupController::class, 'store'])->name('volumes.backup');
+            Route::get('volume-backups/{file}', [AppVolumeBackupController::class, 'download'])->where('file', '[a-z0-9_.-]+')->middleware('password.confirm')->name('volume-backups.download');
+            Route::delete('volume-backups/{file}', [AppVolumeBackupController::class, 'destroy'])->where('file', '[a-z0-9_.-]+')->middleware('password.confirm')->name('volume-backups.destroy');
         });
 
         Route::post('terminal', [AppTerminalController::class, 'ticket'])

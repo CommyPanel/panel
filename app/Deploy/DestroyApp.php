@@ -2,6 +2,7 @@
 
 namespace App\Deploy;
 
+use App\Backups\VolumeBackups;
 use App\Databases\AppLinks;
 use App\Deploy\Source\UploadStorage;
 use App\Host\Exceptions\HostOperationFailed;
@@ -13,7 +14,7 @@ use App\Models\App;
  */
 class DestroyApp
 {
-    public function __construct(private readonly HostDriver $host, private readonly UploadStorage $uploads, private readonly AppLinks $links) {}
+    public function __construct(private readonly HostDriver $host, private readonly UploadStorage $uploads, private readonly AppLinks $links, private readonly VolumeBackups $volumeBackups) {}
 
     /**
      * Deleting an app deletes the files of its volumes, so a locked volume
@@ -74,6 +75,9 @@ class DestroyApp
         }
 
         // After the containers: nothing may still have the folders mounted.
+        // The archives of its volumes go with it, like the files they hold.
+        $this->volumeBackups->deleteAll($app);
+
         try {
             $this->host->removeVolumes($app->slug);
         } catch (HostOperationFailed $e) {
