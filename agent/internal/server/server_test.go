@@ -3,6 +3,8 @@ package server
 import (
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -285,6 +287,16 @@ func (f *fakeDocker) DropDatabase(_ context.Context, t docker.DatabaseTarget, db
 
 func (f *fakeDocker) SetDatabasePassword(_ context.Context, t docker.DatabaseTarget, user, _ string) error {
 	f.calls = append(f.calls, "password "+t.Container+" "+user)
+	return f.err
+}
+
+func (f *fakeDocker) RegisterDump(sum string) error {
+	f.calls = append(f.calls, "register "+sum)
+	return f.err
+}
+
+func (f *fakeDocker) RestoreDatabase(_ context.Context, t docker.DatabaseTarget, db, user, server, file string) error {
+	f.calls = append(f.calls, "restore "+t.Container+" "+db+" "+user+" "+server+" "+file)
 	return f.err
 }
 
@@ -914,5 +926,33 @@ func TestDatabaseDumpRouteStreamsAGzippedFileAndRemovesTheTemporaryOne(t *testin
 
 	if rec := do(t, s, "POST", "/v1/databases/dump", `{`+target+`,"database":"sh op"}`); rec.Code != 400 || strings.Contains(rec.Header().Get("Content-Type"), "gzip") {
 		t.Errorf("a bad name must be a plain error: %d %v", rec.Code, rec.Header())
+	}
+}
+
+func TestDatabaseDumpRouteRemembersTheChecksumOfWhatItSent(t *testing.T) {
+	d := &fakeDocker{}
+	s := newDockerServer(d)
+	target := `"container":"db-main","engine":"postgres","root_password":"abcdefghijklmnop1234"`
+
+	rec := do(t, s, "POST", "/v1/databases/dump", `{`+target+`,"database":"shop"}`)
+	sum := sha256.Sum256(rec.Body.Bytes())
+
+	want := "register " + hex.EncodeToString(sum[:])
+	if len(d.calls) != 1 || d.calls[0] != want {
+		t.Errorf("calls = %v, want [%s]", d.calls, want)
+	}
+}
+
+func TestDatabaseRestoreRoutePassesTheFileOnWithoutTheSecrets(t *testing.T) {
+	d := &fakeDocker{}
+	s := newDockerServer(d)
+	target := `"container":"db-main","engine":"postgres","root_password":"abcdefghijklmnop1234"`
+
+	rec := do(t, s, "POST", "/v1/databases/restore", `{`+target+`,"database":"shop2","user":"shop2","server":"main","file":"shop-20261103-040000.sql.gz"}`)
+	if rec.Code != 200 {
+		t.Fatalf("restore: %d %s", rec.Code, rec.Body)
+	}
+	if len(d.calls) != 1 || d.calls[0] != "restore db-main shop2 shop2 main shop-20261103-040000.sql.gz" {
+		t.Errorf("calls = %v", d.calls)
 	}
 }

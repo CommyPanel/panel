@@ -4,6 +4,8 @@ package server
 import (
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -56,6 +58,8 @@ type Docker interface {
 	SetDatabasePassword(ctx context.Context, t docker.DatabaseTarget, user, password string) error
 	RemoveDatabaseData(ctx context.Context, server string) error
 	DumpDatabase(ctx context.Context, t docker.DatabaseTarget, db string) (string, error)
+	RegisterDump(sum string) error
+	RestoreDatabase(ctx context.Context, t docker.DatabaseTarget, db, user, server, file string) error
 	Logs(ctx context.Context, name string, tail int) (string, error)
 	ValidateBuild(s docker.BuildSpec) error
 	Build(ctx context.Context, s docker.BuildSpec, onLine func(string)) error
@@ -166,6 +170,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/databases/password", s.databasePassword)
 	mux.HandleFunc("POST /v1/databases/remove-data", s.databaseRemoveData)
 	mux.HandleFunc("POST /v1/databases/dump", s.databaseDump)
+	mux.HandleFunc("POST /v1/databases/restore", s.databaseRestore)
 	mux.HandleFunc("POST /v1/terminal/tickets", s.terminalTicket)
 	mux.HandleFunc("POST /v1/volumes/remove", s.removeVolumes)
 	mux.HandleFunc("GET /v1/volumes/{app}", s.listVolumes)
@@ -548,9 +553,35 @@ func (s *Server) databaseDump(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/gzip")
 	w.WriteHeader(http.StatusOK)
-	gz := gzip.NewWriter(w)
-	_, _ = io.Copy(gz, f)
-	_ = gz.Close()
+
+	// What is sent is hashed, and remembered once all of it has gone out, so that
+	// a later restore can tell this exact file from one somebody made up.
+	sum := sha256.New()
+	gz := gzip.NewWriter(io.MultiWriter(w, sum))
+	if _, err := io.Copy(gz, f); err != nil {
+		return
+	}
+	if err := gz.Close(); err != nil {
+		return
+	}
+	if err := s.opts.Docker.RegisterDump(hex.EncodeToString(sum.Sum(nil))); err != nil {
+		slog.Warn("could not remember a dump", "err", err)
+	}
+}
+
+// databaseRestore loads one of the dumps the agent made into an empty database.
+func (s *Server) databaseRestore(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		docker.DatabaseTarget
+		Database string `json:"database"`
+		User     string `json:"user"`
+		Server   string `json:"server"`
+		File     string `json:"file"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	s.respond(w, s.opts.Docker.RestoreDatabase(r.Context(), body.DatabaseTarget, body.Database, body.User, body.Server, body.File))
 }
 
 func (s *Server) databaseRemoveData(w http.ResponseWriter, r *http.Request) {

@@ -3,7 +3,11 @@
 package docker
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
@@ -211,6 +215,40 @@ func TestRealDatabases(t *testing.T) {
 			}
 			if got := readBack("copy"); got != "kept by the dump" {
 				t.Errorf("the restored copy holds %q", got)
+			}
+
+			// The restore the panel offers: a dump the agent registered goes into a new
+			// database, as that database's own user, and an unregistered file does not.
+			var gz bytes.Buffer
+			zw := gzip.NewWriter(&gz)
+			zw.Write(dumpText)
+			zw.Close()
+			sum := sha256.Sum256(gz.Bytes())
+			if err := os.MkdirAll(filepath.Join(dataDir, "backups", "databases", "main"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			const dumpFile = "shop-20261103-040000.sql.gz"
+			if err := os.WriteFile(filepath.Join(dataDir, "backups", "databases", "main", dumpFile), gz.Bytes(), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := m.CreateDatabase(ctx, target, "again", "again_user", "AgainPassword1234567890"); err != nil {
+				t.Fatalf("create again: %v", err)
+			}
+			if err := m.RestoreDatabase(ctx, target, "again", "again_user", "main", dumpFile); err == nil {
+				t.Fatal("an unregistered dump was restored")
+			}
+			if err := m.RegisterDump(hex.EncodeToString(sum[:])); err != nil {
+				t.Fatal(err)
+			}
+			if err := m.RestoreDatabase(ctx, target, "again", "again_user", "main", dumpFile); err != nil {
+				t.Fatalf("restore: %v", err)
+			}
+			if got := readBack("again"); got != "kept by the dump" {
+				t.Errorf("the restored database holds %q", got)
+			}
+			// What was restored belongs to the database's own user, who can read it.
+			if ok, out := connect("again_user", "AgainPassword1234567890", "again"); !ok {
+				t.Errorf("the database's user cannot connect: %s", out)
 			}
 
 			// Rotating the password.

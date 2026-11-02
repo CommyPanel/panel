@@ -29,13 +29,20 @@ const (
 // is an argument list (no shell). Secrets belong in env and stdin, never in the
 // arguments, where other processes in the container could read them.
 func (m *Manager) execIn(ctx context.Context, container string, cmd, env []string, stdin string) (execResult, error) {
+	return m.execFrom(ctx, container, cmd, env, strings.NewReader(stdin), execTimeout)
+}
+
+// execFrom is execIn for input that is read from a stream, such as a dump being
+// loaded, with its own time limit. The input is written while the output is read,
+// so a command that talks back before it has read everything cannot stall.
+func (m *Manager) execFrom(ctx context.Context, container string, cmd, env []string, stdin io.Reader, timeout time.Duration) (execResult, error) {
 	if exists, err := m.requireManaged(ctx, container); err != nil {
 		return execResult{}, err
 	} else if !exists {
 		return execResult{}, &validate.InputError{Msg: fmt.Sprintf("container %q does not exist", container)}
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, execTimeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	var created struct {
@@ -57,17 +64,24 @@ func (m *Manager) execIn(ctx context.Context, container string, cmd, env []strin
 		return execResult{}, err
 	}
 	defer conn.Close()
-	_ = conn.SetDeadline(time.Now().Add(execTimeout))
+	_ = conn.SetDeadline(time.Now().Add(timeout))
 
-	if _, err := io.WriteString(conn, stdin); err != nil {
-		return execResult{}, err
-	}
-	// Tell the command its input is complete.
-	if cw, ok := conn.(interface{ CloseWrite() error }); ok {
-		_ = cw.CloseWrite()
-	}
+	writeErr := make(chan error, 1)
+	go func() {
+		_, err := io.Copy(conn, stdin)
+		// Tell the command its input is complete.
+		if cw, ok := conn.(interface{ CloseWrite() error }); ok {
+			_ = cw.CloseWrite()
+		}
+		writeErr <- err
+	}()
 
 	out := demuxAll(r)
+	// The command has ended, so a write that is still going on can only fail.
+	_ = conn.Close()
+	if err := <-writeErr; err != nil && ctx.Err() != nil {
+		return execResult{}, ctx.Err()
+	}
 
 	var inspect struct {
 		ExitCode int  `json:"ExitCode"`
