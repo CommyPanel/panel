@@ -96,7 +96,8 @@ export function AddServerModal({
                     </li>
                     <li>
                         Its data is kept on this server and survives restarts.
-                        It is not backed up yet.
+                        Every database is also dumped to a file each night, and
+                        the last 7 are kept on this server.
                     </li>
                 </ul>
                 <div className="flex flex-wrap justify-end gap-2">

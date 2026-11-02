@@ -151,5 +151,7 @@ return [
     'backups' => [
         // How many panel backups are kept; the oldest go first.
         'keep' => (int) env('BACKUPS_KEEP', 7),
+        // How many dumps are kept of each database.
+        'keep_databases' => (int) env('BACKUPS_KEEP_DATABASES', 7),
     ],
 ];

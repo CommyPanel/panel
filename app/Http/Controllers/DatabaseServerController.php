@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Audit\AuditLogger;
+use App\Databases\DatabaseBackups;
 use App\Databases\DatabaseException;
 use App\Databases\DatabaseServers;
 use App\Enums\DatabaseEngine;
@@ -24,11 +25,13 @@ class DatabaseServerController extends Controller
         ]);
     }
 
-    public function show(DatabaseServer $server): Response
+    public function show(DatabaseServer $server, DatabaseBackups $backups): Response
     {
         return Inertia::render('databases/show', [
             'server' => DatabasePresenter::server($server),
             'databases' => $server->databases()->with('links.app')->orderBy('name')->get()->map(fn ($d) => DatabasePresenter::database($d))->all(),
+            'backups' => array_map(fn (array $b) => [...$b, 'created_at' => date('c', $b['created'])], $backups->all($server)),
+            'keep' => (int) config('commypanel.backups.keep_databases'),
         ]);
     }
 

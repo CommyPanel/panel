@@ -53,3 +53,10 @@ export type LinksOverview = {
     available_databases: { id: number; label: string }[];
     available_apps: { slug: string; name: string }[];
 };
+
+export type DatabaseBackupFile = {
+    name: string;
+    database: string;
+    size: number;
+    created_at: string;
+};

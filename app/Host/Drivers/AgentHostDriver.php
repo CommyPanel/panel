@@ -495,6 +495,37 @@ class AgentHostDriver implements HostDriver
         $this->send('post', '/v1/databases/password', [...$this->target($server), 'user' => $user, 'password' => $password]);
     }
 
+    public function dumpDatabase(DatabaseTarget $server, string $database, string $toPath): void
+    {
+        $partial = $toPath.'.part';
+
+        try {
+            $response = $this->request(fn () => $this->client(timeout: 1900)->sink($partial)
+                ->post('/v1/databases/dump', [...$this->target($server), 'database' => $database]));
+
+            if ($response->failed()) {
+                // The agent answered with a JSON error, which went into the file.
+                $error = json_decode((string) @file_get_contents($partial), true);
+                $this->throwFor($response->status(), is_array($error) ? ($error['error'] ?? null) : null);
+            }
+
+            // A real dump is gzip; anything else is not one, whatever the status said.
+            $head = (string) @file_get_contents($partial, false, null, 0, 2);
+
+            if ($head !== "\x1f\x8b") {
+                throw new HostOperationFailed('The agent did not send a dump.');
+            }
+
+            if (! @rename($partial, $toPath)) {
+                throw new HostOperationFailed('The dump could not be saved.');
+            }
+        } finally {
+            if (file_exists($partial)) {
+                @unlink($partial);
+            }
+        }
+    }
+
     public function removeDatabaseData(string $server): void
     {
         ResourceName::assertValid($server);

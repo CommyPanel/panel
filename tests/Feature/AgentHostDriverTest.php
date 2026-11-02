@@ -2,6 +2,7 @@
 
 use App\Host\Data\CertificateRequest;
 use App\Host\Data\ContainerSpec;
+use App\Host\Data\DatabaseTarget;
 use App\Host\Data\ImageBuildSpec;
 use App\Host\Data\NginxSite;
 use App\Host\Data\Volume;
@@ -330,4 +331,25 @@ it('asks the agent to remove an app\'s network', function () {
 
     expect(fn () => agentDriver()->removeNetwork('commypanel-shop'))->toThrow(HostOperationFailed::class, 'still has containers')
         ->and(fn () => agentDriver()->removeNetwork('../x'))->toThrow(InvalidArgumentException::class);
+});
+
+it('writes a database dump the agent sends to a file, and only keeps a real one', function () {
+    $dir = storage_path('framework/testing/dump-'.bin2hex(random_bytes(4)));
+    mkdir($dir, 0700, true);
+    $target = new DatabaseTarget('db-main', 'postgres', 'abcdefghijklmnop1234');
+
+    Http::fake(['agent/v1/databases/dump' => Http::sequence()
+        ->push(gzencode("-- dump\n"), 200)
+        ->push(['error' => 'the dump failed: connection refused'], 400)
+        ->push('this is not gzip', 200)]);
+
+    agentDriver()->dumpDatabase($target, 'shop', "{$dir}/ok.sql.gz");
+
+    expect(gzdecode((string) file_get_contents("{$dir}/ok.sql.gz")))->toBe("-- dump\n");
+
+    expect(fn () => agentDriver()->dumpDatabase($target, 'shop', "{$dir}/bad.sql.gz"))->toThrow(HostOperationFailed::class, 'connection refused')
+        ->and(fn () => agentDriver()->dumpDatabase($target, 'shop', "{$dir}/odd.sql.gz"))->toThrow(HostOperationFailed::class, 'did not send a dump');
+
+    expect(glob("{$dir}/*"))->toBe(["{$dir}/ok.sql.gz"]);
+    File::deleteDirectory($dir);
 });

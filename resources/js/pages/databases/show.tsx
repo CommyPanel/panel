@@ -1,6 +1,8 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import {
+    Archive,
     ArrowLeft,
+    Download,
     KeyRound,
     Play,
     Plus,
@@ -10,6 +12,7 @@ import {
     Trash2,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import DatabaseBackupController from '@/actions/App/Http/Controllers/DatabaseBackupController';
 import DatabaseServerController from '@/actions/App/Http/Controllers/DatabaseServerController';
 import ManagedDatabaseController from '@/actions/App/Http/Controllers/ManagedDatabaseController';
 import { AddDatabaseModal } from '@/components/databases/add-database-modal';
@@ -21,19 +24,26 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { TypedConfirmModal } from '@/components/ui/typed-confirm-modal';
+import { formatBytes, formatDate, timeAgo } from '@/lib/format';
 import { useConfirmedAction } from '@/hooks/use-confirmed-action';
 import AppLayout from '@/layouts/app-layout';
 import { useCan } from '@/lib/permissions';
 import { jsonHeaders } from '@/lib/post-json';
 import type {
+    DatabaseBackupFile,
     DatabaseCredentials,
     DatabaseServer,
     ManagedDatabase,
 } from '@/types';
 
-type Props = { server: DatabaseServer; databases: ManagedDatabase[] };
+type Props = {
+    server: DatabaseServer;
+    databases: ManagedDatabase[];
+    backups: DatabaseBackupFile[];
+    keep: number;
+};
 
-export default function Show({ server, databases }: Props) {
+export default function Show({ server, databases, backups, keep }: Props) {
     const can = useCan();
     const { errors } = usePage().props;
     const confirmed = useConfirmedAction();
@@ -47,6 +57,8 @@ export default function Show({ server, databases }: Props) {
     const [dropping, setDropping] = useState<ManagedDatabase | null>(null);
     const [rotating, setRotating] = useState<ManagedDatabase | null>(null);
     const [deleting, setDeleting] = useState(false);
+    const [removingBackup, setRemovingBackup] =
+        useState<DatabaseBackupFile | null>(null);
     const [busy, setBusy] = useState(false);
 
     const manage = can('databases.manage');
@@ -143,6 +155,45 @@ export default function Show({ server, databases }: Props) {
                     onStart: () => setBusy(true),
                     onFinish: () => setBusy(false),
                     onSuccess: () => setDropping(null),
+                },
+            ),
+        );
+    };
+
+    const backUp = (database: ManagedDatabase) =>
+        router.post(
+            DatabaseBackupController.store({
+                server: server.slug,
+                database: database.id,
+            }),
+            {},
+            {
+                preserveScroll: true,
+                onStart: () => setBusy(true),
+                onFinish: () => setBusy(false),
+            },
+        );
+
+    const downloadBackup = (file: DatabaseBackupFile) =>
+        void confirmed.run(() => {
+            window.location.href = DatabaseBackupController.download({
+                server: server.slug,
+                name: file.name,
+            }).url;
+        });
+
+    const deleteBackup = () => {
+        if (!removingBackup) return;
+
+        void confirmed.run(() =>
+            router.delete(
+                DatabaseBackupController.destroy({
+                    server: server.slug,
+                    name: removingBackup.name,
+                }),
+                {
+                    preserveScroll: true,
+                    onFinish: () => setRemovingBackup(null),
                 },
             ),
         );
@@ -338,6 +389,20 @@ export default function Show({ server, databases }: Props) {
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
+                                                        loading={busy}
+                                                        onClick={() =>
+                                                            backUp(database)
+                                                        }
+                                                    >
+                                                        <Archive
+                                                            className="size-4"
+                                                            aria-hidden
+                                                        />
+                                                        Back up
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
                                                         onClick={() =>
                                                             setRotating(
                                                                 database,
@@ -376,6 +441,96 @@ export default function Show({ server, databases }: Props) {
                 )}
             </Card>
 
+            <Card
+                title="Backups"
+                description={`Every database is dumped to a file each night at 04:00, and the newest ${keep} of each are kept on this server. A dump is plain SQL that recreates the database.`}
+                flush={backups.length > 0}
+            >
+                {backups.length === 0 ? (
+                    <p className="text-sm text-base-content/70">
+                        No backup yet. The first is made tonight, or press Back
+                        up next to a database.
+                    </p>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="table">
+                            <thead>
+                                <tr>
+                                    <th>Database</th>
+                                    <th>Made</th>
+                                    <th className="text-right">Size</th>
+                                    <th />
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {backups.map((file) => (
+                                    <tr key={file.name}>
+                                        <td>
+                                            <code>{file.database}</code>
+                                        </td>
+                                        <td
+                                            className="whitespace-nowrap"
+                                            title={formatDate(file.created_at)}
+                                        >
+                                            {timeAgo(file.created_at)}
+                                        </td>
+                                        <td className="text-right whitespace-nowrap">
+                                            {formatBytes(file.size)}
+                                        </td>
+                                        <td className="text-right whitespace-nowrap">
+                                            {manage && (
+                                                <>
+                                                    <Button
+                                                        variant="soft"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            downloadBackup(file)
+                                                        }
+                                                    >
+                                                        <Download
+                                                            className="size-4"
+                                                            aria-hidden
+                                                        />
+                                                        Download
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            setRemovingBackup(
+                                                                file,
+                                                            )
+                                                        }
+                                                    >
+                                                        <Trash2
+                                                            className="size-4"
+                                                            aria-hidden
+                                                        />
+                                                        Delete
+                                                    </Button>
+                                                </>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+                <p className="text-sm text-base-content/70">
+                    Dumps stay on this server, so copy them somewhere else now
+                    and then: a backup on the same disk is lost with it. A dump
+                    holds the data itself, so downloading one needs your
+                    password and is recorded. To load one into a database, run{' '}
+                    <code>
+                        {server.engine === 'postgres'
+                            ? `gunzip -c FILE | docker exec -i db-${server.slug} psql -U postgres -d NAME`
+                            : `gunzip -c FILE | docker exec -i db-${server.slug} sh -c '${server.engine === 'mysql' ? 'mysql' : 'mariadb'} -uroot -p"$${server.engine === 'mysql' ? 'MYSQL' : 'MARIADB'}_ROOT_PASSWORD" NAME'`}
+                    </code>{' '}
+                    on the server.
+                </p>
+            </Card>
+
             {manage && (
                 <Card
                     title="Delete this server"
@@ -401,6 +556,16 @@ export default function Show({ server, databases }: Props) {
                 credentials={credentials}
                 onClose={() => setCredentials(null)}
             />
+            <ConfirmModal
+                open={removingBackup !== null}
+                title="Delete this backup?"
+                confirmLabel="Delete backup"
+                onConfirm={deleteBackup}
+                onClose={() => setRemovingBackup(null)}
+            >
+                <code className="break-all">{removingBackup?.name}</code> is
+                deleted. This cannot be undone.
+            </ConfirmModal>
             <ConfirmModal
                 open={rotating !== null}
                 title="Change the password?"

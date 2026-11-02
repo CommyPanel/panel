@@ -234,6 +234,14 @@ interface HostDriver
     public function setDatabasePassword(DatabaseTarget $server, string $user, #[\SensitiveParameter] string $password): void;
 
     /**
+     * Write a dump of one database, compressed, to a file. The file is only
+     * left in place when the dump succeeded.
+     *
+     * @throws HostOperationFailed
+     */
+    public function dumpDatabase(DatabaseTarget $server, string $database, string $toPath): void;
+
+    /**
      * Delete the data folder of a database server, which must have no container.
      *
      * @throws HostOperationFailed

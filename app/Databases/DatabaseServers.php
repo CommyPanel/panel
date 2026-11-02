@@ -16,7 +16,7 @@ use Illuminate\Support\Str;
  */
 class DatabaseServers
 {
-    public function __construct(private readonly HostDriver $host) {}
+    public function __construct(private readonly HostDriver $host, private readonly DatabaseBackups $backups) {}
 
     /**
      * Register a server and start it in the background.
@@ -116,6 +116,8 @@ class DatabaseServers
         // The data goes last: if that fails the server stays listed and can be deleted again.
         $this->attempt(fn () => $this->host->removeDatabaseData($server->slug), 'delete the files of');
 
+        // Its dumps go with it: they belong to databases that no longer exist.
+        $this->backups->deleteAll($server);
         $server->delete();
     }
 

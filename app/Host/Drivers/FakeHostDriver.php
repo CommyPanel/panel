@@ -80,7 +80,7 @@ class FakeHostDriver implements HostDriver
     private const DOCKER_ACTIONS = [
         'buildImage', 'runContainer', 'runTask', 'stopContainer', 'startContainer', 'restartContainer',
         'removeContainer', 'containerLogs', 'pruneDanglingImages', 'removeImage', 'removeNetwork',
-        'pullImage', 'databaseReady', 'createDatabase', 'dropDatabase', 'setDatabasePassword', 'connectNetwork', 'disconnectNetwork', 'pruneLinkNetworks',
+        'pullImage', 'databaseReady', 'dumpDatabase', 'createDatabase', 'dropDatabase', 'setDatabasePassword', 'connectNetwork', 'disconnectNetwork', 'pruneLinkNetworks',
     ];
 
     public function systemStatus(): SystemStatus
@@ -443,6 +443,17 @@ class FakeHostDriver implements HostDriver
                 $this->databases[$server->container][$name] = ['user' => $user, 'password' => $password];
             }
         }
+    }
+
+    public function dumpDatabase(DatabaseTarget $server, string $database, string $toPath): void
+    {
+        $this->record('dumpDatabase', ['container' => $server->container, 'database' => $database]);
+
+        if (! isset($this->databases[$server->container][$database])) {
+            throw new HostOperationFailed('Agent error: the dump failed: database does not exist');
+        }
+
+        file_put_contents($toPath, gzencode("-- fake dump of {$database}\n"));
     }
 
     public function removeDatabaseData(string $server): void
