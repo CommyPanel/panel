@@ -7,6 +7,7 @@ import {
     Play,
     Plus,
     RefreshCw,
+    RotateCcw,
     RotateCw,
     Square,
     Trash2,
@@ -18,6 +19,7 @@ import ManagedDatabaseController from '@/actions/App/Http/Controllers/ManagedDat
 import { AddDatabaseModal } from '@/components/databases/add-database-modal';
 import { CredentialsModal } from '@/components/databases/credentials-modal';
 import { DatabaseStatusBadge } from '@/components/databases/database-status';
+import { RestoreBackupModal } from '@/components/databases/restore-backup-modal';
 import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -59,14 +61,19 @@ export default function Show({ server, databases, backups, keep }: Props) {
     const [deleting, setDeleting] = useState(false);
     const [removingBackup, setRemovingBackup] =
         useState<DatabaseBackupFile | null>(null);
+    const [restoringFile, setRestoringFile] =
+        useState<DatabaseBackupFile | null>(null);
+    const [restoreError, setRestoreError] = useState<string | undefined>();
     const [busy, setBusy] = useState(false);
 
     const manage = can('databases.manage');
     const running = server.status === 'running';
 
     // While the server starts, look again every few seconds.
+    const restoring = databases.some((d) => d.restore?.status === 'restoring');
+
     useEffect(() => {
-        if (server.status !== 'provisioning') return;
+        if (server.status !== 'provisioning' && !restoring) return;
 
         const timer = setInterval(
             () => router.reload({ only: ['server', 'databases'] }),
@@ -74,7 +81,7 @@ export default function Show({ server, databases, backups, keep }: Props) {
         );
 
         return () => clearInterval(timer);
-    }, [server.status]);
+    }, [server.status, restoring]);
 
     const post = (url: ReturnType<typeof DatabaseServerController.start>) =>
         router.post(
@@ -181,6 +188,30 @@ export default function Show({ server, databases, backups, keep }: Props) {
                 name: file.name,
             }).url;
         });
+
+    const restoreBackup = (name: string) => {
+        if (!restoringFile) return;
+
+        void confirmed.run(() =>
+            router.post(
+                DatabaseBackupController.restore({
+                    server: server.slug,
+                    name: restoringFile.name,
+                }),
+                { database: name },
+                {
+                    preserveScroll: true,
+                    onStart: () => {
+                        setBusy(true);
+                        setRestoreError(undefined);
+                    },
+                    onSuccess: () => setRestoringFile(null),
+                    onError: (errors) => setRestoreError(errors.database),
+                    onFinish: () => setBusy(false),
+                },
+            ),
+        );
+    };
 
     const deleteBackup = () => {
         if (!removingBackup) return;
@@ -351,6 +382,23 @@ export default function Show({ server, databases, backups, keep }: Props) {
                                     <tr key={database.id}>
                                         <td>
                                             <code>{database.name}</code>
+                                            {database.restore?.status ===
+                                                'restoring' && (
+                                                <span className="badge-soft ml-2 badge badge-info">
+                                                    Restoring…
+                                                </span>
+                                            )}
+                                            {database.restore?.status ===
+                                                'failed' && (
+                                                <>
+                                                    <span className="badge-soft ml-2 badge badge-error">
+                                                        Restore failed
+                                                    </span>
+                                                    <p className="mt-1 text-sm break-words text-base-content/70">
+                                                        {database.restore.error}
+                                                    </p>
+                                                </>
+                                            )}
                                         </td>
                                         <td>
                                             {database.apps.length === 0 ? (
@@ -480,6 +528,26 @@ export default function Show({ server, databases, backups, keep }: Props) {
                                         <td className="text-right whitespace-nowrap">
                                             {manage && (
                                                 <>
+                                                    {running && (
+                                                        <Button
+                                                            variant="soft"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                setRestoreError(
+                                                                    undefined,
+                                                                );
+                                                                setRestoringFile(
+                                                                    file,
+                                                                );
+                                                            }}
+                                                        >
+                                                            <RotateCcw
+                                                                className="size-4"
+                                                                aria-hidden
+                                                            />
+                                                            Restore
+                                                        </Button>
+                                                    )}
                                                     <Button
                                                         variant="soft"
                                                         size="sm"
@@ -521,7 +589,10 @@ export default function Show({ server, databases, backups, keep }: Props) {
                     Dumps stay on this server, so copy them somewhere else now
                     and then: a backup on the same disk is lost with it. A dump
                     holds the data itself, so downloading one needs your
-                    password and is recorded. To load one into a database, run{' '}
+                    password and is recorded. To load one back, press{' '}
+                    <strong>Restore</strong>: it goes into a new database, and
+                    nothing that exists is changed. A backup made by an older
+                    CommyPanel cannot be restored here; load it with{' '}
                     <code>
                         {server.engine === 'postgres'
                             ? `gunzip -c FILE | docker exec -i db-${server.slug} psql -U postgres -d NAME`
@@ -556,6 +627,14 @@ export default function Show({ server, databases, backups, keep }: Props) {
                 credentials={credentials}
                 onClose={() => setCredentials(null)}
             />
+            <RestoreBackupModal
+                file={restoringFile}
+                error={restoreError}
+                busy={busy}
+                onSubmit={restoreBackup}
+                onClose={() => setRestoringFile(null)}
+            />
+
             <ConfirmModal
                 open={removingBackup !== null}
                 title="Delete this backup?"

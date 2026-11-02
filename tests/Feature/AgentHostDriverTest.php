@@ -353,3 +353,23 @@ it('writes a database dump the agent sends to a file, and only keeps a real one'
     expect(glob("{$dir}/*"))->toBe(["{$dir}/ok.sql.gz"]);
     File::deleteDirectory($dir);
 });
+
+it('asks the agent to load one of its dumps into a database, and passes its refusal on', function () {
+    $target = new DatabaseTarget('db-main', 'postgres', 'abcdefghijklmnop1234');
+
+    Http::fake(['agent/v1/databases/restore' => Http::sequence()
+        ->push(['ok' => true])
+        ->push(['error' => 'this file was not made by CommyPanel, or was changed since, so it is not restored'], 400)]);
+
+    agentDriver()->restoreDatabase($target, 'shop2', 'shop2', 'main', 'shop-20261103-040000.sql.gz');
+
+    Http::assertSent(fn ($request) => $request->data() === [
+        'container' => 'db-main', 'engine' => 'postgres', 'root_password' => 'abcdefghijklmnop1234',
+        'database' => 'shop2', 'user' => 'shop2', 'server' => 'main', 'file' => 'shop-20261103-040000.sql.gz',
+    ]);
+
+    expect(fn () => agentDriver()->restoreDatabase($target, 'shop2', 'shop2', 'main', 'shop-20261103-040000.sql.gz'))
+        ->toThrow(HostOperationFailed::class, 'not made by CommyPanel')
+        ->and(fn () => agentDriver()->restoreDatabase($target, 'shop2', 'shop2', '../x', 'f'))
+        ->toThrow(InvalidArgumentException::class);
+});

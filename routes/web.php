@@ -177,6 +177,7 @@ Route::middleware('auth')->group(function () {
             Route::delete('{server:slug}/databases/{database}', [ManagedDatabaseController::class, 'destroy'])->whereNumber('database')->middleware('password.confirm')->name('databases.destroy');
             Route::post('{server:slug}/databases/{database}/backup', [DatabaseBackupController::class, 'store'])->whereNumber('database')->name('databases.backup');
             Route::get('{server:slug}/backups/{name}', [DatabaseBackupController::class, 'download'])->where('name', '[a-z0-9_.-]+')->middleware('password.confirm')->name('backups.download');
+            Route::post('{server:slug}/backups/{name}/restore', [DatabaseBackupController::class, 'restore'])->where('name', '[a-z0-9_.-]+')->middleware('password.confirm')->name('backups.restore');
             Route::delete('{server:slug}/backups/{name}', [DatabaseBackupController::class, 'destroy'])->where('name', '[a-z0-9_.-]+')->middleware('password.confirm')->name('backups.destroy');
             Route::post('{server:slug}/databases/{database}/password', [ManagedDatabaseController::class, 'password'])->whereNumber('database')->middleware('password.confirm')->name('databases.password');
         });

@@ -20,6 +20,12 @@ export type ManagedDatabase = {
     name: string;
     username: string;
     apps: { slug: string; name: string }[];
+    /** Set while a backup is being loaded into this database, or when that failed. */
+    restore: {
+        status: 'restoring' | 'failed';
+        from: string | null;
+        error: string | null;
+    } | null;
     created_at: string | null;
 };
 

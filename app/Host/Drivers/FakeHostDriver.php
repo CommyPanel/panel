@@ -63,6 +63,8 @@ class FakeHostDriver implements HostDriver
 
     private int $diskFreeBytes = 50 * 1024 ** 3;
 
+    private ?string $restoreFails = null;
+
     /** @var list<string> images that were pulled */
     private array $pulledImages = [];
 
@@ -82,7 +84,7 @@ class FakeHostDriver implements HostDriver
     private const DOCKER_ACTIONS = [
         'buildImage', 'runContainer', 'runTask', 'stopContainer', 'startContainer', 'restartContainer',
         'removeContainer', 'containerLogs', 'pruneDanglingImages', 'removeImage', 'removeNetwork',
-        'pullImage', 'databaseReady', 'dumpDatabase', 'createDatabase', 'dropDatabase', 'setDatabasePassword', 'connectNetwork', 'disconnectNetwork', 'pruneLinkNetworks',
+        'pullImage', 'databaseReady', 'dumpDatabase', 'restoreDatabase', 'createDatabase', 'dropDatabase', 'setDatabasePassword', 'connectNetwork', 'disconnectNetwork', 'pruneLinkNetworks',
     ];
 
     /**
@@ -464,6 +466,27 @@ class FakeHostDriver implements HostDriver
         }
 
         file_put_contents($toPath, gzencode("-- fake dump of {$database}\n"));
+    }
+
+    public function restoreDatabase(DatabaseTarget $server, string $database, string $user, string $serverSlug, string $file): void
+    {
+        $this->record('restoreDatabase', ['container' => $server->container, 'database' => $database, 'user' => $user, 'server' => $serverSlug, 'file' => $file]);
+
+        if (! isset($this->databases[$server->container][$database])) {
+            throw new HostOperationFailed('Agent error: the database does not exist');
+        }
+
+        if ($this->restoreFails !== null) {
+            throw new HostOperationFailed($this->restoreFails);
+        }
+    }
+
+    /**
+     * Make restores fail with this message (tests).
+     */
+    public function failRestoresWith(?string $message): void
+    {
+        $this->restoreFails = $message;
     }
 
     public function removeDatabaseData(string $server): void

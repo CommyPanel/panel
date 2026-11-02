@@ -527,6 +527,17 @@ class AgentHostDriver implements HostDriver
         }
     }
 
+    public function restoreDatabase(DatabaseTarget $server, string $database, string $user, string $serverSlug, string $file): void
+    {
+        ResourceName::assertValid($serverSlug);
+
+        // Loading a large dump takes as long as making it did (the agent stops at 30 minutes).
+        $response = $this->request(fn () => $this->client(timeout: 1900)
+            ->post('/v1/databases/restore', [...$this->target($server), 'database' => $database, 'user' => $user, 'server' => $serverSlug, 'file' => $file]));
+
+        $this->handle($response);
+    }
+
     public function removeDatabaseData(string $server): void
     {
         ResourceName::assertValid($server);

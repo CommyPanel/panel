@@ -42,7 +42,7 @@ class AppLinkController extends Controller
                 'slug' => $l->target->slug,
             ])->all(),
             'used_by' => $app->linkedFrom()->with('app')->get()->map(fn (AppLink $l) => ['app' => $l->app->name, 'slug' => $l->app->slug])->all(),
-            'available_databases' => ManagedDatabase::query()->with('server')->whereNotIn('id', $linkedDatabases)->orderBy('name')->get()
+            'available_databases' => ManagedDatabase::query()->with('server')->whereNotIn('id', $linkedDatabases)->whereNull('restore_status')->orderBy('name')->get()
                 ->filter(fn (ManagedDatabase $d) => $d->server->isRunning())
                 ->map(fn (ManagedDatabase $d) => ['id' => $d->id, 'label' => "{$d->name} on {$d->server->name} ({$d->server->engine->label()} {$d->server->version})"])->values()->all(),
             'available_apps' => App::query()->whereKeyNot($app->id)->whereNotIn('id', $linkedApps)->where('slug', '!=', PanelDomain::SLUG)->whereNull('setup_step')->orderBy('name')->get(['id', 'name', 'slug'])

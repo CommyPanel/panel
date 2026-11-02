@@ -242,6 +242,15 @@ interface HostDriver
     public function dumpDatabase(DatabaseTarget $server, string $database, string $toPath): void;
 
     /**
+     * Load a dump the agent made earlier into an existing, empty database. `$file`
+     * is its name in the server's backup folder; the agent refuses any file it
+     * did not make itself.
+     *
+     * @throws HostOperationFailed
+     */
+    public function restoreDatabase(DatabaseTarget $server, string $database, string $user, string $serverSlug, string $file): void;
+
+    /**
      * Delete the data folder of a database server, which must have no container.
      *
      * @throws HostOperationFailed

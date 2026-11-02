@@ -14,6 +14,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $name
  * @property string $username
  * @property string $password
+ * @property string|null $restore_status
+ * @property string|null $restore_from
+ * @property string|null $restore_error
  */
 class ManagedDatabase extends Model
 {

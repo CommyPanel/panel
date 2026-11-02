@@ -42,6 +42,7 @@ class DatabasePresenter
             'name' => $database->name,
             'username' => $database->username,
             'apps' => $database->links->map(fn ($link) => ['slug' => $link->app->slug, 'name' => $link->app->name])->values()->all(),
+            'restore' => $database->restore_status === null ? null : ['status' => $database->restore_status, 'from' => $database->restore_from, 'error' => $database->restore_error],
             'created_at' => $database->created_at?->toIso8601String(),
         ];
     }

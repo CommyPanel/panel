@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Audit\AuditLogger;
 use App\Databases\DatabaseBackups;
 use App\Databases\DatabaseException;
+use App\Databases\RestoreDatabase;
 use App\Models\DatabaseServer;
 use App\Models\ManagedDatabase;
 use Illuminate\Http\RedirectResponse;
@@ -42,6 +43,24 @@ class DatabaseBackupController extends Controller
         $audit->record('database.backup_downloaded', $request->user(), ['server' => $server->slug, 'file' => $name]);
 
         return response()->download($path, $name, ['Cache-Control' => 'no-store', 'X-Content-Type-Options' => 'nosniff']);
+    }
+
+    /**
+     * Load a dump into a new database. The name has to be one that is free, so nothing is overwritten.
+     */
+    public function restore(Request $request, DatabaseServer $server, RestoreDatabase $restore, AuditLogger $audit, string $name): RedirectResponse
+    {
+        $data = $request->validate(['database' => ['required', 'string', 'max:31']]);
+
+        try {
+            $database = $restore->start($server, $name, $data['database']);
+        } catch (DatabaseException $e) {
+            return back()->withErrors(['database' => $e->getMessage()]);
+        }
+
+        $audit->record('database.restore_started', $request->user(), ['server' => $server->slug, 'file' => $name, 'database' => $database->name]);
+
+        return back()->with('status', "Loading the backup into the new database {$database->name}. It is ready when its \"Restoring\" label is gone.");
     }
 
     public function destroy(Request $request, DatabaseServer $server, DatabaseBackups $backups, AuditLogger $audit, string $name): RedirectResponse

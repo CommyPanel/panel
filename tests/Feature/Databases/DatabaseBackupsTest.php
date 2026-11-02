@@ -1,12 +1,15 @@
 <?php
 
+use App\Databases\AppLinks;
 use App\Databases\DatabaseBackups;
 use App\Databases\DatabaseException;
 use App\Databases\DatabaseServers;
 use App\Databases\ManageDatabases;
+use App\Databases\RestoreDatabase;
 use App\Enums\DatabaseEngine;
 use App\Host\Drivers\FakeHostDriver;
 use App\Host\HostDriver;
+use App\Models\App;
 use App\Models\AuditLog;
 use App\Models\DatabaseServer;
 use App\Models\User;
@@ -167,5 +170,80 @@ describe('in the panel', function () {
         app(DatabaseServers::class)->delete(DatabaseServer::query()->where('slug', 'main')->firstOrFail());
 
         expect(is_dir($this->dir.'/backups/databases/main'))->toBeFalse();
+    });
+});
+
+describe('restoring a dump into a new database', function () {
+    beforeEach(function () {
+        $this->backup = app(DatabaseBackups::class)->create($this->shop)['name'];
+    });
+
+    it('makes a new database, loads the dump into it and leaves the old one alone', function () {
+        $database = app(RestoreDatabase::class)->start($this->server, $this->backup, 'shop_again');
+
+        $call = collect($this->host->actions())->firstWhere('action', 'restoreDatabase');
+
+        expect($call['args'])->toBe(['container' => 'db-main', 'database' => 'shop_again', 'user' => 'shop_again', 'server' => 'main', 'file' => $this->backup])
+            ->and($database->fresh()->restore_status)->toBeNull()
+            ->and($database->fresh()->restore_from)->toBeNull()
+            ->and($this->server->databases()->pluck('name')->sort()->values()->all())->toBe(['blog', 'shop', 'shop_again']);
+    });
+
+    it('keeps a database whose loading failed, marked with the reason', function () {
+        $this->host->failRestoresWith('Agent error: loading the dump failed: syntax error');
+
+        $database = app(RestoreDatabase::class)->start($this->server, $this->backup, 'shop_again')->fresh();
+
+        expect($database->restore_status)->toBe('failed')
+            ->and($database->restore_error)->toContain('syntax error');
+    });
+
+    it('refuses a name that is taken or a backup that does not exist, before touching anything', function () {
+        expect(fn () => app(RestoreDatabase::class)->start($this->server, $this->backup, 'shop'))
+            ->toThrow(DatabaseException::class, 'already a database')
+            ->and(fn () => app(RestoreDatabase::class)->start($this->server, 'shop-20200101-000000.sql.gz', 'other'))
+            ->toThrow(DatabaseException::class, 'no such backup');
+
+        expect(collect($this->host->actions())->where('action', 'restoreDatabase'))->toHaveCount(0)
+            ->and($this->server->databases()->count())->toBe(2);
+    });
+
+    it('cannot be dropped or linked while it is being loaded, and a failed one cannot be linked', function () {
+        $database = $this->server->databases()->create(['name' => 'busy', 'username' => 'busy', 'password' => 'x', 'restore_status' => 'restoring', 'restore_from' => $this->backup]);
+
+        expect(fn () => app(ManageDatabases::class)->drop($database))->toThrow(DatabaseException::class, 'still being loaded');
+
+        $app = App::factory()->create(['slug' => 'shop-app']);
+        expect(fn () => app(AppLinks::class)->linkDatabase($app, $database, 'DATABASE'))->toThrow(DatabaseException::class, 'still being loaded');
+
+        $database->forceFill(['restore_status' => 'failed'])->save();
+        expect(fn () => app(AppLinks::class)->linkDatabase($app, $database->fresh(), 'DATABASE'))->toThrow(DatabaseException::class, 'failed');
+    });
+
+    it('is started from the page after the password, and recorded', function () {
+        $this->post("/databases/main/backups/{$this->backup}/restore", ['database' => 'shop_again'])->assertRedirect();
+        expect($this->server->databases()->where('name', 'shop_again')->exists())->toBeFalse();
+
+        ($this->confirmed)()->post("/databases/main/backups/{$this->backup}/restore", ['database' => 'shop_again'])
+            ->assertSessionHas('status');
+
+        expect($this->server->databases()->where('name', 'shop_again')->exists())->toBeTrue()
+            ->and(AuditLog::query()->where('action', 'database.restore_started')->first()->metadata)
+            ->toBe(['server' => 'main', 'file' => $this->backup, 'database' => 'shop_again']);
+    });
+
+    it('says why a restore cannot start', function () {
+        ($this->confirmed)()->post("/databases/main/backups/{$this->backup}/restore", ['database' => 'shop'])
+            ->assertSessionHasErrors('database');
+    });
+
+    it('shows the state of a restore on the server page', function () {
+        $this->server->databases()->create(['name' => 'busy', 'username' => 'busy', 'password' => 'x', 'restore_status' => 'restoring', 'restore_from' => $this->backup]);
+
+        $this->get('/databases/main')->assertInertia(fn (Assert $page) => $page
+            ->where('databases.0.restore', null)
+            ->where('databases.1.name', 'busy')
+            ->where('databases.1.restore.status', 'restoring')
+            ->etc());
     });
 });

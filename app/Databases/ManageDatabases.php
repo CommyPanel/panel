@@ -47,6 +47,10 @@ class ManageDatabases
         $server = $database->server;
         $apps = $this->appsUsing($database);
 
+        if ($database->restore_status === RestoreDatabase::RESTORING) {
+            throw new DatabaseException('A backup is still being loaded into this database. Wait for it to finish.');
+        }
+
         if ($apps !== []) {
             throw new DatabaseException('Apps still use this database ('.implode(', ', $apps).'). Remove their links first.');
         }

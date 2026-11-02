@@ -36,6 +36,12 @@ class AppLinks
             throw new DatabaseException('The database server is not running. Start it first.');
         }
 
+        if ($database->restore_status !== null) {
+            throw new DatabaseException($database->restore_status === RestoreDatabase::RESTORING
+                ? 'A backup is still being loaded into this database. Link it when that is done.'
+                : 'Loading the backup into this database failed. Delete it and try again before linking it.');
+        }
+
         $this->assertPrefixFree($app, $prefix);
 
         if ($app->databaseLinks()->where('managed_database_id', $database->id)->exists()) {
