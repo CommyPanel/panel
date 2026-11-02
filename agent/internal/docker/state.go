@@ -59,3 +59,7 @@ func (m *Manager) CleanScratch() {
 		_ = os.RemoveAll(filepath.Join(dir, e.Name()))
 	}
 }
+
+// ScratchDir is the agent's private folder for files it makes and then sends or
+// loads (dumps, restores, volume archives).
+func (m *Manager) ScratchDir() (string, error) { return m.stateDir("tmp") }

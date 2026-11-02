@@ -59,6 +59,7 @@ type Docker interface {
 	RemoveDatabaseData(ctx context.Context, server string) error
 	DumpDatabase(ctx context.Context, t docker.DatabaseTarget, db string) (string, error)
 	RegisterDump(sum string) error
+	ScratchDir() (string, error)
 	RestoreDatabase(ctx context.Context, t docker.DatabaseTarget, db, user, server, file string) error
 	Logs(ctx context.Context, name string, tail int) (string, error)
 	ValidateBuild(s docker.BuildSpec) error
@@ -79,6 +80,7 @@ type Volumes interface {
 	Dir(app, name, rel string) (volumefs.Listing, error)
 	Preview(app, name, rel string) (volumefs.Preview, error)
 	Open(app, name, rel string) (volumefs.Download, error)
+	Archive(ctx context.Context, app, name string, w io.Writer) error
 }
 
 // Terminal hands out the single-use tickets a browser needs to open a terminal.
@@ -173,6 +175,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/databases/restore", s.databaseRestore)
 	mux.HandleFunc("POST /v1/terminal/tickets", s.terminalTicket)
 	mux.HandleFunc("POST /v1/volumes/remove", s.removeVolumes)
+	mux.HandleFunc("POST /v1/volumes/backup", s.backupVolume)
 	mux.HandleFunc("GET /v1/volumes/{app}", s.listVolumes)
 	mux.HandleFunc("GET /v1/volumes/{app}/{name}/dir", s.volumeDir)
 	mux.HandleFunc("GET /v1/volumes/{app}/{name}/file", s.volumeFile)
@@ -680,6 +683,52 @@ func (s *Server) volumeDownload(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Length", strconv.FormatInt(d.Size, 10))
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(w, io.LimitReader(d.File, d.Size))
+}
+
+// backupVolume answers with a gzipped tar of one volume. It is made in full in the
+// agent's own scratch folder first, so a failure (a volume too big, a read error)
+// is a clean error and never a short archive that looks complete.
+func (s *Server) backupVolume(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		App  string `json:"app"`
+		Name string `json:"name"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	dir, err := s.opts.Docker.ScratchDir()
+	if err != nil {
+		s.respond(w, err)
+		return
+	}
+	f, err := os.CreateTemp(dir, "volume-*.tar.gz")
+	if err != nil {
+		s.respond(w, err)
+		return
+	}
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	if err := s.opts.Volumes.Archive(r.Context(), body.App, body.Name, f); err != nil {
+		if errors.Is(err, volumefs.ErrArchiveTooBig) {
+			err = &validate.InputError{Msg: err.Error()}
+		}
+		s.respond(w, err)
+		return
+	}
+	size, err := f.Seek(0, io.SeekEnd)
+	if err == nil {
+		_, err = f.Seek(0, io.SeekStart)
+	}
+	if err != nil {
+		s.respond(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/gzip")
+	w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.Copy(w, f)
 }
 
 func (s *Server) removeVolumes(w http.ResponseWriter, r *http.Request) {

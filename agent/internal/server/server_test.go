@@ -1,6 +1,7 @@
 package server
 
 import (
+	"archive/tar"
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
@@ -289,6 +290,8 @@ func (f *fakeDocker) SetDatabasePassword(_ context.Context, t docker.DatabaseTar
 	f.calls = append(f.calls, "password "+t.Container+" "+user)
 	return f.err
 }
+
+func (f *fakeDocker) ScratchDir() (string, error) { return os.TempDir(), nil }
 
 func (f *fakeDocker) RegisterDump(sum string) error {
 	f.calls = append(f.calls, "register "+sum)
@@ -954,5 +957,38 @@ func TestDatabaseRestoreRoutePassesTheFileOnWithoutTheSecrets(t *testing.T) {
 	}
 	if len(d.calls) != 1 || d.calls[0] != "restore db-main shop2 shop2 main shop-20261103-040000.sql.gz" {
 		t.Errorf("calls = %v", d.calls)
+	}
+}
+
+func TestVolumeBackupRouteStreamsAGzippedArchiveAndLeavesNoCopy(t *testing.T) {
+	dir := t.TempDir()
+	vol := filepath.Join(dir, "volumes", "shop", "uploads")
+	if err := os.MkdirAll(vol, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(vol, "a.txt"), []byte("alpha"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := New(Options{Nginx: &fakeNginx{}, Docker: &fakeDocker{}, Volumes: volumefs.New(dir), Authorize: AllowAll()})
+
+	rec := do(t, s, "POST", "/v1/volumes/backup", `{"app":"shop","name":"uploads"}`)
+	if rec.Code != 200 || rec.Header().Get("Content-Type") != "application/gzip" {
+		t.Fatalf("backup: %d %v %s", rec.Code, rec.Header(), rec.Body)
+	}
+	zr, err := gzip.NewReader(rec.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr := tar.NewReader(zr)
+	hdr, err := tr.Next()
+	if err != nil || hdr.Name != "a.txt" {
+		t.Fatalf("first entry = %v, %v", hdr, err)
+	}
+
+	if rec := do(t, s, "POST", "/v1/volumes/backup", `{"app":"../x","name":"uploads"}`); rec.Code != 400 {
+		t.Errorf("a bad name: %d", rec.Code)
+	}
+	if rec := do(t, s, "POST", "/v1/volumes/backup", `{"app":"shop","name":"missing"}`); rec.Code == 200 {
+		t.Errorf("a missing volume was backed up")
 	}
 }
