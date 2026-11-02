@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -29,6 +30,14 @@ type fakeDaemon struct {
 	waitCode        int
 	mounts          []string // sources mounted by the container the list reports
 	execStatus      int
+	execExit        int
+	execReply       string
+	stdin           string
+	imageMissing    bool
+	pullReply       string
+	pulled          string
+	connected       []string
+	connectBody     map[string]any
 	execBody        map[string]any
 	resized         string
 	netMissing      bool // the per-app network does not exist yet
@@ -39,8 +48,10 @@ type fakeDaemon struct {
 
 func (f *fakeDaemon) handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// An interactive exec turns into a stream, so it must not hold the lock.
+		// An exec turns into a stream, so it must not hold the lock.
 		if strings.HasPrefix(r.URL.Path, "/exec/") && strings.HasSuffix(r.URL.Path, "/start") {
+			var start map[string]any
+			_ = json.NewDecoder(r.Body).Decode(&start)
 			f.mu.Lock()
 			f.requests = append(f.requests, r.Method+" "+r.URL.Path)
 			f.upgrade = r.Header.Get("Upgrade")
@@ -51,6 +62,22 @@ func (f *fakeDaemon) handler() http.Handler {
 			}
 			defer conn.Close()
 			conn.Write([]byte("HTTP/1.1 101 UPGRADED\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n\r\n"))
+			if start["Tty"] != true {
+				// Without a terminal: read the input to its end, answer in the multiplexed format.
+				input, _ := io.ReadAll(conn)
+				f.mu.Lock()
+				f.stdin = string(input)
+				reply := f.execReply
+				f.mu.Unlock()
+				if reply == "" {
+					reply = "OUT:" + string(input)
+				}
+				frame := make([]byte, 8, 8+len(reply))
+				frame[0] = 1
+				binary.BigEndian.PutUint32(frame[4:], uint32(len(reply)))
+				conn.Write(append(frame, reply...))
+				return
+			}
 			buf := make([]byte, 256)
 			for {
 				n, err := conn.Read(buf)
@@ -64,6 +91,24 @@ func (f *fakeDaemon) handler() http.Handler {
 		defer f.mu.Unlock()
 		f.requests = append(f.requests, r.Method+" "+r.URL.Path)
 		switch {
+		case r.Method == "GET" && strings.HasPrefix(r.URL.Path, "/exec/") && strings.HasSuffix(r.URL.Path, "/json"):
+			_ = json.NewEncoder(w).Encode(map[string]any{"ExitCode": f.execExit, "Running": false})
+		case r.Method == "GET" && r.URL.Path != "/images/json" && strings.HasPrefix(r.URL.Path, "/images/") && strings.HasSuffix(r.URL.Path, "/json"):
+			if f.imageMissing {
+				w.WriteHeader(404)
+				w.Write([]byte(`{"message":"no such image"}`))
+				return
+			}
+			w.Write([]byte(`{}`))
+		case r.Method == "POST" && r.URL.Path == "/images/create":
+			f.pulled = r.URL.RawQuery
+			w.Write([]byte(f.pullReply))
+		case r.Method == "POST" && strings.HasPrefix(r.URL.Path, "/networks/") && strings.HasSuffix(r.URL.Path, "/connect"):
+			var body map[string]any
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			f.connected = append(f.connected, strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/networks/"), "/connect"))
+			f.connectBody = body
+			w.WriteHeader(200)
 		case r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/exec"):
 			if f.execStatus != 0 {
 				w.WriteHeader(f.execStatus)

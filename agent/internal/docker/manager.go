@@ -79,7 +79,25 @@ type ContainerSpec struct {
 	MemoryMB      int               `json:"memory_mb,omitempty"`
 	CPUs          float64           `json:"cpus,omitempty"`
 	Network       string            `json:"network,omitempty"`
+	// Aliases are extra names the container answers to on its own network (a
+	// database server is reached by its name, for example).
+	Aliases []string `json:"aliases,omitempty"`
+	// Networks are further networks to join, each with the names the container
+	// has there. They are how a link between an app and a database, or between
+	// two apps, is made: the pair meets on a network of their own.
+	Networks []NetworkAttach `json:"networks,omitempty"`
 }
+
+// NetworkAttach is an extra network for a container, and its names there.
+type NetworkAttach struct {
+	Name    string   `json:"name"`
+	Aliases []string `json:"aliases,omitempty"`
+}
+
+const (
+	maxExtraNetworks = 8
+	maxAliases       = 4
+)
 
 // ContainerInfo describes a managed container.
 type ContainerInfo struct {
@@ -127,14 +145,19 @@ func NewManager(cfg Config, engine *Engine) *Manager {
 }
 
 func (m *Manager) volumesDir() string { return m.cfg.DataDir + "/volumes" }
-func (m *Manager) buildsDir() string  { return m.cfg.DataDir + "/builds" }
+
+// databasesDir holds the data folders of database servers. It is separate from
+// the volumes of apps so the two can never be mixed up, browsed or deleted
+// by one another's actions.
+func (m *Manager) databasesDir() string { return m.cfg.DataDir + "/databases" }
+func (m *Manager) buildsDir() string    { return m.cfg.DataDir + "/builds" }
 
 // Validate checks a container spec without touching Docker.
 func (m *Manager) Validate(s ContainerSpec) error {
 	if err := validate.Name(s.Name); err != nil {
 		return err
 	}
-	if err := validate.Image(s.Image); err != nil {
+	if err := validate.RunImage(s.Image); err != nil {
 		return err
 	}
 	if s.HostPort != 0 {
@@ -166,7 +189,7 @@ func (m *Manager) Validate(s ContainerSpec) error {
 		return &validate.InputError{Msg: "too many volumes"}
 	}
 	for _, v := range s.Volumes {
-		if _, err := validate.ResolveUnder(m.volumesDir(), v.Source); err != nil {
+		if _, err := m.resolveMount(v.Source); err != nil {
 			return err
 		}
 		if err := validate.VolumeTarget(v.Target); err != nil {
@@ -180,7 +203,56 @@ func (m *Manager) Validate(s ContainerSpec) error {
 		return &validate.InputError{Msg: "invalid cpus"}
 	}
 	if s.Network != "" {
-		return validate.Network(s.Network)
+		if err := validate.Network(s.Network); err != nil {
+			return err
+		}
+	}
+	return validateAttachments(s)
+}
+
+// resolveMount checks that a bind mount source is inside the volumes of apps or
+// the data of database servers, and returns it.
+func (m *Manager) resolveMount(source string) (string, error) {
+	if p, err := validate.ResolveUnder(m.volumesDir(), source); err == nil {
+		return p, nil
+	}
+	return validate.ResolveUnder(m.databasesDir(), source)
+}
+
+// validateAttachments checks the extra networks and the names on them.
+func validateAttachments(s ContainerSpec) error {
+	if len(s.Aliases) > maxAliases {
+		return &validate.InputError{Msg: "too many network aliases"}
+	}
+	for _, a := range s.Aliases {
+		if err := validate.Alias(a); err != nil {
+			return err
+		}
+	}
+	if len(s.Networks) > maxExtraNetworks {
+		return &validate.InputError{Msg: "too many networks"}
+	}
+	primary := s.Network
+	if primary == "" {
+		primary = defaultNetwork
+	}
+	seen := map[string]bool{primary: true}
+	for _, n := range s.Networks {
+		if err := validate.Network(n.Name); err != nil {
+			return err
+		}
+		if seen[n.Name] {
+			return &validate.InputError{Msg: fmt.Sprintf("network %q is listed twice", n.Name)}
+		}
+		seen[n.Name] = true
+		if len(n.Aliases) > maxAliases {
+			return &validate.InputError{Msg: "too many network aliases"}
+		}
+		for _, a := range n.Aliases {
+			if err := validate.Alias(a); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -231,6 +303,11 @@ func (m *Manager) createBody(s ContainerSpec) map[string]any {
 		"Labels":     map[string]string{ManagedLabel: "true"},
 		"HostConfig": host,
 	}
+	if len(s.Aliases) > 0 {
+		body["NetworkingConfig"] = map[string]any{"EndpointsConfig": map[string]any{
+			network: map[string]any{"Aliases": s.Aliases},
+		}}
+	}
 	if s.HostPort != 0 {
 		port := strconv.Itoa(s.ContainerPort) + "/tcp"
 		body["ExposedPorts"] = map[string]any{port: struct{}{}}
@@ -255,13 +332,28 @@ func (m *Manager) Run(ctx context.Context, s ContainerSpec) error {
 	if err := m.ensureNetwork(ctx, network); err != nil {
 		return err
 	}
+	for _, n := range s.Networks {
+		if err := m.ensureNetwork(ctx, n.Name); err != nil {
+			return err
+		}
+	}
 	for _, v := range s.Volumes {
-		if err := ensureVolumeDir(v.Source); err != nil {
+		if err := m.prepareMount(v.Source); err != nil {
 			return fmt.Errorf("create volume dir: %w", err)
 		}
 	}
 	if err := m.engine.doJSON(ctx, "POST", "/containers/create", url.Values{"name": {s.Name}}, m.createBody(s), nil); err != nil {
 		return err
+	}
+	for _, n := range s.Networks {
+		body := map[string]any{"Container": s.Name}
+		if len(n.Aliases) > 0 {
+			body["EndpointConfig"] = map[string]any{"Aliases": n.Aliases}
+		}
+		if err := m.engine.doJSON(ctx, "POST", "/networks/"+url.PathEscape(n.Name)+"/connect", nil, body, nil); err != nil {
+			_ = m.engine.doJSON(context.WithoutCancel(ctx), "DELETE", "/containers/"+s.Name, url.Values{"force": {"true"}}, nil, nil)
+			return err
+		}
 	}
 	if err := m.engine.doJSON(ctx, "POST", "/containers/"+s.Name+"/start", nil, nil, nil); err != nil {
 		_ = m.engine.doJSON(context.WithoutCancel(ctx), "DELETE", "/containers/"+s.Name, url.Values{"force": {"true"}}, nil, nil)

@@ -114,7 +114,7 @@ func (m *Manager) RunTask(ctx context.Context, s TaskSpec, onLine func(string)) 
 		return -1, err
 	}
 	for _, v := range s.Volumes {
-		if err := ensureVolumeDir(v.Source); err != nil {
+		if err := m.prepareMount(v.Source); err != nil {
 			return -1, fmt.Errorf("create volume dir: %w", err)
 		}
 	}

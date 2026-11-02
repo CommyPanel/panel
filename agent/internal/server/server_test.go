@@ -164,6 +164,8 @@ type fakeDocker struct {
 	removedImages   []string
 	removedVolumes  []string
 	removedNetworks []string
+	calls           []string
+	notReady        bool
 }
 
 func (f *fakeDocker) Run(_ context.Context, s docker.ContainerSpec) error {
@@ -251,6 +253,41 @@ func (f *fakeDocker) RemoveNetwork(_ context.Context, name string) error {
 		return err
 	}
 	f.removedNetworks = append(f.removedNetworks, name)
+	return f.err
+}
+
+func (f *fakeDocker) PullImage(_ context.Context, image string) error {
+	if err := validate.DatabaseImage(image); err != nil {
+		return err
+	}
+	f.calls = append(f.calls, "pull "+image)
+	return f.err
+}
+
+func (f *fakeDocker) DatabaseReady(context.Context, docker.DatabaseTarget) (bool, error) {
+	return !f.notReady, f.err
+}
+
+func (f *fakeDocker) CreateDatabase(_ context.Context, t docker.DatabaseTarget, db, user, _ string) error {
+	if err := validate.DatabaseIdent(db); err != nil {
+		return err
+	}
+	f.calls = append(f.calls, "create "+t.Container+" "+db+" "+user)
+	return f.err
+}
+
+func (f *fakeDocker) DropDatabase(_ context.Context, t docker.DatabaseTarget, db, user string) error {
+	f.calls = append(f.calls, "drop "+t.Container+" "+db+" "+user)
+	return f.err
+}
+
+func (f *fakeDocker) SetDatabasePassword(_ context.Context, t docker.DatabaseTarget, user, _ string) error {
+	f.calls = append(f.calls, "password "+t.Container+" "+user)
+	return f.err
+}
+
+func (f *fakeDocker) RemoveDatabaseData(_ context.Context, server string) error {
+	f.calls = append(f.calls, "remove-data "+server)
 	return f.err
 }
 
@@ -763,5 +800,41 @@ func TestTerminalTicketsNeedAuthorization(t *testing.T) {
 	s := New(Options{Nginx: &fakeNginx{}, Terminal: &fakeTerminal{}})
 	if rec := do(t, s, "POST", "/v1/terminal/tickets", `{}`); rec.Code != http.StatusForbidden {
 		t.Errorf("code = %d, want 403", rec.Code)
+	}
+}
+
+func TestDatabaseRoutes(t *testing.T) {
+	f := &fakeDocker{}
+	s := newDockerServer(f)
+	target := `"container":"db-main","engine":"postgres","root_password":"abcdefghijklmnop1234"`
+
+	if rec := do(t, s, "POST", "/v1/images/pull", `{"image":"postgres:17"}`); rec.Code != 200 {
+		t.Errorf("pull: %d %s", rec.Code, rec.Body)
+	}
+	if rec := do(t, s, "POST", "/v1/images/pull", `{"image":"evil/image:1"}`); rec.Code != 400 {
+		t.Errorf("a foreign image must be refused: %d", rec.Code)
+	}
+	if rec := do(t, s, "POST", "/v1/databases/ready", `{`+target+`}`); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"ready":true`) {
+		t.Errorf("ready: %d %s", rec.Code, rec.Body)
+	}
+	f.notReady = true
+	if rec := do(t, s, "POST", "/v1/databases/ready", `{`+target+`}`); !strings.Contains(rec.Body.String(), `"ready":false`) {
+		t.Errorf("not ready: %s", rec.Body)
+	}
+	if rec := do(t, s, "POST", "/v1/databases/create", `{`+target+`,"database":"shop","user":"shop","password":"abcdefghijklmnop1234"}`); rec.Code != 200 {
+		t.Errorf("create: %d %s", rec.Code, rec.Body)
+	}
+	if rec := do(t, s, "POST", "/v1/databases/create", `{`+target+`,"database":"sh op","user":"shop","password":"x"}`); rec.Code != 400 {
+		t.Errorf("a bad name must be refused: %d", rec.Code)
+	}
+	do(t, s, "POST", "/v1/databases/drop", `{`+target+`,"database":"shop","user":"shop"}`)
+	do(t, s, "POST", "/v1/databases/password", `{`+target+`,"user":"shop","password":"abcdefghijklmnop1234"}`)
+	do(t, s, "POST", "/v1/databases/remove-data", `{"server":"main"}`)
+	if rec := do(t, s, "POST", "/v1/databases/create", `{`+target+`,"database":"shop","extra":1}`); rec.Code != 400 {
+		t.Errorf("unknown fields must be refused: %d", rec.Code)
+	}
+	want := "pull postgres:17|create db-main shop shop|drop db-main shop shop|password db-main shop|remove-data main"
+	if got := strings.Join(f.calls, "|"); got != want {
+		t.Errorf("calls = %s", got)
 	}
 }

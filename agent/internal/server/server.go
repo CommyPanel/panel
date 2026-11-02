@@ -44,6 +44,12 @@ type Docker interface {
 	List(ctx context.Context) ([]docker.ContainerInfo, error)
 	Networks(ctx context.Context) ([]docker.NetworkInfo, error)
 	RemoveNetwork(ctx context.Context, name string) error
+	PullImage(ctx context.Context, image string) error
+	DatabaseReady(ctx context.Context, t docker.DatabaseTarget) (bool, error)
+	CreateDatabase(ctx context.Context, t docker.DatabaseTarget, db, user, password string) error
+	DropDatabase(ctx context.Context, t docker.DatabaseTarget, db, user string) error
+	SetDatabasePassword(ctx context.Context, t docker.DatabaseTarget, user, password string) error
+	RemoveDatabaseData(ctx context.Context, server string) error
 	Logs(ctx context.Context, name string, tail int) (string, error)
 	ValidateBuild(s docker.BuildSpec) error
 	Build(ctx context.Context, s docker.BuildSpec, onLine func(string)) error
@@ -144,6 +150,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/docker/images/remove", s.removeImage)
 	mux.HandleFunc("GET /v1/docker/networks", s.networks)
 	mux.HandleFunc("POST /v1/docker/networks/remove", s.removeNetwork)
+	mux.HandleFunc("POST /v1/images/pull", s.pullImage)
+	mux.HandleFunc("POST /v1/databases/ready", s.databaseReady)
+	mux.HandleFunc("POST /v1/databases/create", s.databaseCreate)
+	mux.HandleFunc("POST /v1/databases/drop", s.databaseDrop)
+	mux.HandleFunc("POST /v1/databases/password", s.databasePassword)
+	mux.HandleFunc("POST /v1/databases/remove-data", s.databaseRemoveData)
 	mux.HandleFunc("POST /v1/terminal/tickets", s.terminalTicket)
 	mux.HandleFunc("POST /v1/volumes/remove", s.removeVolumes)
 	mux.HandleFunc("GET /v1/volumes/{app}", s.listVolumes)
@@ -405,6 +417,76 @@ func (s *Server) terminalTicket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ticket": ticket, "expires_in": int(terminal.TicketTTL.Seconds())})
+}
+
+func (s *Server) pullImage(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Image string `json:"image"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	s.respond(w, s.opts.Docker.PullImage(r.Context(), body.Image))
+}
+
+func (s *Server) databaseReady(w http.ResponseWriter, r *http.Request) {
+	var t docker.DatabaseTarget
+	if !decode(w, r, &t) {
+		return
+	}
+	ready, err := s.opts.Docker.DatabaseReady(r.Context(), t)
+	if err != nil {
+		s.respond(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ready": ready})
+}
+
+func (s *Server) databaseCreate(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		docker.DatabaseTarget
+		Database string `json:"database"`
+		User     string `json:"user"`
+		Password string `json:"password"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	s.respond(w, s.opts.Docker.CreateDatabase(r.Context(), body.DatabaseTarget, body.Database, body.User, body.Password))
+}
+
+func (s *Server) databaseDrop(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		docker.DatabaseTarget
+		Database string `json:"database"`
+		User     string `json:"user"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	s.respond(w, s.opts.Docker.DropDatabase(r.Context(), body.DatabaseTarget, body.Database, body.User))
+}
+
+func (s *Server) databasePassword(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		docker.DatabaseTarget
+		User     string `json:"user"`
+		Password string `json:"password"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	s.respond(w, s.opts.Docker.SetDatabasePassword(r.Context(), body.DatabaseTarget, body.User, body.Password))
+}
+
+func (s *Server) databaseRemoveData(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Server string `json:"server"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	s.respond(w, s.opts.Docker.RemoveDatabaseData(r.Context(), body.Server))
 }
 
 func (s *Server) removeNetwork(w http.ResponseWriter, r *http.Request) {

@@ -52,6 +52,72 @@ func Network(s string) error {
 	return nil
 }
 
+var (
+	dbImageRe    = regexp.MustCompile(`^(mariadb|mysql|postgres):[0-9]+(\.[0-9]+){0,2}$`)
+	dbIdentRe    = regexp.MustCompile(`^[a-z][a-z0-9_]{0,30}$`)
+	dbPasswordRe = regexp.MustCompile(`^[A-Za-z0-9]{16,64}$`)
+	aliasRe      = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+)
+
+// DatabaseEngines are the database servers CommyPanel can run, by the name of
+// their official image.
+var DatabaseEngines = []string{"mariadb", "mysql", "postgres"}
+
+// DatabaseImage checks an official database image with a plain version tag,
+// such as postgres:17 or mariadb:11.4. Nothing else (no other repository, no
+// "latest", no digest) is accepted.
+func DatabaseImage(s string) error {
+	if !dbImageRe.MatchString(s) {
+		return invalid("invalid database image %q", s)
+	}
+	return nil
+}
+
+// RunImage checks the image a container may be started from: one CommyPanel
+// built (commypanel/...) or an official database image.
+func RunImage(s string) error {
+	if strings.HasPrefix(s, "commypanel/") {
+		return Image(s)
+	}
+	return DatabaseImage(s)
+}
+
+// DatabaseEngine checks the name of a database engine.
+func DatabaseEngine(s string) error {
+	for _, e := range DatabaseEngines {
+		if s == e {
+			return nil
+		}
+	}
+	return invalid("unknown database engine %q", s)
+}
+
+// DatabaseIdent checks the name of a database or of a database user: lowercase
+// letters, digits and underscores, starting with a letter. Because nothing else
+// is accepted, it is safe inside the quotes of every engine's SQL.
+func DatabaseIdent(s string) error {
+	if !dbIdentRe.MatchString(s) {
+		return invalid("invalid database name %q", s)
+	}
+	return nil
+}
+
+// DatabasePassword checks a database password: 16 to 64 letters and digits.
+func DatabasePassword(s string) error {
+	if !dbPasswordRe.MatchString(s) {
+		return invalid("a database password must be 16 to 64 letters and digits")
+	}
+	return nil
+}
+
+// Alias checks a name a container is reachable by on a network.
+func Alias(s string) error {
+	if !aliasRe.MatchString(s) {
+		return invalid("invalid network alias %q", s)
+	}
+	return nil
+}
+
 // Domain checks a lowercase DNS hostname with at least two labels.
 func Domain(s string) error {
 	if len(s) == 0 || len(s) > 253 {

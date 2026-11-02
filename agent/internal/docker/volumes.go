@@ -98,3 +98,15 @@ func (m *Manager) mountedBy(ctx context.Context, path string) (string, error) {
 	}
 	return "", nil
 }
+
+// prepareMount creates the folder behind a mount the first time it is used. An
+// app's volume is open to whichever user the app runs as (see ensureVolumeDir).
+// A database server's data folder stays private to root: the database image
+// takes it over for its own user when it starts, and no other user should ever
+// be able to open it.
+func (m *Manager) prepareMount(source string) error {
+	if _, err := validate.ResolveUnder(m.databasesDir(), source); err == nil {
+		return os.MkdirAll(source, 0o700)
+	}
+	return ensureVolumeDir(source)
+}

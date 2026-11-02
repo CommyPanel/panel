@@ -151,3 +151,62 @@ func TestNetwork(t *testing.T) {
 		}
 	}
 }
+
+func TestDatabaseImagesAreOfficialAndPinned(t *testing.T) {
+	for _, ok := range []string{"mariadb:11.4", "mysql:8.4", "postgres:17", "postgres:17.2", "mariadb:10.11.9"} {
+		if err := DatabaseImage(ok); err != nil {
+			t.Errorf("%q: %v", ok, err)
+		}
+	}
+	for _, bad := range []string{"", "postgres", "postgres:latest", "postgres:17-alpine", "library/postgres:17", "evil/postgres:17", "postgres:17@sha256:abc", "mongo:7", "postgres:17.1.2.3", "docker.io/postgres:17", "postgres:17 ", "postgres:../x"} {
+		if err := DatabaseImage(bad); err == nil {
+			t.Errorf("%q must be refused", bad)
+		}
+	}
+}
+
+func TestRunImageIsOursOrAnOfficialDatabase(t *testing.T) {
+	for _, ok := range []string{"commypanel/shop:3", "postgres:17"} {
+		if err := RunImage(ok); err != nil {
+			t.Errorf("%q: %v", ok, err)
+		}
+	}
+	for _, bad := range []string{"alpine:3", "nginx", "ubuntu:24.04", "ghcr.io/evil/x:1", "commypanel", "commypanel/Bad Name:1"} {
+		if err := RunImage(bad); err == nil {
+			t.Errorf("%q must be refused", bad)
+		}
+	}
+}
+
+func TestDatabaseNamesAndPasswords(t *testing.T) {
+	for _, ok := range []string{"shop", "a", "my_app_2", strings.Repeat("a", 31)} {
+		if err := DatabaseIdent(ok); err != nil {
+			t.Errorf("ident %q: %v", ok, err)
+		}
+	}
+	for _, bad := range []string{"", "1shop", "_x", "Shop", "sh-op", "sh op", "shop;", "sh'op", "sh\"op", "sh`op", "shop\n", "sh$op", strings.Repeat("a", 32), "ünï"} {
+		if err := DatabaseIdent(bad); err == nil {
+			t.Errorf("ident %q must be refused", bad)
+		}
+	}
+	for _, ok := range []string{strings.Repeat("a", 16), "Abcdefgh12345678", strings.Repeat("Z9", 32)} {
+		if err := DatabasePassword(ok); err != nil {
+			t.Errorf("password %q: %v", ok, err)
+		}
+	}
+	for _, bad := range []string{"", "short", strings.Repeat("a", 15), strings.Repeat("a", 65), "abcdefgh1234567'", "abcdefgh12345678;", "abcdefgh 2345678x", "abcdefgh1234567\\", "abcdefgh1234567$", "abcdefgh1234567\n"} {
+		if err := DatabasePassword(bad); err == nil {
+			t.Errorf("password %q must be refused", bad)
+		}
+	}
+	for _, bad := range []string{"", "mongo", "Postgres", "postgres "} {
+		if err := DatabaseEngine(bad); err == nil {
+			t.Errorf("engine %q must be refused", bad)
+		}
+	}
+	for _, bad := range []string{"", "-a", "a-", "A", "a_b", "a b", strings.Repeat("a", 64)} {
+		if err := Alias(bad); err == nil {
+			t.Errorf("alias %q must be refused", bad)
+		}
+	}
+}
