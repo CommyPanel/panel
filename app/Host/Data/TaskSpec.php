@@ -15,6 +15,7 @@ final readonly class TaskSpec
      * @param  list<string>  $command
      * @param  array<string, string>  $env
      * @param  list<Volume>  $volumes
+     * @param  list<NetworkAttachment>  $networks  further networks to join
      */
     public function __construct(
         public string $name,
@@ -26,6 +27,7 @@ final readonly class TaskSpec
         public array $volumes = [],
         public ?string $network = null,
         public int $timeoutSeconds = 600,
+        public array $networks = [],
     ) {
         ResourceName::assertValid($name);
 

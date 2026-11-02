@@ -153,6 +153,34 @@ class App extends Model
     }
 
     /**
+     * @return HasMany<AppDatabaseLink, $this>
+     */
+    public function databaseLinks(): HasMany
+    {
+        return $this->hasMany(AppDatabaseLink::class);
+    }
+
+    /**
+     * Links where this app may reach another app.
+     *
+     * @return HasMany<AppLink, $this>
+     */
+    public function links(): HasMany
+    {
+        return $this->hasMany(AppLink::class);
+    }
+
+    /**
+     * Links where another app may reach this one.
+     *
+     * @return HasMany<AppLink, $this>
+     */
+    public function linkedFrom(): HasMany
+    {
+        return $this->hasMany(AppLink::class, 'target_app_id');
+    }
+
+    /**
      * A locked app cannot be deleted. Locking guards against a slip, not against
      * a determined administrator: anyone who may change the app can unlock it.
      */

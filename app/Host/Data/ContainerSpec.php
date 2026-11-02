@@ -9,6 +9,8 @@ final readonly class ContainerSpec
     /**
      * @param  array<string, string>  $env
      * @param  list<Volume>  $volumes
+     * @param  list<string>  $aliases  extra names on its own network
+     * @param  list<NetworkAttachment>  $networks  further networks to join
      */
     public function __construct(
         public string $name,
@@ -20,6 +22,8 @@ final readonly class ContainerSpec
         public ?float $cpuLimit = null,
         public array $volumes = [],
         public ?string $network = null,
+        public array $aliases = [],
+        public array $networks = [],
     ) {
         ResourceName::assertValid($name);
 
@@ -33,7 +37,14 @@ final readonly class ContainerSpec
             ResourceName::assertValid($network);
         }
 
-        if ($hostPort < 1024 || $hostPort > 65535 || $containerPort < 1 || $containerPort > 65535) {
+        foreach ($aliases as $alias) {
+            ResourceName::assertValid($alias);
+        }
+
+        // A host port of 0 means nothing is published (a database server).
+        $published = $hostPort !== 0;
+
+        if ($published && ($hostPort < 1024 || $hostPort > 65535 || $containerPort < 1 || $containerPort > 65535) || ! $published && $containerPort !== 0) {
             throw new InvalidArgumentException('Invalid container port mapping.');
         }
     }

@@ -3,6 +3,7 @@
 namespace App\Deploy;
 
 use App\Audit\AuditLogger;
+use App\Databases\AppLinks;
 use App\Deploy\Health\HealthChecker;
 use App\Deploy\Source\SourceFetcher;
 use App\Deploy\Stacks\DetectionFailed;
@@ -43,6 +44,7 @@ class DeployApp
         private readonly AuditLogger $audit,
         private readonly TlsPlanner $tls,
         private readonly AppVolumes $volumes,
+        private readonly AppLinks $links,
     ) {}
 
     public function __invoke(Deployment $deployment): void
@@ -171,6 +173,7 @@ class DeployApp
             cpuLimit: $app->cpu_limit === null ? null : (float) $app->cpu_limit,
             volumes: $this->volumes->mounts($app),
             network: $app->networkName(),
+            networks: $this->links->attachments($app),
         ));
 
         return true;
@@ -203,6 +206,7 @@ class DeployApp
             volumes: $this->volumes->mounts($app),
             network: $app->networkName(),
             timeoutSeconds: $timeout,
+            networks: $this->links->attachments($app),
         ), $log->line(...));
 
         if ($code !== 0) {
@@ -217,7 +221,8 @@ class DeployApp
      */
     private function environment(App $app): array
     {
-        return ['PORT' => (string) $app->container_port, ...$app->environment()];
+        // The app's own variables come last, so one with the same name wins on purpose.
+        return ['PORT' => (string) $app->container_port, ...$this->links->environment($app), ...$app->environment()];
     }
 
     private function checkHealth(App $app, Deployment $deployment, DeployLogger $log): void

@@ -141,9 +141,11 @@ it('validates and accepts Docker operations in dry-run mode', function () {
 });
 
 it('surfaces agent-side Docker validation errors', function () {
-    // The PHP DTO accepts this image; the agent's allow-list does not.
-    expect(fn () => $this->driver->runContainer(new ContainerSpec('demo-1', 'Not A Valid Image', 20001, 8080)))
-        ->toThrow(HostOperationFailed::class, 'invalid image');
+    // The PHP DTO accepts these images; the agent's allow-list does not.
+    expect(fn () => $this->driver->runContainer(new ContainerSpec('demo-1', 'commypanel/Not A Valid Image', 20001, 8080)))
+        ->toThrow(HostOperationFailed::class, 'invalid image')
+        ->and(fn () => $this->driver->runContainer(new ContainerSpec('demo-1', 'alpine:3', 20001, 8080)))
+        ->toThrow(HostOperationFailed::class, 'invalid database image');
 });
 
 it('streams a dry-run build', function () {

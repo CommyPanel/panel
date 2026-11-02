@@ -7,6 +7,7 @@ use App\Host\Data\CertificateRequest;
 use App\Host\Data\ContainerInfo;
 use App\Host\Data\ContainerSpec;
 use App\Host\Data\ContainerUsage;
+use App\Host\Data\DatabaseTarget;
 use App\Host\Data\DockerDiagnosis;
 use App\Host\Data\DockerInfo;
 use App\Host\Data\HostInfo;
@@ -60,6 +61,18 @@ class FakeHostDriver implements HostDriver
 
     private bool $dockerDown = false;
 
+    /** @var list<string> images that were pulled */
+    private array $pulledImages = [];
+
+    /** @var array<string, array<string, array{user: string, password: string}>> container => database => its user */
+    private array $databases = [];
+
+    /** @var array<string, array<string, list<string>>> network => container => aliases (links made while running) */
+    private array $connections = [];
+
+    /** @var list<string> database server containers that do not answer yet */
+    private array $notReady = [];
+
     /** @var array<string, array<string, string>> "app/volume" => relative path => content */
     private array $volumeFiles = [];
 
@@ -67,6 +80,7 @@ class FakeHostDriver implements HostDriver
     private const DOCKER_ACTIONS = [
         'buildImage', 'runContainer', 'runTask', 'stopContainer', 'startContainer', 'restartContainer',
         'removeContainer', 'containerLogs', 'pruneDanglingImages', 'removeImage', 'removeNetwork',
+        'pullImage', 'databaseReady', 'createDatabase', 'dropDatabase', 'setDatabasePassword', 'connectNetwork', 'disconnectNetwork', 'pruneLinkNetworks',
     ];
 
     public function systemStatus(): SystemStatus
@@ -371,6 +385,128 @@ class FakeHostDriver implements HostDriver
         $this->record('removeNetwork', ['name' => $name]);
     }
 
+    public function pullImage(string $image): void
+    {
+        $this->record('pullImage', ['image' => $image]);
+        $this->pulledImages[] = $image;
+    }
+
+    /**
+     * Make a database server answer only after it was asked this many times (tests).
+     */
+    public function startSlowly(string $container): static
+    {
+        $this->notReady[] = $container;
+
+        return $this;
+    }
+
+    public function databaseReady(DatabaseTarget $server): bool
+    {
+        $this->record('databaseReady', ['container' => $server->container]);
+
+        $index = array_search($server->container, $this->notReady, true);
+
+        if ($index !== false) {
+            $this->notReady = array_values(array_filter($this->notReady, fn (string $c) => $c !== $server->container));
+
+            return false;
+        }
+
+        return isset($this->containers[$server->container]) && ! isset($this->stopped[$server->container]);
+    }
+
+    public function createDatabase(DatabaseTarget $server, string $database, string $user, #[\SensitiveParameter] string $password): void
+    {
+        $this->record('createDatabase', ['container' => $server->container, 'database' => $database, 'user' => $user]);
+
+        if (! isset($this->containers[$server->container])) {
+            throw new HostOperationFailed('Agent error: container does not exist');
+        }
+
+        $this->databases[$server->container][$database] = ['user' => $user, 'password' => $password];
+    }
+
+    public function dropDatabase(DatabaseTarget $server, string $database, string $user): void
+    {
+        $this->record('dropDatabase', ['container' => $server->container, 'database' => $database, 'user' => $user]);
+
+        unset($this->databases[$server->container][$database]);
+    }
+
+    public function setDatabasePassword(DatabaseTarget $server, string $user, #[\SensitiveParameter] string $password): void
+    {
+        $this->record('setDatabasePassword', ['container' => $server->container, 'user' => $user]);
+
+        foreach ($this->databases[$server->container] ?? [] as $name => $entry) {
+            if ($entry['user'] === $user) {
+                $this->databases[$server->container][$name] = ['user' => $user, 'password' => $password];
+            }
+        }
+    }
+
+    public function removeDatabaseData(string $server): void
+    {
+        ResourceName::assertValid($server);
+        $this->record('removeDatabaseData', ['server' => $server]);
+    }
+
+    /**
+     * What the fake database servers hold (tests): container => database => user and password.
+     *
+     * @return array<string, array<string, array{user: string, password: string}>>
+     */
+    public function databases(): array
+    {
+        return $this->databases;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function pulledImages(): array
+    {
+        return $this->pulledImages;
+    }
+
+    /**
+     * Containers attached to link networks while running (tests).
+     *
+     * @return array<string, array<string, list<string>>>
+     */
+    public function connections(): array
+    {
+        return $this->connections;
+    }
+
+    public function connectNetwork(string $container, string $network, array $aliases = []): void
+    {
+        ResourceName::assertValid($container);
+        $this->record('connectNetwork', ['container' => $container, 'network' => $network, 'aliases' => $aliases]);
+
+        $this->connections[$network][$container] = $aliases;
+    }
+
+    public function disconnectNetwork(string $container, string $network): void
+    {
+        $this->record('disconnectNetwork', ['container' => $container, 'network' => $network]);
+
+        unset($this->connections[$network][$container]);
+    }
+
+    public function pruneLinkNetworks(): array
+    {
+        $this->record('pruneLinkNetworks', []);
+
+        $empty = array_keys(array_filter($this->connections, fn (array $members) => $members === []));
+
+        foreach ($empty as $name) {
+            unset($this->connections[$name]);
+        }
+
+        return $empty;
+    }
+
     public function createTerminalTicket(string $container, string $origin): string
     {
         ResourceName::assertValid($container);
@@ -386,6 +522,18 @@ class FakeHostDriver implements HostDriver
         foreach ($this->listContainers() as $container) {
             foreach ($container->networks as $network) {
                 $members[$network['name']][] = ['name' => $container->name, 'ip' => $network['ip']];
+            }
+        }
+
+        foreach ($this->containers as $spec) {
+            foreach ($spec->networks as $attachment) {
+                $members[$attachment->name][] = ['name' => $spec->name, 'ip' => '172.21.0.'.(count($members[$attachment->name] ?? []) + 2)];
+            }
+        }
+
+        foreach ($this->connections as $network => $containers) {
+            foreach (array_keys($containers) as $container) {
+                $members[$network][] = ['name' => $container, 'ip' => '172.22.0.'.(count($members[$network] ?? []) + 2)];
             }
         }
 

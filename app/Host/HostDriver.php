@@ -6,6 +6,7 @@ use App\Host\Data\CertificateInfo;
 use App\Host\Data\CertificateRequest;
 use App\Host\Data\ContainerInfo;
 use App\Host\Data\ContainerSpec;
+use App\Host\Data\DatabaseTarget;
 use App\Host\Data\DockerDiagnosis;
 use App\Host\Data\DockerInfo;
 use App\Host\Data\HostInfo;
@@ -195,6 +196,72 @@ interface HostDriver
      * @throws HostOperationFailed
      */
     public function removeNetwork(string $name): void;
+
+    /**
+     * Download an official database image (mariadb, mysql or postgres with a
+     * plain version tag). An image that is already there is not downloaded again.
+     *
+     * @throws HostOperationFailed
+     */
+    public function pullImage(string $image): void;
+
+    /**
+     * Whether a database server answers a query. One that is starting, or stopped,
+     * is not ready, which is not an error.
+     *
+     * @throws HostOperationFailed
+     */
+    public function databaseReady(DatabaseTarget $server): bool;
+
+    /**
+     * Create a database and a user that owns it and nothing else. Doing it again
+     * with the same names only sets the password.
+     *
+     * @throws HostOperationFailed
+     */
+    public function createDatabase(DatabaseTarget $server, string $database, string $user, #[\SensitiveParameter] string $password): void;
+
+    /**
+     * Delete a database and its user. What does not exist is not an error.
+     *
+     * @throws HostOperationFailed
+     */
+    public function dropDatabase(DatabaseTarget $server, string $database, string $user): void;
+
+    /**
+     * @throws HostOperationFailed
+     */
+    public function setDatabasePassword(DatabaseTarget $server, string $user, #[\SensitiveParameter] string $password): void;
+
+    /**
+     * Delete the data folder of a database server, which must have no container.
+     *
+     * @throws HostOperationFailed
+     */
+    public function removeDatabaseData(string $server): void;
+
+    /**
+     * Attach a running container to a link network, with the names it answers to there.
+     *
+     * @param  list<string>  $aliases
+     *
+     * @throws HostOperationFailed
+     */
+    public function connectNetwork(string $container, string $network, array $aliases = []): void;
+
+    /**
+     * @throws HostOperationFailed
+     */
+    public function disconnectNetwork(string $container, string $network): void;
+
+    /**
+     * Remove the link networks nothing is attached to; returns their names.
+     *
+     * @return list<string>
+     *
+     * @throws HostOperationFailed
+     */
+    public function pruneLinkNetworks(): array;
 
     /**
      * A single-use ticket that lets one browser open a terminal in one managed

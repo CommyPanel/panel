@@ -2,6 +2,7 @@
 
 namespace App\Deploy;
 
+use App\Databases\AppLinks;
 use App\Deploy\Source\UploadStorage;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
@@ -12,7 +13,7 @@ use App\Models\App;
  */
 class DestroyApp
 {
-    public function __construct(private readonly HostDriver $host, private readonly UploadStorage $uploads) {}
+    public function __construct(private readonly HostDriver $host, private readonly UploadStorage $uploads, private readonly AppLinks $links) {}
 
     /**
      * Deleting an app deletes the files of its volumes, so a locked volume
@@ -52,6 +53,10 @@ class DestroyApp
                 $problems[] = "Container {$container}: {$e->getMessage()}";
             }
         }
+
+        // The app's containers are gone, so the database servers and apps on the other ends of its links
+        // let go of the link networks, and those networks are removed.
+        $this->links->removeAllFor($app);
 
         // After the containers: a network cannot go while something is attached.
         try {

@@ -136,4 +136,15 @@ return [
         'max_files' => (int) env('UPLOAD_MAX_FILES', 20000),
     ],
 
+    'databases' => [
+        // Official image tags that can be chosen, newest first.
+        'versions' => [
+            'mariadb' => ['11.4', '10.11'],
+            'mysql' => ['8.4', '8.0'],
+            'postgres' => ['17', '16', '15'],
+        ],
+        'memory_mb' => (int) env('DATABASE_MEMORY_MB', 1024),
+        // How long a new server may take to answer its first query.
+        'ready_timeout' => (int) env('DATABASE_READY_TIMEOUT', 240),
+    ],
 ];

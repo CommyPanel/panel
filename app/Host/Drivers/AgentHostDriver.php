@@ -7,11 +7,13 @@ use App\Host\Data\CertificateRequest;
 use App\Host\Data\ContainerInfo;
 use App\Host\Data\ContainerSpec;
 use App\Host\Data\ContainerUsage;
+use App\Host\Data\DatabaseTarget;
 use App\Host\Data\DockerDiagnosis;
 use App\Host\Data\DockerInfo;
 use App\Host\Data\HostInfo;
 use App\Host\Data\ImageBuildSpec;
 use App\Host\Data\ImageInfo;
+use App\Host\Data\NetworkAttachment;
 use App\Host\Data\NetworkInfo;
 use App\Host\Data\NginxSite;
 use App\Host\Data\NginxStatus;
@@ -278,6 +280,7 @@ class AgentHostDriver implements HostDriver
             'memory_mb' => $spec->memoryLimitMb,
             'cpus' => $spec->cpuLimit,
             'network' => $spec->network,
+            'networks' => array_map(fn (NetworkAttachment $n) => array_filter(['name' => $n->name, 'aliases' => $n->aliases], fn ($v) => $v !== []), $spec->networks),
             'timeout_seconds' => $spec->timeoutSeconds,
         ], fn ($value) => $value !== null && $value !== []), $spec->timeoutSeconds + 60, $onOutput, 'The command output ended unexpectedly.');
 
@@ -346,6 +349,8 @@ class AgentHostDriver implements HostDriver
             'memory_mb' => $spec->memoryLimitMb,
             'cpus' => $spec->cpuLimit,
             'network' => $spec->network,
+            'aliases' => $spec->aliases,
+            'networks' => array_map(fn (NetworkAttachment $n) => array_filter(['name' => $n->name, 'aliases' => $n->aliases], fn ($v) => $v !== []), $spec->networks),
         ], fn ($value) => $value !== null && $value !== []));
     }
 
@@ -460,6 +465,72 @@ class AgentHostDriver implements HostDriver
         ResourceName::assertValid($name);
 
         $this->send('post', '/v1/docker/networks/remove', ['name' => $name]);
+    }
+
+    public function pullImage(string $image): void
+    {
+        // A first download can take minutes.
+        $this->handle($this->request(fn () => $this->client(timeout: 900)->post('/v1/images/pull', ['image' => $image])));
+    }
+
+    public function databaseReady(DatabaseTarget $server): bool
+    {
+        $data = $this->send('post', '/v1/databases/ready', $this->target($server));
+
+        return (bool) ($data['ready'] ?? false);
+    }
+
+    public function createDatabase(DatabaseTarget $server, string $database, string $user, #[\SensitiveParameter] string $password): void
+    {
+        $this->send('post', '/v1/databases/create', [...$this->target($server), 'database' => $database, 'user' => $user, 'password' => $password]);
+    }
+
+    public function dropDatabase(DatabaseTarget $server, string $database, string $user): void
+    {
+        $this->send('post', '/v1/databases/drop', [...$this->target($server), 'database' => $database, 'user' => $user]);
+    }
+
+    public function setDatabasePassword(DatabaseTarget $server, string $user, #[\SensitiveParameter] string $password): void
+    {
+        $this->send('post', '/v1/databases/password', [...$this->target($server), 'user' => $user, 'password' => $password]);
+    }
+
+    public function removeDatabaseData(string $server): void
+    {
+        ResourceName::assertValid($server);
+
+        $this->send('post', '/v1/databases/remove-data', ['server' => $server]);
+    }
+
+    public function connectNetwork(string $container, string $network, array $aliases = []): void
+    {
+        ResourceName::assertValid($container);
+        ResourceName::assertValid($network);
+
+        $this->send('post', '/v1/docker/networks/connect', array_filter(['container' => $container, 'network' => $network, 'aliases' => $aliases], fn ($v) => $v !== []));
+    }
+
+    public function disconnectNetwork(string $container, string $network): void
+    {
+        ResourceName::assertValid($container);
+        ResourceName::assertValid($network);
+
+        $this->send('post', '/v1/docker/networks/disconnect', ['container' => $container, 'network' => $network]);
+    }
+
+    public function pruneLinkNetworks(): array
+    {
+        $data = $this->send('post', '/v1/docker/networks/prune');
+
+        return array_values(array_map('strval', $data['removed'] ?? []));
+    }
+
+    /**
+     * @return array{container: string, engine: string, root_password: string}
+     */
+    private function target(DatabaseTarget $server): array
+    {
+        return ['container' => $server->container, 'engine' => $server->engine, 'root_password' => $server->rootPassword];
     }
 
     public function createTerminalTicket(string $container, string $origin): string
