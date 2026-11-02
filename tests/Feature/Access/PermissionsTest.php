@@ -4,6 +4,7 @@ use App\Actions\Setup\IssueSetupToken;
 use App\Auth\Permissions;
 use App\Auth\SyncRolesAndPermissions;
 use App\Models\App;
+use App\Models\DatabaseServer;
 use App\Models\Domain;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
@@ -95,6 +96,13 @@ describe('route protection', function () {
         Domain::query()->create(['name' => 'shop.example.com', 'app_id' => $shop->id]);
         // Bound by id, so it has to exist for the route to reach its permission check.
         $shop->volumes()->create(['name' => 'data', 'path' => '/data']);
+
+        // Database servers, databases and links are bound by name or id too.
+        $server = DatabaseServer::query()->create(['name' => 'Main', 'slug' => 'main', 'engine' => 'postgres', 'version' => '17', 'status' => 'running', 'root_password' => 'abcdefghijklmnop1234']);
+        $database = $server->databases()->create(['name' => 'shop', 'username' => 'shop', 'password' => 'abcdefghijklmnop1234']);
+        $shop->databaseLinks()->create(['managed_database_id' => $database->id, 'env_prefix' => 'DATABASE']);
+        $api = App::factory()->create(['slug' => 'api']);
+        $shop->links()->create(['target_app_id' => $api->id, 'env_prefix' => 'API']);
     });
 
     $routes = [
@@ -105,6 +113,10 @@ describe('route protection', function () {
         'apps.nginx' => [['get', '/apps/shop/nginx'], ['put', '/apps/shop/nginx']],
         'apps.volumes' => [['get', '/apps/shop/volumes'], ['get', '/apps/shop/volumes/data'], ['get', '/apps/shop/volumes/data/file'], ['get', '/apps/shop/volumes/data/download']],
         'apps.terminal' => [['post', '/apps/shop/terminal']],
+        'apps.links' => [['get', '/apps/shop/links'], ['post', '/apps/shop/links/database'], ['post', '/apps/shop/links/app'], ['delete', '/apps/shop/links/database/1'], ['delete', '/apps/shop/links/app/1']],
+        'databases.view' => [['get', '/databases'], ['get', '/databases/main']],
+        'databases.manage' => [['post', '/databases'], ['post', '/databases/main/start'], ['post', '/databases/main/stop'], ['post', '/databases/main/restart'], ['post', '/databases/main/retry'], ['delete', '/databases/main'], ['post', '/databases/main/databases'], ['delete', '/databases/main/databases/1'], ['post', '/databases/main/databases/1/password']],
+        'databases.credentials' => [['get', '/databases/main/databases/1/credentials']],
         'apps.logs' => [['get', '/apps/shop/logs'], ['get', '/apps/shop/logs/download']],
         'apps.control' => [['post', '/apps/shop/stop'], ['post', '/apps/shop/start'], ['post', '/apps/shop/restart']],
         'apps.deactivate' => [['post', '/apps/shop/deactivate'], ['post', '/apps/shop/activate']],

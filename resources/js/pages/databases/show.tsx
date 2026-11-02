@@ -1,0 +1,453 @@
+import { Link, router, usePage } from '@inertiajs/react';
+import {
+    ArrowLeft,
+    KeyRound,
+    Play,
+    Plus,
+    RefreshCw,
+    RotateCw,
+    Square,
+    Trash2,
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import DatabaseServerController from '@/actions/App/Http/Controllers/DatabaseServerController';
+import ManagedDatabaseController from '@/actions/App/Http/Controllers/ManagedDatabaseController';
+import { AddDatabaseModal } from '@/components/databases/add-database-modal';
+import { CredentialsModal } from '@/components/databases/credentials-modal';
+import { DatabaseStatusBadge } from '@/components/databases/database-status';
+import { PageHeader } from '@/components/page-header';
+import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { TypedConfirmModal } from '@/components/ui/typed-confirm-modal';
+import { useConfirmedAction } from '@/hooks/use-confirmed-action';
+import AppLayout from '@/layouts/app-layout';
+import { useCan } from '@/lib/permissions';
+import { jsonHeaders } from '@/lib/post-json';
+import type {
+    DatabaseCredentials,
+    DatabaseServer,
+    ManagedDatabase,
+} from '@/types';
+
+type Props = { server: DatabaseServer; databases: ManagedDatabase[] };
+
+export default function Show({ server, databases }: Props) {
+    const can = useCan();
+    const { errors } = usePage().props;
+    const confirmed = useConfirmedAction();
+    const [adding, setAdding] = useState(false);
+    const [credentials, setCredentials] = useState<DatabaseCredentials | null>(
+        null,
+    );
+    const [credentialsError, setCredentialsError] = useState<string | null>(
+        null,
+    );
+    const [dropping, setDropping] = useState<ManagedDatabase | null>(null);
+    const [rotating, setRotating] = useState<ManagedDatabase | null>(null);
+    const [deleting, setDeleting] = useState(false);
+    const [busy, setBusy] = useState(false);
+
+    const manage = can('databases.manage');
+    const running = server.status === 'running';
+
+    // While the server starts, look again every few seconds.
+    useEffect(() => {
+        if (server.status !== 'provisioning') return;
+
+        const timer = setInterval(
+            () => router.reload({ only: ['server', 'databases'] }),
+            3000,
+        );
+
+        return () => clearInterval(timer);
+    }, [server.status]);
+
+    const post = (url: ReturnType<typeof DatabaseServerController.start>) =>
+        router.post(
+            url,
+            {},
+            {
+                preserveScroll: true,
+                onStart: () => setBusy(true),
+                onFinish: () => setBusy(false),
+            },
+        );
+
+    const showCredentials = (database: ManagedDatabase) =>
+        void confirmed.run(async () => {
+            setCredentialsError(null);
+
+            try {
+                const response = await fetch(
+                    ManagedDatabaseController.credentials({
+                        server: server.slug,
+                        database: database.id,
+                    }).url,
+                    { credentials: 'same-origin', headers: jsonHeaders() },
+                );
+
+                if (!response.ok) {
+                    throw new Error(
+                        response.status === 423
+                            ? 'Confirm your password and try again.'
+                            : 'The connection could not be loaded.',
+                    );
+                }
+
+                setCredentials((await response.json()) as DatabaseCredentials);
+            } catch (e) {
+                setCredentialsError(
+                    e instanceof Error
+                        ? e.message
+                        : 'The connection could not be loaded.',
+                );
+            }
+        });
+
+    const rotate = () => {
+        if (!rotating) return;
+
+        void confirmed.run(() =>
+            router.post(
+                ManagedDatabaseController.password({
+                    server: server.slug,
+                    database: rotating.id,
+                }),
+                {},
+                {
+                    preserveScroll: true,
+                    onStart: () => setBusy(true),
+                    onFinish: () => {
+                        setBusy(false);
+                        setRotating(null);
+                    },
+                },
+            ),
+        );
+    };
+
+    const drop = (typed: string) => {
+        if (!dropping) return;
+
+        void confirmed.run(() =>
+            router.delete(
+                ManagedDatabaseController.destroy({
+                    server: server.slug,
+                    database: dropping.id,
+                }),
+                {
+                    data: { confirm: typed },
+                    preserveScroll: true,
+                    onStart: () => setBusy(true),
+                    onFinish: () => setBusy(false),
+                    onSuccess: () => setDropping(null),
+                },
+            ),
+        );
+    };
+
+    const deleteServer = (typed: string) =>
+        void confirmed.run(() =>
+            router.delete(DatabaseServerController.destroy(server.slug), {
+                data: { confirm: typed },
+                onStart: () => setBusy(true),
+                onFinish: () => setBusy(false),
+            }),
+        );
+
+    return (
+        <AppLayout title={server.name}>
+            <PageHeader
+                title={server.name}
+                badge={<DatabaseStatusBadge status={server.status} />}
+                description={`${server.engine_label} ${server.version}. Apps that are linked to one of its databases reach it as ${server.host} on port ${server.port}.`}
+                actions={
+                    <>
+                        <Link
+                            href={DatabaseServerController.index()}
+                            className="btn btn-soft"
+                        >
+                            <ArrowLeft className="size-4" aria-hidden />
+                            All servers
+                        </Link>
+                        {manage && running && (
+                            <>
+                                <Button
+                                    variant="soft"
+                                    loading={busy}
+                                    onClick={() =>
+                                        post(
+                                            DatabaseServerController.restart(
+                                                server.slug,
+                                            ),
+                                        )
+                                    }
+                                >
+                                    <RotateCw className="size-4" aria-hidden />
+                                    Restart
+                                </Button>
+                                <Button
+                                    variant="warning"
+                                    loading={busy}
+                                    onClick={() =>
+                                        post(
+                                            DatabaseServerController.stop(
+                                                server.slug,
+                                            ),
+                                        )
+                                    }
+                                >
+                                    <Square className="size-4" aria-hidden />
+                                    Stop
+                                </Button>
+                            </>
+                        )}
+                        {manage && server.status === 'stopped' && (
+                            <Button
+                                loading={busy}
+                                onClick={() =>
+                                    post(
+                                        DatabaseServerController.start(
+                                            server.slug,
+                                        ),
+                                    )
+                                }
+                            >
+                                <Play className="size-4" aria-hidden />
+                                Start
+                            </Button>
+                        )}
+                    </>
+                }
+            />
+
+            {errors.database && (
+                <Alert variant="error">{errors.database}</Alert>
+            )}
+            {credentialsError && (
+                <Alert variant="error">{credentialsError}</Alert>
+            )}
+
+            {server.status === 'provisioning' && (
+                <Alert variant="info">
+                    The server is starting. The first start downloads the image,
+                    which can take a few minutes. This page updates by itself.
+                </Alert>
+            )}
+
+            {server.status === 'failed' && (
+                <Alert variant="error">
+                    <span className="flex flex-wrap items-center justify-between gap-3">
+                        <span>
+                            The server could not start
+                            {server.error ? `: ${server.error}` : '.'}
+                        </span>
+                        {manage && (
+                            <Button
+                                variant="soft"
+                                size="sm"
+                                loading={busy}
+                                onClick={() =>
+                                    post(
+                                        DatabaseServerController.retry(
+                                            server.slug,
+                                        ),
+                                    )
+                                }
+                            >
+                                <RefreshCw className="size-4" aria-hidden />
+                                Try again
+                            </Button>
+                        )}
+                    </span>
+                </Alert>
+            )}
+
+            <Card
+                title="Databases"
+                description="Each database has one user that can use it and nothing else on this server."
+                actions={
+                    manage &&
+                    running && (
+                        <Button size="sm" onClick={() => setAdding(true)}>
+                            <Plus className="size-4" aria-hidden />
+                            Add database
+                        </Button>
+                    )
+                }
+                flush={databases.length > 0}
+            >
+                {databases.length === 0 ? (
+                    <p className="text-sm text-base-content/70">
+                        {running
+                            ? 'No databases yet. Add one, then link it to an app on that app’s Links tab.'
+                            : 'Databases can be added once the server is running.'}
+                    </p>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="table">
+                            <thead>
+                                <tr>
+                                    <th>Database</th>
+                                    <th>Used by</th>
+                                    <th />
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {databases.map((database) => (
+                                    <tr key={database.id}>
+                                        <td>
+                                            <code>{database.name}</code>
+                                        </td>
+                                        <td>
+                                            {database.apps.length === 0 ? (
+                                                <span className="text-base-content/70">
+                                                    No app
+                                                </span>
+                                            ) : (
+                                                database.apps.map((app, i) => (
+                                                    <span key={app.slug}>
+                                                        {i > 0 && ', '}
+                                                        {app.name}
+                                                    </span>
+                                                ))
+                                            )}
+                                        </td>
+                                        <td className="text-right whitespace-nowrap">
+                                            {can('databases.credentials') && (
+                                                <Button
+                                                    variant="soft"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        showCredentials(
+                                                            database,
+                                                        )
+                                                    }
+                                                >
+                                                    <KeyRound
+                                                        className="size-4"
+                                                        aria-hidden
+                                                    />
+                                                    Connection
+                                                </Button>
+                                            )}
+                                            {manage && running && (
+                                                <>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            setRotating(
+                                                                database,
+                                                            )
+                                                        }
+                                                    >
+                                                        <RotateCw
+                                                            className="size-4"
+                                                            aria-hidden
+                                                        />
+                                                        New password
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            setDropping(
+                                                                database,
+                                                            )
+                                                        }
+                                                    >
+                                                        <Trash2
+                                                            className="size-4"
+                                                            aria-hidden
+                                                        />
+                                                        Delete
+                                                    </Button>
+                                                </>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </Card>
+
+            {manage && (
+                <Card
+                    title="Delete this server"
+                    description={`Removes the server and permanently deletes every database on it (${server.databases_count}) with all their data. This cannot be undone, and it is refused while an app still uses one of its databases.`}
+                    actions={
+                        <Button
+                            variant="error"
+                            onClick={() => setDeleting(true)}
+                        >
+                            <Trash2 className="size-4" aria-hidden />
+                            Delete server
+                        </Button>
+                    }
+                />
+            )}
+
+            <AddDatabaseModal
+                slug={server.slug}
+                open={adding}
+                onClose={() => setAdding(false)}
+            />
+            <CredentialsModal
+                credentials={credentials}
+                onClose={() => setCredentials(null)}
+            />
+            <ConfirmModal
+                open={rotating !== null}
+                title="Change the password?"
+                confirmLabel="Change password"
+                loading={busy}
+                onConfirm={rotate}
+                onClose={() => setRotating(null)}
+            >
+                A new password is set for <code>{rotating?.username}</code>.
+                Apps linked to this database keep using the old one, and stop
+                working, until they are deployed again.
+            </ConfirmModal>
+            <TypedConfirmModal
+                open={dropping !== null}
+                title="Delete this database?"
+                expected={dropping?.name ?? ''}
+                confirmLabel="Delete database"
+                loading={busy}
+                error={errors.confirm}
+                onConfirm={drop}
+                onClose={() => setDropping(null)}
+            >
+                <p>
+                    <code>{dropping?.name}</code> and all its data are deleted,
+                    together with its user. This cannot be undone.
+                </p>
+                <p className="text-base-content/70">
+                    If an app is linked to it, remove the link first.
+                </p>
+            </TypedConfirmModal>
+            <TypedConfirmModal
+                open={deleting}
+                title="Delete this server?"
+                expected={server.slug}
+                confirmLabel="Delete server"
+                loading={busy}
+                error={errors.confirm}
+                onConfirm={deleteServer}
+                onClose={() => setDeleting(false)}
+            >
+                <p>
+                    <strong>{server.name}</strong> is removed, and so is the
+                    data of all {server.databases_count} of its databases. This
+                    cannot be undone.
+                </p>
+            </TypedConfirmModal>
+            {confirmed.modal}
+        </AppLayout>
+    );
+}

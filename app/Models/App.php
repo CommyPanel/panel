@@ -171,6 +171,17 @@ class App extends Model
     }
 
     /**
+     * The same as links(), named for route binding: a route parameter called
+     * appLink is looked up through this relation.
+     *
+     * @return HasMany<AppLink, $this>
+     */
+    public function appLinks(): HasMany
+    {
+        return $this->hasMany(AppLink::class);
+    }
+
+    /**
      * Links where another app may reach this one.
      *
      * @return HasMany<AppLink, $this>

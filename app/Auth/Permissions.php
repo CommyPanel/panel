@@ -39,6 +39,14 @@ final class Permissions
 
     public const DOMAINS_SETTINGS = 'domains.settings';
 
+    public const DATABASES_VIEW = 'databases.view';
+
+    public const DATABASES_MANAGE = 'databases.manage';
+
+    public const DATABASES_CREDENTIALS = 'databases.credentials';
+
+    public const APPS_LINKS = 'apps.links';
+
     public const SERVER_VIEW = 'server.view';
 
     public const SERVER_MANAGE = 'server.manage';
@@ -80,6 +88,10 @@ final class Permissions
             self::DOMAINS_VIEW => ['group' => 'Domains', 'label' => 'View domains', 'description' => 'See every domain with its DNS and HTTPS state.'],
             self::DOMAINS_MANAGE => ['group' => 'Domains', 'label' => 'Manage domains and certificates', 'description' => 'Add domains to apps, set redirects, re-check DNS, remove domains and request certificates.'],
             self::DOMAINS_SETTINGS => ['group' => 'Domains', 'label' => 'Change HTTPS and server address', 'description' => 'Accept the Let\'s Encrypt terms, set the server\'s public address and the panel\'s own domain.'],
+            self::DATABASES_VIEW => ['group' => 'Databases', 'label' => 'View databases', 'description' => 'See the database servers, the databases on them and which apps use them. Passwords and connection strings are not shown.'],
+            self::DATABASES_MANAGE => ['group' => 'Databases', 'label' => 'Manage databases', 'description' => 'Create, start, stop and delete database servers, and create, drop and change the password of databases on them. Deleting a server deletes the data of every database on it.'],
+            self::DATABASES_CREDENTIALS => ['group' => 'Databases', 'label' => 'See database passwords', 'description' => 'Show a database\'s password and connection string. Asks for the password unless it was confirmed recently, and every time it is shown is recorded in the audit log.'],
+            self::APPS_LINKS => ['group' => 'Apps', 'label' => 'Link apps to databases and other apps', 'description' => 'Let an app reach a database, or another app, over a private network made for that link. A linked app can use the database it is given, and its connection details are added to its environment variables.'],
             self::SERVER_VIEW => ['group' => 'Server', 'label' => 'View the server', 'description' => 'See host resources, service states, Docker and nginx status.'],
             self::SERVER_MANAGE => ['group' => 'Server', 'label' => 'Manage Docker and nginx', 'description' => 'Reload nginx, test its configuration, remove unused images and read container logs.'],
             self::USERS_VIEW => ['group' => 'Users', 'label' => 'View users', 'description' => 'See the list of user accounts and their roles.'],

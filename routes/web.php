@@ -4,6 +4,7 @@ use App\Auth\Permissions;
 use App\Http\Controllers\AppContainerController;
 use App\Http\Controllers\AppController;
 use App\Http\Controllers\AppDomainController;
+use App\Http\Controllers\AppLinkController;
 use App\Http\Controllers\AppLockController;
 use App\Http\Controllers\AppLogController;
 use App\Http\Controllers\AppNginxController;
@@ -18,12 +19,14 @@ use App\Http\Controllers\AppWebhookController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DatabaseServerController;
 use App\Http\Controllers\DeployKeyController;
 use App\Http\Controllers\DeploymentController;
 use App\Http\Controllers\DomainController;
 use App\Http\Controllers\EnvVarController;
 use App\Http\Controllers\GitTokenController;
 use App\Http\Controllers\HttpsController;
+use App\Http\Controllers\ManagedDatabaseController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\ServerAddressController;
@@ -109,6 +112,15 @@ Route::middleware('auth')->group(function () {
             Route::delete('volumes/{name}/data', [AppVolumeFilesController::class, 'destroyData'])->where('name', '[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?')->middleware('password.confirm')->name('volumes.data.destroy');
         });
 
+        Route::get('links', [AppLinkController::class, 'index'])->middleware('can:'.Permissions::APPS_LINKS)->name('links.index');
+
+        Route::middleware('can:'.Permissions::APPS_LINKS)->group(function () {
+            Route::post('links/database', [AppLinkController::class, 'storeDatabase'])->name('links.database.store');
+            Route::post('links/app', [AppLinkController::class, 'storeApp'])->name('links.app.store');
+            Route::delete('links/database/{databaseLink}', [AppLinkController::class, 'destroyDatabase'])->whereNumber('databaseLink')->name('links.database.destroy');
+            Route::delete('links/app/{appLink}', [AppLinkController::class, 'destroyApp'])->whereNumber('appLink')->name('links.app.destroy');
+        });
+
         Route::middleware('can:'.Permissions::APPS_LOGS)->group(function () {
             Route::get('logs', [AppLogController::class, 'show'])->name('logs.show');
             Route::get('logs/download', [AppLogController::class, 'download'])->name('logs.download');
@@ -144,6 +156,28 @@ Route::middleware('auth')->group(function () {
             Route::post('domains', [AppDomainController::class, 'store'])->name('domains.store');
             Route::post('certificate', [CertificateController::class, 'store'])->name('certificate.store');
         });
+    });
+
+    Route::prefix('databases')->name('databases.')->scopeBindings()->group(function () {
+        Route::middleware('can:'.Permissions::DATABASES_VIEW)->group(function () {
+            Route::get('/', [DatabaseServerController::class, 'index'])->name('index');
+            Route::get('{server:slug}', [DatabaseServerController::class, 'show'])->name('show');
+        });
+
+        Route::middleware('can:'.Permissions::DATABASES_MANAGE)->group(function () {
+            Route::post('/', [DatabaseServerController::class, 'store'])->name('store');
+            Route::post('{server:slug}/start', [DatabaseServerController::class, 'start'])->name('start');
+            Route::post('{server:slug}/stop', [DatabaseServerController::class, 'stop'])->name('stop');
+            Route::post('{server:slug}/restart', [DatabaseServerController::class, 'restart'])->name('restart');
+            Route::post('{server:slug}/retry', [DatabaseServerController::class, 'retry'])->name('retry');
+            Route::delete('{server:slug}', [DatabaseServerController::class, 'destroy'])->middleware('password.confirm')->name('destroy');
+            Route::post('{server:slug}/databases', [ManagedDatabaseController::class, 'store'])->name('databases.store');
+            Route::delete('{server:slug}/databases/{database}', [ManagedDatabaseController::class, 'destroy'])->whereNumber('database')->middleware('password.confirm')->name('databases.destroy');
+            Route::post('{server:slug}/databases/{database}/password', [ManagedDatabaseController::class, 'password'])->whereNumber('database')->middleware('password.confirm')->name('databases.password');
+        });
+
+        Route::get('{server:slug}/databases/{database}/credentials', [ManagedDatabaseController::class, 'credentials'])
+            ->whereNumber('database')->middleware(['can:'.Permissions::DATABASES_CREDENTIALS, 'password.confirm'])->name('databases.credentials');
     });
 
     Route::prefix('server')->name('server.')->group(function () {

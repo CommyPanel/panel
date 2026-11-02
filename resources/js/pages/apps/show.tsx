@@ -4,6 +4,7 @@ import {
     ExternalLink,
     Globe,
     HardDrive,
+    Link2,
     Layers,
     FileCode,
     Rocket,
@@ -21,6 +22,7 @@ import { AdvancedTab } from '@/components/apps/tabs/advanced-tab';
 import { DeploymentsTab } from '@/components/apps/tabs/deployments-tab';
 import { DomainsTab } from '@/components/apps/tabs/domains-tab';
 import { VolumesTab } from '@/components/apps/tabs/volumes-tab';
+import { LinksTab } from '@/components/apps/tabs/links-tab';
 import { LogsTab } from '@/components/apps/tabs/logs-tab';
 import { EnvironmentTab } from '@/components/apps/tabs/environment-tab';
 import { NginxTab } from '@/components/apps/tabs/nginx-tab';
@@ -63,6 +65,7 @@ type TabId =
     | 'usage'
     | 'logs'
     | 'volumes'
+    | 'links'
     | 'terminal'
     | 'domains'
     | 'environment'
@@ -75,6 +78,7 @@ const TAB_IDS: TabId[] = [
     'usage',
     'logs',
     'volumes',
+    'links',
     'terminal',
     'domains',
     'environment',
@@ -117,11 +121,13 @@ export default function Show({
     const canLogs = can('apps.logs');
     const canVolumes = can('apps.volumes');
     const canTerminal = can('apps.terminal');
+    const canLinks = can('apps.links');
     const active: TabId =
         (tab === 'nginx' && !canNginx) ||
         (tab === 'logs' && !canLogs) ||
         (tab === 'volumes' && !canVolumes) ||
-        (tab === 'terminal' && !canTerminal)
+        (tab === 'terminal' && !canTerminal) ||
+        (tab === 'links' && !canLinks)
             ? 'deployments'
             : tab;
 
@@ -195,6 +201,15 @@ export default function Show({
                       label: 'Volumes',
                       icon: <HardDrive className="size-4" aria-hidden />,
                       badge: <Count value={app.volumes.length} />,
+                  },
+              ]
+            : []),
+        ...(canLinks
+            ? [
+                  {
+                      id: 'links' as const,
+                      label: 'Links',
+                      icon: <Link2 className="size-4" aria-hidden />,
                   },
               ]
             : []),
@@ -312,6 +327,7 @@ export default function Show({
                 {active === 'usage' && <UsageTab app={app} />}
                 {active === 'logs' && <LogsTab app={app} />}
                 {active === 'volumes' && <VolumesTab app={app} />}
+                {active === 'links' && <LinksTab app={app} />}
                 {active === 'terminal' && (
                     <Suspense
                         fallback={
