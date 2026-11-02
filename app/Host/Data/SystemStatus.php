@@ -8,5 +8,6 @@ final readonly class SystemStatus
         public bool $dockerAvailable,
         public bool $nginxAvailable,
         public int $diskFreeBytes,
+        public int $diskTotalBytes = 0,
     ) {}
 }

@@ -220,6 +220,7 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 		"nginx_available":  sys.NginxAvailable,
 		"docker_available": s.opts.Docker != nil && s.opts.Docker.Ping(r.Context()) == nil,
 		"disk_free_bytes":  sys.DiskFreeBytes,
+		"disk_total_bytes": sys.DiskTotalBytes,
 	})
 }
 

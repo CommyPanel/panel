@@ -2,6 +2,7 @@ import { Link, usePage } from '@inertiajs/react';
 import ServerController from '@/actions/App/Http/Controllers/ServerController';
 import ServerDockerController from '@/actions/App/Http/Controllers/ServerDockerController';
 import { Alert } from '@/components/ui/alert';
+import { formatBytes } from '@/lib/format';
 import { useCan } from '@/lib/permissions';
 
 /**
@@ -13,7 +14,9 @@ export function HostBanner() {
     const host = props.hostHealth;
     const can = useCan();
 
-    if (!host || (host.agent && host.docker)) return null;
+    if (!host) return null;
+
+    if (host.agent && host.docker) return <DiskBanner />;
 
     if (!host.agent) {
         return (
@@ -59,6 +62,39 @@ export function HostBanner() {
                             See what is wrong
                         </Link>
                     </>
+                )}
+            </span>
+        </Alert>
+    );
+}
+
+/**
+ * Shown on every page once the disk that holds the panel's data is nearly
+ * full: builds, backups and database servers all write there.
+ */
+function DiskBanner() {
+    const { props } = usePage();
+    const disk = props.hostHealth?.disk;
+    const can = useCan();
+
+    if (!disk || disk.level === 'ok') return null;
+
+    return (
+        <Alert variant={disk.level === 'critical' ? 'error' : 'warning'}>
+            <span>
+                The server&apos;s disk is {disk.used_percent}% full (
+                {formatBytes(disk.free_bytes)} free of{' '}
+                {formatBytes(disk.total_bytes)}).{' '}
+                {disk.level === 'critical'
+                    ? 'Builds, backups and databases can fail now. '
+                    : 'Builds, backups and database servers need room. '}
+                {can('server.view') && (
+                    <Link
+                        href={ServerController.index()}
+                        className="link font-medium"
+                    >
+                        See what uses the space
+                    </Link>
                 )}
             </span>
         </Alert>

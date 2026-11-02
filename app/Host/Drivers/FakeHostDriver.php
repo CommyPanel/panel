@@ -61,6 +61,8 @@ class FakeHostDriver implements HostDriver
 
     private bool $dockerDown = false;
 
+    private int $diskFreeBytes = 50 * 1024 ** 3;
+
     /** @var list<string> images that were pulled */
     private array $pulledImages = [];
 
@@ -83,9 +85,17 @@ class FakeHostDriver implements HostDriver
         'pullImage', 'databaseReady', 'dumpDatabase', 'createDatabase', 'dropDatabase', 'setDatabasePassword', 'connectNetwork', 'disconnectNetwork', 'pruneLinkNetworks',
     ];
 
+    /**
+     * How much of the (100 GB) fake disk is free, for tests of the disk warning.
+     */
+    public function setDiskFree(int $bytes): void
+    {
+        $this->diskFreeBytes = $bytes;
+    }
+
     public function systemStatus(): SystemStatus
     {
-        return new SystemStatus(dockerAvailable: ! $this->dockerDown, nginxAvailable: true, diskFreeBytes: 50 * 1024 ** 3);
+        return new SystemStatus(dockerAvailable: ! $this->dockerDown, nginxAvailable: true, diskFreeBytes: $this->diskFreeBytes, diskTotalBytes: 100 * 1024 ** 3);
     }
 
     public function systemInfo(): HostInfo

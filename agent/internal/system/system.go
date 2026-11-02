@@ -11,26 +11,20 @@ import (
 type Status struct {
 	NginxAvailable bool   `json:"nginx_available"`
 	DiskFreeBytes  uint64 `json:"disk_free_bytes"`
+	DiskTotalBytes uint64 `json:"disk_total_bytes"`
 }
 
 // Collect gathers the status. dataDir is where free disk space is measured.
 func Collect(dataDir string) Status {
 	_, nginxErr := exec.LookPath("nginx")
 
+	total, free := diskUsage(dataDir)
+
 	return Status{
 		NginxAvailable: nginxErr == nil,
-		DiskFreeBytes:  diskFree(dataDir),
+		DiskFreeBytes:  free,
+		DiskTotalBytes: total,
 	}
-}
-
-func diskFree(dir string) uint64 {
-	for _, path := range []string{dir, "/"} {
-		var st syscall.Statfs_t
-		if err := syscall.Statfs(path, &st); err == nil {
-			return uint64(st.Bavail) * uint64(st.Bsize)
-		}
-	}
-	return 0
 }
 
 // diskUsage returns the total and free bytes of the filesystem holding dir.

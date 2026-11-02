@@ -40,6 +40,12 @@ return [
 
     // Loopback-only port where nginx serves the panel over plain HTTP, so the
     // agent-managed site for the panel's own domain can proxy to it.
+    // The panel warns on every page once the disk holding its data is this full.
+    'disk' => [
+        'warn_percent' => (int) env('DISK_WARN_PERCENT', 85),
+        'critical_percent' => (int) env('DISK_CRITICAL_PERCENT', 95),
+    ],
+
     'panel_internal_port' => (int) env('PANEL_INTERNAL_PORT', 8081),
 
     'agent_socket' => env('AGENT_SOCKET', '/run/commypanel/agent.sock'),

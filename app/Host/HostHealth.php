@@ -6,28 +6,35 @@ use App\Host\Exceptions\HostOperationFailed;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * Whether the agent and Docker are up, for the warning every page shows when
- * they are not. Cached briefly so pages do not ask the agent on every visit.
+ * Whether the agent and Docker are up, and how full the disk is, for the warning
+ * every page shows when something is wrong. Cached briefly so pages do not ask
+ * the agent on every visit.
  */
 class HostHealth
 {
-    private const KEY = 'commypanel.host-health';
+    private const KEY = 'commypanel.host-health.v2';
 
     private const SECONDS = 15;
 
     public function __construct(private readonly HostDriver $host) {}
 
     /**
-     * @return array{agent: bool, docker: bool}
+     * @return array{agent: bool, docker: bool, disk: array{level: string, used_percent: int, free_bytes: int, total_bytes: int}|null}
      */
     public function status(): array
     {
-        /** @var array{agent: bool, docker: bool} */
+        /** @var array{agent: bool, docker: bool, disk: array{level: string, used_percent: int, free_bytes: int, total_bytes: int}|null} */
         return Cache::remember(self::KEY, self::SECONDS, function (): array {
             try {
-                return ['agent' => true, 'docker' => $this->host->systemStatus()->dockerAvailable];
+                $status = $this->host->systemStatus();
+
+                return [
+                    'agent' => true,
+                    'docker' => $status->dockerAvailable,
+                    'disk' => DiskWarning::of($status->diskTotalBytes, $status->diskFreeBytes)?->toArray(),
+                ];
             } catch (HostOperationFailed) {
-                return ['agent' => false, 'docker' => false];
+                return ['agent' => false, 'docker' => false, 'disk' => null];
             }
         });
     }

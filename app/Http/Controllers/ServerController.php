@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Host\BiggestVolumes;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -14,7 +16,7 @@ use Inertia\Response;
  */
 class ServerController extends Controller
 {
-    public function index(HostDriver $host): Response
+    public function index(Request $request, HostDriver $host, BiggestVolumes $volumes): Response
     {
         try {
             $info = $host->systemInfo();
@@ -26,6 +28,8 @@ class ServerController extends Controller
 
         return Inertia::render('server/overview', [
             'error' => $error,
+            // Measuring walks every volume, so it is remembered for a few minutes; ?fresh=1 measures again.
+            'volumes' => $info === null ? [] : $volumes->top(5, fresh: $request->boolean('fresh')),
             'host' => $info === null ? null : [
                 'hostname' => $info->hostname,
                 'os' => $info->os,

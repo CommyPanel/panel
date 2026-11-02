@@ -54,6 +54,7 @@ class AgentHostDriver implements HostDriver
             dockerAvailable: (bool) ($data['docker_available'] ?? false),
             nginxAvailable: (bool) ($data['nginx_available'] ?? false),
             diskFreeBytes: (int) ($data['disk_free_bytes'] ?? 0),
+            diskTotalBytes: (int) ($data['disk_total_bytes'] ?? 0),
         );
     }
 

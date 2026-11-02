@@ -23,14 +23,14 @@ beforeEach(function () {
 describe('the status every page gets', function () {
     it('says the agent and Docker are up', function () {
         $this->get('/dashboard')->assertInertia(fn (Assert $page) => $page
-            ->where('hostHealth', ['agent' => true, 'docker' => true]));
+            ->where('hostHealth', ['agent' => true, 'docker' => true, 'disk' => ['level' => 'ok', 'used_percent' => 50, 'free_bytes' => 50 * 1024 ** 3, 'total_bytes' => 100 * 1024 ** 3]]));
     });
 
     it('says when Docker is down', function () {
         $this->host->dockerGoesDown();
 
         $this->get('/dashboard')->assertInertia(fn (Assert $page) => $page
-            ->where('hostHealth', ['agent' => true, 'docker' => false]));
+            ->where('hostHealth', ['agent' => true, 'docker' => false, 'disk' => ['level' => 'ok', 'used_percent' => 50, 'free_bytes' => 50 * 1024 ** 3, 'total_bytes' => 100 * 1024 ** 3]]));
     });
 
     it('says when the agent cannot be reached, without failing the page', function () {
@@ -43,7 +43,7 @@ describe('the status every page gets', function () {
         });
 
         $this->get('/apps')->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->where('hostHealth', ['agent' => false, 'docker' => false]));
+            ->where('hostHealth', ['agent' => false, 'docker' => false, 'disk' => null]));
     });
 
     it('asks the agent at most once per short interval', function () {

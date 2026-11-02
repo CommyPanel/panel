@@ -1,8 +1,10 @@
+import { Link } from '@inertiajs/react';
+import AppController from '@/actions/App/Http/Controllers/AppController';
 import { ServerLayout } from '@/components/server/server-layout';
 import { StateMark, toneOfService } from '@/components/server/state-mark';
 import { Card } from '@/components/ui/card';
 import { LiveUsage } from '@/components/usage/live-usage';
-import { formatUptime } from '@/lib/format';
+import { formatBytes, formatUptime } from '@/lib/format';
 
 type Props = {
     error: string | null;
@@ -19,6 +21,13 @@ type Props = {
         services: { name: string; state: string }[];
         agent_version: string;
     } | null;
+    volumes: {
+        app: string;
+        name: string;
+        bytes: number;
+        files: number;
+        partial: boolean;
+    }[];
 };
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -32,7 +41,7 @@ function Row({ label, value }: { label: string; value: string }) {
     );
 }
 
-export default function Overview({ error, host }: Props) {
+export default function Overview({ error, host, volumes }: Props) {
     return (
         <ServerLayout active="overview" error={error}>
             {host && <LiveUsage />}
@@ -64,6 +73,12 @@ export default function Overview({ error, host }: Props) {
                                 />
                             </dl>
                         </Card>
+                        <Card
+                            title="Disk"
+                            description="Everything CommyPanel keeps (apps' volumes, database servers, backups, images) shares this disk."
+                        >
+                            <DiskUsage disk={host.disk} volumes={volumes} />
+                        </Card>
                     </div>
                     <Card
                         title="Services"
@@ -89,5 +104,69 @@ export default function Overview({ error, host }: Props) {
                 </div>
             )}
         </ServerLayout>
+    );
+}
+
+function DiskUsage({
+    disk,
+    volumes,
+}: {
+    disk: { total: number; free: number };
+    volumes: Props['volumes'];
+}) {
+    const used = Math.max(0, disk.total - disk.free);
+    const percent = disk.total > 0 ? Math.round((100 * used) / disk.total) : 0;
+
+    return (
+        <div className="space-y-4 text-sm">
+            <div>
+                <div className="mb-1 flex justify-between">
+                    <span>
+                        {formatBytes(used)} used of {formatBytes(disk.total)}
+                    </span>
+                    <span className="font-medium">{percent}%</span>
+                </div>
+                <progress
+                    className={`progress w-full ${percent >= 95 ? 'progress-error' : percent >= 85 ? 'progress-warning' : 'progress-primary'}`}
+                    value={percent}
+                    max={100}
+                    aria-label="Disk used"
+                />
+            </div>
+            <div>
+                <h3 className="mb-1 font-medium">Biggest app volumes</h3>
+                {volumes.length === 0 ? (
+                    <p className="text-base-content/70">
+                        No app keeps files in a volume.
+                    </p>
+                ) : (
+                    <ul className="divide-y divide-base-300 rounded-field border border-base-300">
+                        {volumes.map((volume) => (
+                            <li
+                                key={`${volume.app}/${volume.name}`}
+                                className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+                            >
+                                <Link
+                                    href={AppController.show(volume.app)}
+                                    className="link"
+                                >
+                                    {volume.app} / {volume.name}
+                                </Link>
+                                <span className="font-medium">
+                                    {volume.partial ? 'more than ' : ''}
+                                    {formatBytes(volume.bytes)}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+                <p className="mt-2 text-base-content/60">
+                    Database servers keep their data in{' '}
+                    <code>/var/lib/commypanel/databases</code> and backups in{' '}
+                    <code>/var/lib/commypanel/backups</code>; images are listed
+                    under Docker.
+                </p>
+            </div>
+        </div>
     );
 }
