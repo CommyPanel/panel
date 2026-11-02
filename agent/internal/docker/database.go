@@ -247,3 +247,61 @@ func (m *Manager) RemoveDatabaseData(ctx context.Context, server string) error {
 	}
 	return nil
 }
+
+// dumpCommand is the engine's own backup tool, run inside the database's
+// container. The output is plain SQL that recreates the database's content.
+func dumpCommand(t DatabaseTarget, db string) (cmd, env []string) {
+	switch t.Engine {
+	case "postgres":
+		return []string{"pg_dump", "-U", "postgres", "--no-owner", "--no-privileges", "-d", db}, nil
+	case "mysql":
+		return []string{"mysqldump", "-uroot", "--single-transaction", "--routines", "--triggers", "--no-tablespaces", db}, []string{"MYSQL_PWD=" + t.RootPassword}
+	default:
+		return []string{"mariadb-dump", "-uroot", "--single-transaction", "--routines", "--triggers", db}, []string{"MYSQL_PWD=" + t.RootPassword}
+	}
+}
+
+// DumpDatabase writes a dump of one database to a temporary file under the data
+// folder and returns its path. The caller reads it and then removes it. A failed
+// dump leaves nothing behind and returns the tool's message, so a half-written
+// backup is never mistaken for a good one.
+func (m *Manager) DumpDatabase(ctx context.Context, t DatabaseTarget, db string) (string, error) {
+	if err := t.validate(); err != nil {
+		return "", err
+	}
+	if err := checkDatabaseName(db); err != nil {
+		return "", err
+	}
+	if m.cfg.DryRun {
+		return "", &validate.InputError{Msg: "dumps are not available in dry-run mode"}
+	}
+
+	tmpDir := filepath.Join(m.cfg.DataDir, "tmp")
+	if err := os.MkdirAll(tmpDir, 0o700); err != nil {
+		return "", err
+	}
+	f, err := os.CreateTemp(tmpDir, "dump-*.sql")
+	if err != nil {
+		return "", err
+	}
+	name := f.Name()
+	fail := func(err error) (string, error) {
+		f.Close()
+		os.Remove(name)
+		return "", err
+	}
+
+	cmd, env := dumpCommand(t, db)
+	res, err := m.execStream(ctx, t.Container, cmd, env, f)
+	if err != nil {
+		return fail(err)
+	}
+	if res.ExitCode != 0 {
+		return fail(&validate.InputError{Msg: "the dump failed: " + redact(res.Output, t.RootPassword)})
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(name)
+		return "", err
+	}
+	return name, nil
+}

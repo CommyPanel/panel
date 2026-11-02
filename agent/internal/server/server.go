@@ -2,6 +2,7 @@
 package server
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,6 +10,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 
 	"commypanel/agent/internal/certs"
@@ -53,6 +55,7 @@ type Docker interface {
 	DropDatabase(ctx context.Context, t docker.DatabaseTarget, db, user string) error
 	SetDatabasePassword(ctx context.Context, t docker.DatabaseTarget, user, password string) error
 	RemoveDatabaseData(ctx context.Context, server string) error
+	DumpDatabase(ctx context.Context, t docker.DatabaseTarget, db string) (string, error)
 	Logs(ctx context.Context, name string, tail int) (string, error)
 	ValidateBuild(s docker.BuildSpec) error
 	Build(ctx context.Context, s docker.BuildSpec, onLine func(string)) error
@@ -162,6 +165,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/databases/drop", s.databaseDrop)
 	mux.HandleFunc("POST /v1/databases/password", s.databasePassword)
 	mux.HandleFunc("POST /v1/databases/remove-data", s.databaseRemoveData)
+	mux.HandleFunc("POST /v1/databases/dump", s.databaseDump)
 	mux.HandleFunc("POST /v1/terminal/tickets", s.terminalTicket)
 	mux.HandleFunc("POST /v1/volumes/remove", s.removeVolumes)
 	mux.HandleFunc("GET /v1/volumes/{app}", s.listVolumes)
@@ -515,6 +519,37 @@ func (s *Server) databasePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.respond(w, s.opts.Docker.SetDatabasePassword(r.Context(), body.DatabaseTarget, body.User, body.Password))
+}
+
+// databaseDump answers with the dump of one database, compressed as it is sent.
+// It is made in full first, so a failure is a clean error and never a short file.
+func (s *Server) databaseDump(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		docker.DatabaseTarget
+		Database string `json:"database"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	path, err := s.opts.Docker.DumpDatabase(r.Context(), body.DatabaseTarget, body.Database)
+	if err != nil {
+		s.respond(w, err)
+		return
+	}
+	defer os.Remove(path)
+
+	f, err := os.Open(path)
+	if err != nil {
+		s.respond(w, err)
+		return
+	}
+	defer f.Close()
+
+	w.Header().Set("Content-Type", "application/gzip")
+	w.WriteHeader(http.StatusOK)
+	gz := gzip.NewWriter(w)
+	_, _ = io.Copy(gz, f)
+	_ = gz.Close()
 }
 
 func (s *Server) databaseRemoveData(w http.ResponseWriter, r *http.Request) {

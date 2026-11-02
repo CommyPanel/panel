@@ -1,10 +1,12 @@
 package server
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -284,6 +286,22 @@ func (f *fakeDocker) DropDatabase(_ context.Context, t docker.DatabaseTarget, db
 func (f *fakeDocker) SetDatabasePassword(_ context.Context, t docker.DatabaseTarget, user, _ string) error {
 	f.calls = append(f.calls, "password "+t.Container+" "+user)
 	return f.err
+}
+
+func (f *fakeDocker) DumpDatabase(_ context.Context, t docker.DatabaseTarget, db string) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	if err := validate.DatabaseIdent(db); err != nil {
+		return "", err
+	}
+	file, err := os.CreateTemp("", "fakedump")
+	if err != nil {
+		return "", err
+	}
+	file.WriteString("-- dump of " + db + " from " + t.Container + "\n")
+	file.Close()
+	return file.Name(), nil
 }
 
 func (f *fakeDocker) RemoveDatabaseData(_ context.Context, server string) error {
@@ -874,5 +892,27 @@ func TestLinkNetworkRoutes(t *testing.T) {
 	}
 	if got := strings.Join(f.calls, "|"); got != "connect db-main commypanel-link-d3 main|disconnect db-main commypanel-link-d3" {
 		t.Errorf("calls = %s", got)
+	}
+}
+
+func TestDatabaseDumpRouteStreamsAGzippedFileAndRemovesTheTemporaryOne(t *testing.T) {
+	s := newDockerServer(&fakeDocker{})
+	target := `"container":"db-main","engine":"postgres","root_password":"abcdefghijklmnop1234"`
+
+	rec := do(t, s, "POST", "/v1/databases/dump", `{`+target+`,"database":"shop"}`)
+	if rec.Code != 200 || rec.Header().Get("Content-Type") != "application/gzip" {
+		t.Fatalf("dump: %d %v", rec.Code, rec.Header())
+	}
+	zr, err := gzip.NewReader(rec.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text, _ := io.ReadAll(zr)
+	if string(text) != "-- dump of shop from db-main\n" {
+		t.Errorf("content = %q", text)
+	}
+
+	if rec := do(t, s, "POST", "/v1/databases/dump", `{`+target+`,"database":"sh op"}`); rec.Code != 400 || strings.Contains(rec.Header().Get("Content-Type"), "gzip") {
+		t.Errorf("a bad name must be a plain error: %d %v", rec.Code, rec.Header())
 	}
 }

@@ -31,6 +31,7 @@ type fakeDaemon struct {
 	mounts          []string // sources mounted by the container the list reports
 	execStatus      int
 	execExit        int
+	execStderr      string
 	execReply       string
 	stdin           string
 	imageMissing    bool
@@ -63,8 +64,15 @@ func (f *fakeDaemon) handler() http.Handler {
 			defer conn.Close()
 			conn.Write([]byte("HTTP/1.1 101 UPGRADED\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n\r\n"))
 			if start["Tty"] != true {
-				// Without a terminal: read the input to its end, answer in the multiplexed format.
-				input, _ := io.ReadAll(conn)
+				// Without a terminal: read the input to its end (only when the exec attached stdin, as
+				// Docker does), and answer in the multiplexed format.
+				f.mu.Lock()
+				attached := f.execBody["AttachStdin"] == true
+				f.mu.Unlock()
+				var input []byte
+				if attached {
+					input, _ = io.ReadAll(conn)
+				}
 				f.mu.Lock()
 				f.stdin = string(input)
 				reply := f.execReply
@@ -76,6 +84,15 @@ func (f *fakeDaemon) handler() http.Handler {
 				frame[0] = 1
 				binary.BigEndian.PutUint32(frame[4:], uint32(len(reply)))
 				conn.Write(append(frame, reply...))
+				f.mu.Lock()
+				messages := f.execStderr
+				f.mu.Unlock()
+				if messages != "" {
+					errFrame := make([]byte, 8, 8+len(messages))
+					errFrame[0] = 2
+					binary.BigEndian.PutUint32(errFrame[4:], uint32(len(messages)))
+					conn.Write(append(errFrame, messages...))
+				}
 				return
 			}
 			buf := make([]byte, 256)

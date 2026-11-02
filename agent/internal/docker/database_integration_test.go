@@ -157,6 +157,62 @@ func TestRealDatabases(t *testing.T) {
 				t.Error("one database's user can open another database")
 			}
 
+			// A dump holds the data, and can be loaded into another database.
+			createTable := "CREATE TABLE notes (id int, body text); INSERT INTO notes VALUES (1, 'kept by the dump');\n"
+			if err := m.runSQL(ctx, target, "\\c shop\n"+createTable, userPw); err != nil && c.engine == "postgres" {
+				t.Fatalf("create table: %v", err)
+			}
+			if c.engine != "postgres" {
+				if err := m.runSQL(ctx, target, "USE shop;\n"+createTable); err != nil {
+					t.Fatalf("create table: %v", err)
+				}
+			}
+			dumpPath, err := m.DumpDatabase(ctx, target, "shop")
+			if err != nil {
+				t.Fatalf("dump: %v", err)
+			}
+			defer os.Remove(dumpPath)
+			dumpText, _ := os.ReadFile(dumpPath)
+			if !strings.Contains(string(dumpText), "kept by the dump") {
+				t.Errorf("the dump does not hold the row:\n%.400s", dumpText)
+			}
+			if strings.Contains(string(dumpText), userPw) || strings.Contains(string(dumpText), rootPw) {
+				t.Error("the dump holds a password")
+			}
+			if err := m.CreateDatabase(ctx, target, "copy", "copy_user", "CopyPassword1234567890"); err != nil {
+				t.Fatalf("create copy: %v", err)
+			}
+			load := string(dumpText)
+			if c.engine == "postgres" {
+				load = "\\c copy\n" + load
+			} else {
+				load = "USE copy;\n" + load
+			}
+			cmd, cenv := adminCommand(target)
+			if res, err := m.execIn(ctx, container, cmd, cenv, load); err != nil || res.ExitCode != 0 {
+				t.Fatalf("loading the dump: %v %+v", err, res)
+			}
+			readBack := func(db string) string {
+				var q, qenv []string
+				if c.engine == "postgres" {
+					q, qenv = []string{"psql", "-U", "postgres", "-d", db, "-tAc", "SELECT body FROM notes"}, nil
+				} else {
+					bin := "mariadb"
+					if c.engine == "mysql" {
+						bin = "mysql"
+					}
+					q, qenv = []string{bin, "-uroot", db, "--batch", "--skip-column-names", "-e", "SELECT body FROM notes"}, []string{"MYSQL_PWD=" + rootPw}
+				}
+				res, err := m.execIn(ctx, container, q, qenv, "")
+				if err != nil {
+					t.Fatal(err)
+				}
+				return strings.TrimSpace(res.Output)
+			}
+			if got := readBack("copy"); got != "kept by the dump" {
+				t.Errorf("the restored copy holds %q", got)
+			}
+
 			// Rotating the password.
 			const next = "NewPassword1234567890"
 			if err := m.SetDatabasePassword(ctx, target, "shop_user", next); err != nil {

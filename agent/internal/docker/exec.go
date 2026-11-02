@@ -20,6 +20,7 @@ type execResult struct {
 
 const (
 	execTimeout   = 2 * time.Minute
+	dumpTimeout   = 30 * time.Minute
 	maxExecOutput = 1 << 20
 )
 
@@ -102,4 +103,68 @@ func demuxAll(r *bufio.Reader) string {
 
 func asInput(err error, target **validate.InputError) bool {
 	return errors.As(err, target)
+}
+
+// execStream is execIn for a command with a lot of output: stdout goes to w as
+// it arrives, and only stderr (the messages) is kept, up to a limit.
+func (m *Manager) execStream(ctx context.Context, container string, cmd, env []string, w io.Writer) (execResult, error) {
+	if exists, err := m.requireManaged(ctx, container); err != nil {
+		return execResult{}, err
+	} else if !exists {
+		return execResult{}, &validate.InputError{Msg: fmt.Sprintf("container %q does not exist", container)}
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, dumpTimeout)
+	defer cancel()
+
+	var created struct {
+		ID string `json:"Id"`
+	}
+	err := m.engine.doJSON(ctx, "POST", "/containers/"+container+"/exec", nil, map[string]any{
+		"AttachStdin": false, "AttachStdout": true, "AttachStderr": true, "Tty": false,
+		"Privileged": false, "Cmd": cmd, "Env": env,
+	}, &created)
+	if isStatus(err, 409) {
+		return execResult{}, &validate.InputError{Msg: "the container is not running"}
+	}
+	if err != nil {
+		return execResult{}, err
+	}
+
+	conn, r, err := m.engine.hijack(ctx, "/exec/"+created.ID+"/start", map[string]any{"Detach": false, "Tty": false})
+	if err != nil {
+		return execResult{}, err
+	}
+	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(dumpTimeout))
+
+	var stderr strings.Builder
+	header := make([]byte, 8)
+	for {
+		if _, err := io.ReadFull(r, header); err != nil {
+			break
+		}
+		size := int64(header[4])<<24 | int64(header[5])<<16 | int64(header[6])<<8 | int64(header[7])
+		if header[0] == 2 { // stderr
+			keep := min(size, int64(maxExecOutput-stderr.Len()))
+			if keep > 0 {
+				_, _ = io.CopyN(&stderr, r, keep)
+			}
+			if size > keep {
+				_, _ = io.CopyN(io.Discard, r, size-keep)
+			}
+			continue
+		}
+		if _, err := io.CopyN(w, r, size); err != nil {
+			return execResult{}, fmt.Errorf("writing the output: %w", err)
+		}
+	}
+
+	var inspect struct {
+		ExitCode int `json:"ExitCode"`
+	}
+	if err := m.engine.doJSON(context.WithoutCancel(ctx), "GET", "/exec/"+created.ID+"/json", nil, nil, &inspect); err != nil {
+		return execResult{}, err
+	}
+	return execResult{Output: stderr.String(), ExitCode: inspect.ExitCode}, nil
 }

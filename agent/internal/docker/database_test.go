@@ -344,3 +344,92 @@ func TestRemoveDatabaseData(t *testing.T) {
 		}
 	}
 }
+
+func TestEachEngineGetsItsOwnDumpTool(t *testing.T) {
+	for engine, tool := range map[string]string{"postgres": "pg_dump", "mysql": "mysqldump", "mariadb": "mariadb-dump"} {
+		cmd, env := dumpCommand(target(engine), "shop")
+		if cmd[0] != tool || cmd[len(cmd)-1] != "shop" {
+			t.Errorf("%s runs %v", engine, cmd)
+		}
+		for _, arg := range cmd {
+			if strings.Contains(arg, rootPw) {
+				t.Errorf("%s: the password is on the command line", engine)
+			}
+		}
+		if engine != "postgres" && (len(env) != 1 || env[0] != "MYSQL_PWD="+rootPw) {
+			t.Errorf("%s: env = %v", engine, env)
+		}
+	}
+}
+
+func TestDumpWritesTheOutputToATemporaryFile(t *testing.T) {
+	m, d, dir := setup(t)
+	d.execReply = "-- the dump\nCREATE TABLE t (id int);\n"
+
+	path, err := m.DumpDatabase(context.Background(), target("postgres"), "shop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _ := os.ReadFile(path)
+	if string(got) != d.execReply {
+		t.Errorf("file = %q", got)
+	}
+	if filepath.Dir(path) != filepath.Join(dir, "tmp") {
+		t.Errorf("written to %s, want the data folder's tmp", path)
+	}
+	if info, _ := os.Stat(path); info.Mode().Perm() != 0o600 {
+		t.Errorf("temporary file mode %o, want 600", info.Mode().Perm())
+	}
+	d.mu.Lock()
+	cmd, _ := d.execBody["Cmd"].([]any)
+	d.mu.Unlock()
+	if len(cmd) == 0 || cmd[0] != "pg_dump" {
+		t.Errorf("command = %v", cmd)
+	}
+}
+
+func TestAFailedDumpLeavesNoFileAndNoSecret(t *testing.T) {
+	m, d, dir := setup(t)
+	d.execExit = 1
+	d.execReply = "partial output that must not be kept"
+	d.execStderr = "pg_dump: error: connection failed for root " + rootPw
+
+	path, err := m.DumpDatabase(context.Background(), target("postgres"), "shop")
+
+	var ie *validate.InputError
+	if !errors.As(err, &ie) || path != "" {
+		t.Fatalf("want an input error and no path, got %q %v", path, err)
+	}
+	if strings.Contains(ie.Msg, rootPw) || !strings.Contains(ie.Msg, "connection failed") {
+		t.Errorf("message = %q", ie.Msg)
+	}
+	left, _ := filepath.Glob(filepath.Join(dir, "tmp", "dump-*"))
+	if len(left) != 0 {
+		t.Errorf("a failed dump left %v", left)
+	}
+}
+
+func TestDumpRefusesBadNamesBeforeTouchingTheContainer(t *testing.T) {
+	m, d, _ := setup(t)
+
+	for _, db := range []string{"sh op", "shop;", "postgres", "", "Shop"} {
+		if _, err := m.DumpDatabase(context.Background(), target("postgres"), db); err == nil {
+			t.Errorf("database %q must be refused", db)
+		}
+	}
+	if _, err := m.DumpDatabase(context.Background(), DatabaseTarget{Container: "db-main", Engine: "mongo", RootPassword: rootPw}, "shop"); err == nil {
+		t.Error("an unknown engine must be refused")
+	}
+	for _, r := range d.requests {
+		if strings.Contains(r, "/exec") {
+			t.Fatalf("something reached the container: %v", d.requests)
+		}
+	}
+}
+
+func TestDumpIsNotAvailableInDryRun(t *testing.T) {
+	m := NewManager(Config{DataDir: t.TempDir(), DryRun: true}, NewEngine("http://127.0.0.1:1", nil))
+	if _, err := m.DumpDatabase(context.Background(), target("postgres"), "shop"); err == nil {
+		t.Error("dry-run must not dump")
+	}
+}
