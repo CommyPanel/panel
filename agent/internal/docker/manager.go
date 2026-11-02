@@ -36,6 +36,7 @@ const (
 // Config sets the directories and limits the manager enforces.
 type Config struct {
 	DataDir         string  // mounts and build contexts must live under here
+	StateDir        string  // the agent's own scratch space and records; root only, outside DataDir
 	DryRun          bool    // validate and log only; never call Docker
 	DefaultMemoryMB int     // applied when a spec does not set a limit
 	DefaultCPUs     float64 // applied when a spec does not set a limit
@@ -44,6 +45,10 @@ type Config struct {
 }
 
 func (c Config) withDefaults() Config {
+	if c.StateDir == "" {
+		// Only for development and tests; a real install passes --state-dir.
+		c.StateDir = filepath.Join(c.DataDir, "agent-state")
+	}
 	if c.DefaultMemoryMB == 0 {
 		c.DefaultMemoryMB = 512
 	}
@@ -189,7 +194,7 @@ func (m *Manager) Validate(s ContainerSpec) error {
 		return &validate.InputError{Msg: "too many volumes"}
 	}
 	for _, v := range s.Volumes {
-		if _, err := m.resolveMount(v.Source); err != nil {
+		if _, err := m.resolveMount(v.Source, validate.DatabaseImage(s.Image) == nil); err != nil {
 			return err
 		}
 		if err := validate.VolumeTarget(v.Target); err != nil {
@@ -206,17 +211,24 @@ func (m *Manager) Validate(s ContainerSpec) error {
 		if err := validate.Network(s.Network); err != nil {
 			return err
 		}
+		// A link network is how two containers are joined on purpose; it is never
+		// a container's own network, which is where its name is taken.
+		if strings.HasPrefix(s.Network, validate.LinkNetworkPrefix) {
+			return &validate.InputError{Msg: "a link network cannot be a container's own network"}
+		}
 	}
 	return validateAttachments(s)
 }
 
-// resolveMount checks that a bind mount source is inside the volumes of apps or
-// the data of database servers, and returns it.
-func (m *Manager) resolveMount(source string) (string, error) {
-	if p, err := validate.ResolveUnder(m.volumesDir(), source); err == nil {
-		return p, nil
+// resolveMount checks that a bind mount source is where its kind of container
+// may mount from, and returns it: a database server only from the data folders
+// of database servers, anything else only from the volumes of apps. An app's
+// image therefore cannot mount a database server's files, nor the other way round.
+func (m *Manager) resolveMount(source string, database bool) (string, error) {
+	if database {
+		return validate.ResolveUnder(m.databasesDir(), source)
 	}
-	return validate.ResolveUnder(m.databasesDir(), source)
+	return validate.ResolveUnder(m.volumesDir(), source)
 }
 
 // validateAttachments checks the extra networks and the names on them.
@@ -238,7 +250,10 @@ func validateAttachments(s ContainerSpec) error {
 	}
 	seen := map[string]bool{primary: true}
 	for _, n := range s.Networks {
-		if err := validate.Network(n.Name); err != nil {
+		// Further networks are link networks only. Joining another app's or a
+		// database server's own network would reach it, and a name on it could
+		// answer in its place.
+		if err := validate.LinkNetwork(n.Name); err != nil {
 			return err
 		}
 		if seen[n.Name] {

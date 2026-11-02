@@ -55,6 +55,7 @@ func run() error {
 		socket     = flag.String("socket", "/run/commypanel/agent.sock", "Unix socket path")
 		group      = flag.String("socket-group", "commypanel", "group that may connect to the socket")
 		dataDir    = flag.String("data-dir", "/var/lib/commypanel", "panel data directory")
+		stateDir   = flag.String("state-dir", "/var/lib/commypanel-agent", "the agent's own scratch space and records; root only, outside the data directory")
 		sitesDir   = flag.String("nginx-sites-dir", "/etc/nginx/commypanel", "directory nginx includes site configs from")
 		dockerSock = flag.String("docker-socket", "/var/run/docker.sock", "Docker Engine socket")
 		defMemory  = flag.Int("default-memory-mb", 512, "memory limit for containers that do not set one")
@@ -92,10 +93,11 @@ func run() error {
 
 	mgr := nginx.NewManager(nginx.Config{SitesDir: *sitesDir, DataDir: *dataDir, DryRun: *dryRun, TerminalSocket: *termSocket}, nil)
 	dockerMgr := docker.NewManager(docker.Config{
-		DataDir: *dataDir, DryRun: *dryRun,
+		DataDir: *dataDir, StateDir: *stateDir, DryRun: *dryRun,
 		DefaultMemoryMB: *defMemory, DefaultCPUs: *defCPUs,
 		BuildMemoryMB: *buildMem, BuildCPUs: *buildCPUs,
 	}, docker.NewUnixEngine(*dockerSock))
+	dockerMgr.CleanScratch()
 	certMgr := certs.NewManager(certs.Config{DataDir: *dataDir, DryRun: *dryRun, UserAgent: "commypanel-agent/" + version})
 	sampler := usage.New(usage.Config{DataDir: *dataDir, Containers: dockerMgr})
 	var tickets *terminal.Tickets

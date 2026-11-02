@@ -83,14 +83,11 @@ func (m *Manager) execFrom(ctx context.Context, container string, cmd, env []str
 		return execResult{}, ctx.Err()
 	}
 
-	var inspect struct {
-		ExitCode int  `json:"ExitCode"`
-		Running  bool `json:"Running"`
-	}
-	if err := m.engine.doJSON(context.WithoutCancel(ctx), "GET", "/exec/"+created.ID+"/json", nil, nil, &inspect); err != nil {
+	code, err := m.exitCode(ctx, created.ID)
+	if err != nil {
 		return execResult{}, err
 	}
-	return execResult{Output: out, ExitCode: inspect.ExitCode}, nil
+	return execResult{Output: out, ExitCode: code}, nil
 }
 
 // demuxAll reads a multiplexed (non-terminal) stream to its end, keeping at
@@ -174,11 +171,35 @@ func (m *Manager) execStream(ctx context.Context, container string, cmd, env []s
 		}
 	}
 
-	var inspect struct {
-		ExitCode int `json:"ExitCode"`
-	}
-	if err := m.engine.doJSON(context.WithoutCancel(ctx), "GET", "/exec/"+created.ID+"/json", nil, nil, &inspect); err != nil {
+	code, err := m.exitCode(ctx, created.ID)
+	if err != nil {
 		return execResult{}, err
 	}
-	return execResult{Output: stderr.String(), ExitCode: inspect.ExitCode}, nil
+	return execResult{Output: stderr.String(), ExitCode: code}, nil
+}
+
+// exitPolls is how many times (50 ms apart) a command that still shows as
+// running is asked about; tests make it small.
+var exitPolls = 100
+
+// exitCode is how a finished exec ended. The output stream also ends when the
+// time limit runs out or the daemon goes away, with the command still running,
+// and the exit code of a command that has not finished is a meaningless 0, so a
+// cut-off dump would pass for a good one. A command that has just ended can
+// still show as running for a moment, so it is asked again briefly.
+func (m *Manager) exitCode(ctx context.Context, id string) (int, error) {
+	for range exitPolls {
+		var inspect struct {
+			ExitCode int  `json:"ExitCode"`
+			Running  bool `json:"Running"`
+		}
+		if err := m.engine.doJSON(context.WithoutCancel(ctx), "GET", "/exec/"+id+"/json", nil, nil, &inspect); err != nil {
+			return 0, err
+		}
+		if !inspect.Running {
+			return inspect.ExitCode, nil
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return 0, &validate.InputError{Msg: "the command did not finish: it ran out of time or the connection was lost"}
 }

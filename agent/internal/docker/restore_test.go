@@ -34,7 +34,7 @@ func TestACopiedDumpIsRefusedUnlessTheAgentMadeIt(t *testing.T) {
 	if _, err := m.copyDump("main", name); err == nil || !strings.Contains(err.Error(), "not made by CommyPanel") {
 		t.Fatalf("an unregistered file must be refused, got %v", err)
 	}
-	if left, _ := filepath.Glob(filepath.Join(dir, "tmp", "restore-*")); len(left) != 0 {
+	if left, _ := filepath.Glob(filepath.Join(dir, "agent-state", "tmp", "restore-*")); len(left) != 0 {
 		t.Errorf("a refused file left a copy behind: %v", left)
 	}
 
@@ -120,5 +120,61 @@ func TestRestoreCommandsRunAsTheRightUserWithoutSecretsInTheArguments(t *testing
 		if strings.Contains(strings.Join(cmd, " "), "abcdefghijklmnop1234") || len(env) != 1 || env[0] != "MYSQL_PWD=abcdefghijklmnop1234" {
 			t.Errorf("%s: %v %v", engine, cmd, env)
 		}
+	}
+}
+
+func TestTheStateDirectoryMustBePrivate(t *testing.T) {
+	dir := t.TempDir()
+	state := filepath.Join(dir, "state")
+	m := NewManager(Config{DataDir: dir, StateDir: state}, nil)
+
+	if _, err := m.stateDir("tmp"); err != nil {
+		t.Fatalf("a fresh state directory: %v", err)
+	}
+	if info, _ := os.Stat(state); info.Mode().Perm() != 0o700 {
+		t.Errorf("state dir is %v, want 0700", info.Mode().Perm())
+	}
+
+	// A folder others can write to is not trusted, however it came about.
+	if err := os.Chmod(state, 0o777); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.stateDir("tmp"); err == nil {
+		t.Error("a world-writable state directory was accepted")
+	}
+	if err := os.Chmod(state, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	// And a link in its place is not followed.
+	other := filepath.Join(dir, "other")
+	if err := os.Mkdir(other, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(filepath.Join(state, "tmp")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(other, filepath.Join(state, "tmp")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.stateDir("tmp"); err == nil {
+		t.Error("a link in place of a state folder was accepted")
+	}
+}
+
+func TestCleanScratchRemovesWhatACrashLeftBehind(t *testing.T) {
+	m, dir := newRestoreManager(t)
+	tmp := filepath.Join(dir, "agent-state", "tmp")
+	if err := os.MkdirAll(tmp, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "dump-123.sql"), []byte("a whole database"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	m.CleanScratch()
+
+	if left, _ := os.ReadDir(tmp); len(left) != 0 {
+		t.Errorf("left behind: %v", left)
 	}
 }

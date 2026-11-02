@@ -23,10 +23,38 @@ func (t DatabaseTarget) validate() error {
 	if err := validate.Name(t.Container); err != nil {
 		return err
 	}
+	if !strings.HasPrefix(t.Container, "db-") {
+		return &validate.InputError{Msg: fmt.Sprintf("%q is not a database server", t.Container)}
+	}
 	if err := validate.DatabaseEngine(t.Engine); err != nil {
 		return err
 	}
 	return validate.DatabasePassword(t.RootPassword)
+}
+
+// checkTarget makes sure the container really is a database server before its
+// client tools are run in it: managed by CommyPanel and started from an
+// official database image. Otherwise a name that merely starts with db- (an
+// app called db-shop) would have the database client, and the administrator
+// password, run inside the app's own container.
+func (m *Manager) checkTarget(ctx context.Context, t DatabaseTarget) error {
+	var inspect struct {
+		Config struct {
+			Image  string            `json:"Image"`
+			Labels map[string]string `json:"Labels"`
+		} `json:"Config"`
+	}
+	err := m.engine.doJSON(ctx, "GET", "/containers/"+t.Container+"/json", nil, nil, &inspect)
+	if isStatus(err, 404) {
+		return &validate.InputError{Msg: fmt.Sprintf("container %q does not exist", t.Container)}
+	}
+	if err != nil {
+		return err
+	}
+	if inspect.Config.Labels[ManagedLabel] != "true" || validate.DatabaseImage(inspect.Config.Image) != nil {
+		return &validate.InputError{Msg: fmt.Sprintf("%q is not a database server", t.Container)}
+	}
+	return nil
 }
 
 // Names the engines keep for themselves; a database or user cannot be called
@@ -96,8 +124,15 @@ GRANT ALL PRIVILEGES ON DATABASE "%[1]s" TO "%[2]s";
 	return fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%[1]s` CHARACTER SET utf8mb4;\n"+
 		"CREATE USER IF NOT EXISTS '%[2]s'@'%%' IDENTIFIED BY '%[3]s';\n"+
 		"ALTER USER '%[2]s'@'%%' IDENTIFIED BY '%[3]s';\n"+
-		"GRANT ALL PRIVILEGES ON `%[1]s`.* TO '%[2]s'@'%%';\n"+
-		"FLUSH PRIVILEGES;\n", db, user, password)
+		"GRANT ALL PRIVILEGES ON `%[4]s`.* TO '%[2]s'@'%%';\n"+
+		"FLUSH PRIVILEGES;\n", db, user, password, grantPattern(db))
+}
+
+// grantPattern is a database name as a GRANT target. There an underscore stands
+// for any one character, so a user granted on shop_db would also reach shopxdb;
+// escaping it makes the grant cover that one database only.
+func grantPattern(db string) string {
+	return strings.ReplaceAll(db, "_", `\_`)
 }
 
 func dropSQL(engine, db, user string) string {
@@ -117,6 +152,9 @@ func passwordSQL(engine, user, password string) string {
 // run executes SQL on a database server and turns a failure into an error that
 // is safe to show: the secrets in play are removed from whatever the client said.
 func (m *Manager) runSQL(ctx context.Context, t DatabaseTarget, sql string, secrets ...string) error {
+	if err := m.checkTarget(ctx, t); err != nil {
+		return err
+	}
 	cmd, env := adminCommand(t)
 	res, err := m.execIn(ctx, t.Container, cmd, env, sql)
 	if err != nil {
@@ -152,6 +190,13 @@ func (m *Manager) DatabaseReady(ctx context.Context, t DatabaseTarget) (bool, er
 	}
 	if m.cfg.DryRun {
 		return true, nil
+	}
+	if err := m.checkTarget(ctx, t); err != nil {
+		var input *validate.InputError
+		if asInput(err, &input) {
+			return false, nil
+		}
+		return false, err
 	}
 	cmd, env := adminCommand(t)
 	res, err := m.execIn(ctx, t.Container, cmd, env, "SELECT 1;\n")
@@ -276,8 +321,8 @@ func (m *Manager) DumpDatabase(ctx context.Context, t DatabaseTarget, db string)
 		return "", &validate.InputError{Msg: "dumps are not available in dry-run mode"}
 	}
 
-	tmpDir := filepath.Join(m.cfg.DataDir, "tmp")
-	if err := os.MkdirAll(tmpDir, 0o700); err != nil {
+	tmpDir, err := m.stateDir("tmp")
+	if err != nil {
 		return "", err
 	}
 	f, err := os.CreateTemp(tmpDir, "dump-*.sql")
@@ -291,6 +336,9 @@ func (m *Manager) DumpDatabase(ctx context.Context, t DatabaseTarget, db string)
 		return "", err
 	}
 
+	if err := m.checkTarget(ctx, t); err != nil {
+		return fail(err)
+	}
 	cmd, env := dumpCommand(t, db)
 	res, err := m.execStream(ctx, t.Container, cmd, env, f)
 	if err != nil {

@@ -12,12 +12,17 @@ ExecStart=@@PREFIX@@/current/bin/commypanel-agent \
     --terminal-socket /run/commypanel-terminal/terminal.sock \
     --terminal-socket-group www-data \
     --data-dir @@DATA_DIR@@ \
+    --state-dir /var/lib/commypanel-agent \
     --nginx-sites-dir /etc/nginx/commypanel \
     --allow-uid @@PANEL_UID@@
 Restart=always
 RestartSec=2
 RuntimeDirectory=commypanel commypanel-terminal
 RuntimeDirectoryMode=0755
+# The agent's own scratch space and records. Root only, and outside the data
+# directory, which the panel user owns.
+StateDirectory=commypanel-agent
+StateDirectoryMode=0700
 LimitNOFILE=65536
 
 # The agent needs root for Docker and nginx, but not much else.

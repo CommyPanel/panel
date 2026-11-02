@@ -31,6 +31,8 @@ type fakeDaemon struct {
 	mounts          []string // sources mounted by the container the list reports
 	execStatus      int
 	execExit        int
+	image           string // image the inspect call reports; empty = an official database image
+	execRunning     bool   // the exec still reports running when asked for its result
 	execStderr      string
 	execReply       string
 	stdin           string
@@ -109,7 +111,7 @@ func (f *fakeDaemon) handler() http.Handler {
 		f.requests = append(f.requests, r.Method+" "+r.URL.Path)
 		switch {
 		case r.Method == "GET" && strings.HasPrefix(r.URL.Path, "/exec/") && strings.HasSuffix(r.URL.Path, "/json"):
-			_ = json.NewEncoder(w).Encode(map[string]any{"ExitCode": f.execExit, "Running": false})
+			_ = json.NewEncoder(w).Encode(map[string]any{"ExitCode": f.execExit, "Running": f.execRunning})
 		case r.Method == "GET" && r.URL.Path != "/images/json" && strings.HasPrefix(r.URL.Path, "/images/") && strings.HasSuffix(r.URL.Path, "/json"):
 			if f.imageMissing {
 				w.WriteHeader(404)
@@ -178,7 +180,7 @@ func (f *fakeDaemon) handler() http.Handler {
 				w.Write([]byte(`{"message":"no such container"}`))
 				return
 			}
-			_ = json.NewEncoder(w).Encode(map[string]any{"Config": map[string]any{"Labels": f.labels}})
+			_ = json.NewEncoder(w).Encode(map[string]any{"Config": map[string]any{"Labels": f.labels, "Image": f.databaseImage()}})
 		case r.URL.Path == "/containers/json":
 			mounts := []map[string]any{}
 			for _, source := range f.mounts {
@@ -604,5 +606,38 @@ func TestDemuxKeepsTheNewestLinesWhenTooLarge(t *testing.T) {
 	}
 	if !strings.HasPrefix(got, "x") || strings.Index(got, "\n") != 99 {
 		t.Fatal("output does not start on a whole line")
+	}
+}
+
+// databaseImage is the image the fake reports for any container it knows: a
+// database one, unless a test says otherwise.
+func (f *fakeDaemon) databaseImage() string {
+	if f.image != "" {
+		return f.image
+	}
+	return "mariadb:11.4"
+}
+
+func TestAnAppCannotMountADatabaseServersFilesAndTheOtherWayRound(t *testing.T) {
+	m := NewManager(Config{DataDir: t.TempDir()}, nil)
+	dbData := m.databasesDir() + "/main"
+	appData := m.volumesDir() + "/shop/data"
+
+	app := ContainerSpec{Name: "shop-1", Image: "commypanel/shop:r1", Volumes: []Volume{{Source: dbData, Target: "/x"}}}
+	if err := m.Validate(app); err == nil {
+		t.Error("an app image was allowed to mount a database server's data")
+	}
+	app.Volumes = []Volume{{Source: appData, Target: "/x"}}
+	if err := m.Validate(app); err != nil {
+		t.Errorf("an app's own volume must be allowed: %v", err)
+	}
+
+	db := ContainerSpec{Name: "db-main", Image: "postgres:17", Volumes: []Volume{{Source: appData, Target: "/var/lib/postgresql/data"}}}
+	if err := m.Validate(db); err == nil {
+		t.Error("a database image was allowed to mount an app's volume")
+	}
+	db.Volumes = []Volume{{Source: dbData, Target: "/var/lib/postgresql/data"}}
+	if err := m.Validate(db); err != nil {
+		t.Errorf("a database server's own data folder must be allowed: %v", err)
 	}
 }

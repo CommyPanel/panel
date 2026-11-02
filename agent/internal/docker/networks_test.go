@@ -215,3 +215,28 @@ func TestPruneRemovesOnlyEmptyLinkNetworks(t *testing.T) {
 		}
 	}
 }
+
+func TestAContainerCannotJoinAnotherAppsOrADatabaseServersNetwork(t *testing.T) {
+	m := NewManager(Config{DataDir: t.TempDir()}, nil)
+	base := ContainerSpec{Name: "evil-1", Image: "commypanel/evil:r1", Network: "commypanel-evil"}
+
+	for _, name := range []string{"commypanel-shop", "commypanel-db-main", "commypanel", "bridge", "host"} {
+		s := base
+		s.Networks = []NetworkAttach{{Name: name, Aliases: []string{"db-main"}}}
+		if err := m.Validate(s); err == nil {
+			t.Errorf("joining %q as an extra network was accepted", name)
+		}
+	}
+
+	s := base
+	s.Networks = []NetworkAttach{{Name: "commypanel-link-d7", Aliases: []string{"main"}}}
+	if err := m.Validate(s); err != nil {
+		t.Errorf("a link network must still be allowed: %v", err)
+	}
+
+	s = base
+	s.Network = "commypanel-link-d7"
+	if err := m.Validate(s); err == nil {
+		t.Error("a link network was accepted as the container's own network")
+	}
+}

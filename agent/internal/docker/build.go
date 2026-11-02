@@ -121,8 +121,18 @@ func (m *Manager) Build(ctx context.Context, s BuildSpec, onLine func(string)) e
 // writeTar archives dir. Symlinks are stored as symlinks, never followed, so
 // a link inside the context cannot pull in files from elsewhere on the host.
 func writeTar(w io.Writer, dir string) error {
+	// The build folder belongs to the panel user, who could swap a file for a link
+	// to a root-only file between the moment it is listed and the moment it is
+	// read. Files are therefore opened through a root that cannot be left, and
+	// must still be what was listed.
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+
 	tw := tar.NewWriter(w)
-	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+	err = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -158,12 +168,15 @@ func writeTar(w io.Writer, dir string) error {
 		if !info.Mode().IsRegular() {
 			return nil
 		}
-		f, err := os.Open(path)
+		f, err := root.Open(rel)
 		if err != nil {
 			return err
 		}
 		defer f.Close()
-		_, err = io.Copy(tw, f)
+		if st, err := f.Stat(); err != nil || !st.Mode().IsRegular() || st.Size() != hdr.Size {
+			return fmt.Errorf("%s changed while the build context was being read", rel)
+		}
+		_, err = io.Copy(tw, io.LimitReader(f, hdr.Size))
 		return err
 	})
 	if err != nil {

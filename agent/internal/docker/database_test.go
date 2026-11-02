@@ -374,8 +374,8 @@ func TestDumpWritesTheOutputToATemporaryFile(t *testing.T) {
 	if string(got) != d.execReply {
 		t.Errorf("file = %q", got)
 	}
-	if filepath.Dir(path) != filepath.Join(dir, "tmp") {
-		t.Errorf("written to %s, want the data folder's tmp", path)
+	if filepath.Dir(path) != filepath.Join(dir, "agent-state", "tmp") {
+		t.Errorf("written to %s, want the agent's own tmp, outside what the panel can write", path)
 	}
 	if info, _ := os.Stat(path); info.Mode().Perm() != 0o600 {
 		t.Errorf("temporary file mode %o, want 600", info.Mode().Perm())
@@ -431,5 +431,61 @@ func TestDumpIsNotAvailableInDryRun(t *testing.T) {
 	m := NewManager(Config{DataDir: t.TempDir(), DryRun: true}, NewEngine("http://127.0.0.1:1", nil))
 	if _, err := m.DumpDatabase(context.Background(), target("postgres"), "shop"); err == nil {
 		t.Error("dry-run must not dump")
+	}
+}
+
+func TestAMySQLGrantCoversOnlyTheNamedDatabase(t *testing.T) {
+	for _, engine := range []string{"mysql", "mariadb"} {
+		sql := createSQL(engine, "shop_db", "shop_db", "abcdefghijklmnop1234")
+		if !strings.Contains(sql, "GRANT ALL PRIVILEGES ON `shop\\_db`.* TO") {
+			t.Errorf("%s: the grant does not escape the underscore:\n%s", engine, sql)
+		}
+		if !strings.Contains(sql, "CREATE DATABASE IF NOT EXISTS `shop_db`") {
+			t.Errorf("%s: the database itself must keep its real name:\n%s", engine, sql)
+		}
+	}
+}
+
+func TestACommandThatIsStillRunningIsNotAGoodDump(t *testing.T) {
+	m, d, dir := setup(t)
+	d.execReply = "-- cut off in the middle"
+	d.execRunning = true
+	defer func(n int) { exitPolls = n }(exitPolls)
+	exitPolls = 2
+
+	if path, err := m.DumpDatabase(context.Background(), target("postgres"), "shop"); err == nil {
+		t.Fatalf("a dump whose command never finished was accepted: %s", path)
+	}
+	if left, _ := filepath.Glob(filepath.Join(dir, "agent-state", "tmp", "dump-*")); len(left) != 0 {
+		t.Errorf("left behind: %v", left)
+	}
+	if err := m.runSQL(context.Background(), target("postgres"), "SELECT 1;"); err == nil {
+		t.Error("SQL that never finished was reported as done")
+	}
+}
+
+func TestDatabaseToolsRunOnlyInDatabaseServers(t *testing.T) {
+	m, d, _ := setup(t)
+
+	// An app that happens to be called db-shop is not a database server.
+	d.image = "commypanel/db-shop:r1"
+	if err := m.CreateDatabase(context.Background(), target("postgres"), "shop", "shop", userPw); err == nil {
+		t.Error("the database client was run in an app's container")
+	}
+	if ready, _ := m.DatabaseReady(context.Background(), target("postgres")); ready {
+		t.Error("an app's container counted as a ready database server")
+	}
+	for _, r := range d.requests {
+		if strings.Contains(r, "/exec") {
+			t.Errorf("something was executed in the app's container: %s", r)
+		}
+	}
+
+	// And a container that is not named like one is refused before Docker is asked.
+	d.image = ""
+	other := target("postgres")
+	other.Container = "shop-1"
+	if err := m.DropDatabase(context.Background(), other, "shop", "shop"); err == nil {
+		t.Error("a container not named db-... was accepted as a database server")
 	}
 }

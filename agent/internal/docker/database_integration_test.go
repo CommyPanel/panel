@@ -251,6 +251,22 @@ func TestRealDatabases(t *testing.T) {
 				t.Errorf("the database's user cannot connect: %s", out)
 			}
 
+			// An underscore in a name is not a wildcard in what the user may reach.
+			if c.engine != "postgres" {
+				if err := m.CreateDatabase(ctx, target, "wild_db", "wild_user", "WildPassword1234567890"); err != nil {
+					t.Fatalf("create wild_db: %v", err)
+				}
+				if err := m.CreateDatabase(ctx, target, "wildxdb", "wildx_user", "WildxPassword1234567890"); err != nil {
+					t.Fatalf("create wildxdb: %v", err)
+				}
+				if ok, _ := connect("wild_user", "WildPassword1234567890", "wild_db"); !ok {
+					t.Error("wild_user cannot use its own database")
+				}
+				if ok, _ := connect("wild_user", "WildPassword1234567890", "wildxdb"); ok {
+					t.Error("wild_user reaches a database whose name only matches the pattern")
+				}
+			}
+
 			// Rotating the password.
 			const next = "NewPassword1234567890"
 			if err := m.SetDatabasePassword(ctx, target, "shop_user", next); err != nil {

@@ -26,11 +26,11 @@ const (
 var dumpFileName = regexp.MustCompile(`^[a-z][a-z0-9_]{0,30}-\d{8}-\d{6}\.sql\.gz$`)
 
 // dumpRegistry is the folder where the agent remembers the checksum of every dump
-// it made. It is owned by root and the panel cannot write to it, which is what
+// it made. It is in the agent's state directory, which the panel cannot write to, which is what
 // makes a restore safe: only a file that is byte for byte something this agent
 // dumped is ever loaded into a database server.
-func (m *Manager) dumpRegistry() string {
-	return filepath.Join(m.cfg.DataDir, "agent-state", "dumps")
+func (m *Manager) dumpRegistry() (string, error) {
+	return m.stateDir("dumps")
 }
 
 // RegisterDump remembers the checksum (hex SHA-256) of a dump the agent made.
@@ -38,8 +38,8 @@ func (m *Manager) RegisterDump(sum string) error {
 	if !sha256Hex.MatchString(sum) {
 		return fmt.Errorf("not a checksum")
 	}
-	dir := m.dumpRegistry()
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	dir, err := m.dumpRegistry()
+	if err != nil {
 		return err
 	}
 	return os.WriteFile(filepath.Join(dir, sum), nil, 0o600)
@@ -51,7 +51,11 @@ func (m *Manager) dumpRegistered(sum string) bool {
 	if !sha256Hex.MatchString(sum) {
 		return false
 	}
-	info, err := os.Lstat(filepath.Join(m.dumpRegistry(), sum))
+	dir, err := m.dumpRegistry()
+	if err != nil {
+		return false
+	}
+	info, err := os.Lstat(filepath.Join(dir, sum))
 	return err == nil && info.Mode().IsRegular()
 }
 
@@ -96,6 +100,9 @@ func (m *Manager) RestoreDatabase(ctx context.Context, t DatabaseTarget, db, use
 		return &validate.InputError{Msg: "restoring is not available in dry-run mode"}
 	}
 
+	if err := m.checkTarget(ctx, t); err != nil {
+		return err
+	}
 	tmp, err := m.copyDump(server, file)
 	if err != nil {
 		return err
@@ -144,8 +151,8 @@ func (m *Manager) copyDump(server, file string) (string, error) {
 	}
 	defer src.Close()
 
-	tmpDir := filepath.Join(m.cfg.DataDir, "tmp")
-	if err := os.MkdirAll(tmpDir, 0o700); err != nil {
+	tmpDir, err := m.stateDir("tmp")
+	if err != nil {
 		return "", err
 	}
 	dst, err := os.CreateTemp(tmpDir, "restore-*.sql.gz")
