@@ -1,0 +1,106 @@
+name: install
+
+# Installs the built release on each supported distribution and checks that the
+# panel comes up: the services run, the setup page and its assets load on the
+# panel's own port, and installing over an existing install works. Both bugs
+# that 0.4.0 shipped with (a missing port on Debian, PHP 8.3 on Ubuntu 24.04)
+# would have failed here.
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  distro:
+    name: ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - debian:13
+          - ubuntu:24.04
+          - ubuntu:26.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
+        with:
+          php-version: '8.5'
+          tools: composer:v2
+          coverage: none
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+
+      - name: Build the release
+        run: scripts/build-release.sh 0.0.0-ci dist
+
+      - name: Start a machine with systemd
+        run: |
+          docker build -f tests/ci/systemd.Dockerfile --build-arg IMAGE=${{ matrix.image }} -t smoke tests/ci
+          docker run -d --name smoke --privileged --cgroupns=host \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:rw --tmpfs /run --tmpfs /run/lock smoke
+          sleep 5
+          docker exec smoke mkdir -p /ci/scripts /ci/installer
+          docker cp dist/commypanel.tar.gz smoke:/ci/commypanel.tar.gz
+          docker cp scripts/ci-install-smoke.sh smoke:/ci/scripts/
+          docker cp installer/install.sh smoke:/ci/installer/
+
+      # Docker is not installed inside the container; the native job below
+      # covers the Docker installation on a real virtual machine.
+      - name: Install and check
+        run: docker exec smoke bash /ci/scripts/ci-install-smoke.sh /ci/commypanel.tar.gz --no-docker
+
+  native:
+    name: ubuntu-24.04 with Docker
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Runs on GitHub's own image, which already has other web servers and PHP
+    # versions installed, so a failure here is a reason to look, not yet to block.
+    continue-on-error: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
+        with:
+          php-version: '8.5'
+          tools: composer:v2
+          coverage: none
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+
+      - name: Build the release
+        run: scripts/build-release.sh 0.0.0-ci dist
+
+      - name: Free the ports and remove the runner's web servers
+        run: |
+          sudo systemctl stop apache2 nginx mysql postgresql 2>/dev/null || true
+          sudo apt-get purge -y 'apache2*' 'nginx*' 2>/dev/null || true
+
+      - name: Install and check
+        run: sudo bash scripts/ci-install-smoke.sh dist/commypanel.tar.gz
