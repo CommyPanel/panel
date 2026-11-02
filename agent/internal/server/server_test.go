@@ -291,6 +291,23 @@ func (f *fakeDocker) RemoveDatabaseData(_ context.Context, server string) error 
 	return f.err
 }
 
+func (f *fakeDocker) ConnectNetwork(_ context.Context, container, network string, aliases []string) error {
+	if err := validate.LinkNetwork(network); err != nil {
+		return err
+	}
+	f.calls = append(f.calls, "connect "+container+" "+network+" "+strings.Join(aliases, ","))
+	return f.err
+}
+
+func (f *fakeDocker) DisconnectNetwork(_ context.Context, container, network string) error {
+	f.calls = append(f.calls, "disconnect "+container+" "+network)
+	return f.err
+}
+
+func (f *fakeDocker) PruneLinkNetworks(context.Context) ([]string, error) {
+	return []string{"commypanel-link-d1"}, f.err
+}
+
 func (f *fakeDocker) RemoveVolumes(_ context.Context, app, name string) error {
 	if err := validate.Name(app); err != nil {
 		return err
@@ -835,6 +852,27 @@ func TestDatabaseRoutes(t *testing.T) {
 	}
 	want := "pull postgres:17|create db-main shop shop|drop db-main shop shop|password db-main shop|remove-data main"
 	if got := strings.Join(f.calls, "|"); got != want {
+		t.Errorf("calls = %s", got)
+	}
+}
+
+func TestLinkNetworkRoutes(t *testing.T) {
+	f := &fakeDocker{}
+	s := newDockerServer(f)
+
+	if rec := do(t, s, "POST", "/v1/docker/networks/connect", `{"container":"db-main","network":"commypanel-link-d3","aliases":["main"]}`); rec.Code != 200 {
+		t.Errorf("connect: %d %s", rec.Code, rec.Body)
+	}
+	for _, bad := range []string{`{"container":"db-main","network":"host"}`, `{"container":"db-main","network":"commypanel-shop"}`, `{"container":"db-main","network":"commypanel"}`, `{"container":"db-main","network":"bridge"}`} {
+		if rec := do(t, s, "POST", "/v1/docker/networks/connect", bad); rec.Code != 400 {
+			t.Errorf("%s: %d, want 400", bad, rec.Code)
+		}
+	}
+	do(t, s, "POST", "/v1/docker/networks/disconnect", `{"container":"db-main","network":"commypanel-link-d3"}`)
+	if rec := do(t, s, "POST", "/v1/docker/networks/prune", `{}`); rec.Code != 200 || !strings.Contains(rec.Body.String(), "commypanel-link-d1") {
+		t.Errorf("prune: %d %s", rec.Code, rec.Body)
+	}
+	if got := strings.Join(f.calls, "|"); got != "connect db-main commypanel-link-d3 main|disconnect db-main commypanel-link-d3" {
 		t.Errorf("calls = %s", got)
 	}
 }

@@ -157,3 +157,61 @@ func TestRemoveNetworkDryRun(t *testing.T) {
 		t.Errorf("dry-run must not touch Docker: %v", err)
 	}
 }
+
+func TestConnectAndDisconnectOnlyLinkNetworks(t *testing.T) {
+	m, d, _ := setup(t)
+	ctx := context.Background()
+
+	if err := m.ConnectNetwork(ctx, "db-main", "commypanel-link-d3", []string{"main"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(d.connected) != 1 || d.connected[0] != "commypanel-link-d3" {
+		t.Errorf("connected %v", d.connected)
+	}
+	if err := m.DisconnectNetwork(ctx, "db-main", "commypanel-link-d3"); err != nil {
+		t.Fatal(err)
+	}
+	if !d.has("POST /networks/commypanel-link-d3/disconnect") {
+		t.Errorf("requests = %v", d.requests)
+	}
+
+	before := len(d.requests)
+	for _, bad := range []string{"host", "bridge", "none", "commypanel", "commypanel-shop", "commypanel-db-main", "other-link-1", ""} {
+		if err := m.ConnectNetwork(ctx, "db-main", bad, nil); err == nil {
+			t.Errorf("connect %q must be refused", bad)
+		}
+		if err := m.DisconnectNetwork(ctx, "db-main", bad); err == nil {
+			t.Errorf("disconnect %q must be refused", bad)
+		}
+	}
+	if err := m.ConnectNetwork(ctx, "db-main", "commypanel-link-d3", []string{"Bad Alias"}); err == nil {
+		t.Error("a bad alias must be refused")
+	}
+	for _, r := range d.requests[before:] {
+		if strings.Contains(r, "/connect") || strings.Contains(r, "/disconnect") {
+			t.Errorf("a refused request reached Docker: %s", r)
+		}
+	}
+
+	d.labels = map[string]string{"other": "x"}
+	if err := m.ConnectNetwork(ctx, "db-main", "commypanel-link-d3", nil); err == nil {
+		t.Error("a container the agent did not create must be refused")
+	}
+}
+
+func TestPruneRemovesOnlyEmptyLinkNetworks(t *testing.T) {
+	m, d, _ := setup(t)
+	removed, err := m.PruneLinkNetworks(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The fake daemon lists the shared network with two containers: nothing to prune.
+	if len(removed) != 0 {
+		t.Errorf("removed %v", removed)
+	}
+	for _, r := range d.requests {
+		if strings.HasPrefix(r, "DELETE /networks") {
+			t.Errorf("unexpected %s", r)
+		}
+	}
+}

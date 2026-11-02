@@ -118,6 +118,19 @@ func Alias(s string) error {
 	return nil
 }
 
+// LinkNetworkPrefix starts the name of a network made for one link between two
+// containers (an app and a database, or two apps).
+const LinkNetworkPrefix = NetworkPrefix + "-link-"
+
+// LinkNetwork checks the name of a network that exists for one link. Only these
+// can be joined or left while a container runs.
+func LinkNetwork(s string) error {
+	if !strings.HasPrefix(s, LinkNetworkPrefix) || !nameRe.MatchString(s) {
+		return invalid("invalid link network %q", s)
+	}
+	return nil
+}
+
 // Domain checks a lowercase DNS hostname with at least two labels.
 func Domain(s string) error {
 	if len(s) == 0 || len(s) > 253 {

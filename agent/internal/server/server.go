@@ -45,6 +45,9 @@ type Docker interface {
 	Networks(ctx context.Context) ([]docker.NetworkInfo, error)
 	RemoveNetwork(ctx context.Context, name string) error
 	PullImage(ctx context.Context, image string) error
+	ConnectNetwork(ctx context.Context, container, network string, aliases []string) error
+	DisconnectNetwork(ctx context.Context, container, network string) error
+	PruneLinkNetworks(ctx context.Context) ([]string, error)
 	DatabaseReady(ctx context.Context, t docker.DatabaseTarget) (bool, error)
 	CreateDatabase(ctx context.Context, t docker.DatabaseTarget, db, user, password string) error
 	DropDatabase(ctx context.Context, t docker.DatabaseTarget, db, user string) error
@@ -151,6 +154,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/docker/networks", s.networks)
 	mux.HandleFunc("POST /v1/docker/networks/remove", s.removeNetwork)
 	mux.HandleFunc("POST /v1/images/pull", s.pullImage)
+	mux.HandleFunc("POST /v1/docker/networks/connect", s.connectNetwork)
+	mux.HandleFunc("POST /v1/docker/networks/disconnect", s.disconnectNetwork)
+	mux.HandleFunc("POST /v1/docker/networks/prune", s.pruneNetworks)
 	mux.HandleFunc("POST /v1/databases/ready", s.databaseReady)
 	mux.HandleFunc("POST /v1/databases/create", s.databaseCreate)
 	mux.HandleFunc("POST /v1/databases/drop", s.databaseDrop)
@@ -417,6 +423,38 @@ func (s *Server) terminalTicket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ticket": ticket, "expires_in": int(terminal.TicketTTL.Seconds())})
+}
+
+func (s *Server) connectNetwork(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Container string   `json:"container"`
+		Network   string   `json:"network"`
+		Aliases   []string `json:"aliases"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	s.respond(w, s.opts.Docker.ConnectNetwork(r.Context(), body.Container, body.Network, body.Aliases))
+}
+
+func (s *Server) disconnectNetwork(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Container string `json:"container"`
+		Network   string `json:"network"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	s.respond(w, s.opts.Docker.DisconnectNetwork(r.Context(), body.Container, body.Network))
+}
+
+func (s *Server) pruneNetworks(w http.ResponseWriter, r *http.Request) {
+	removed, err := s.opts.Docker.PruneLinkNetworks(r.Context())
+	if err != nil {
+		s.respond(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"removed": removed})
 }
 
 func (s *Server) pullImage(w http.ResponseWriter, r *http.Request) {
