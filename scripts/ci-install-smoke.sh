@@ -68,9 +68,21 @@ check_page() {
     ok "the setup page and its $(printf '%s\n' "$assets" | wc -l | tr -d ' ') assets load on the panel's port"
 }
 
+# Let's Encrypt fetches its challenge files over plain HTTP from the agent's own folder,
+# which only root may change but nginx must be able to read.
+check_acme_webroot() {
+    local dir=/var/lib/commypanel-agent/acme-webroot/.well-known/acme-challenge body
+    mkdir -p "$dir" && printf 'ci-challenge' > "$dir/ci-token" && chmod 644 "$dir/ci-token"
+    body="$(curl -s -H 'Host: not-a-known-site.example' http://127.0.0.1/.well-known/acme-challenge/ci-token || true)"
+    rm -f "$dir/ci-token"
+    [ "$body" = ci-challenge ] || fail "nginx did not serve a challenge file from the agent's folder (got: ${body:-nothing})"
+    ok "nginx serves ACME challenge files from the agent's private folder"
+}
+
 install_it "install"
 check_running
 check_page
+check_acme_webroot
 
 install_it "upgrade over the same version"
 check_running
