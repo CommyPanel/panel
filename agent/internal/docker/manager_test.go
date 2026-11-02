@@ -641,3 +641,13 @@ func TestAnAppCannotMountADatabaseServersFilesAndTheOtherWayRound(t *testing.T) 
 		t.Errorf("a database server's own data folder must be allowed: %v", err)
 	}
 }
+
+func TestAMountSourceCannotSmuggleInBindOptions(t *testing.T) {
+	m := NewManager(Config{DataDir: t.TempDir()}, nil)
+	for _, source := range []string{"/shop/a:/etc", "/shop/a,rw", "/shop/a\n/etc"} {
+		s := ContainerSpec{Name: "shop-1", Image: "commypanel/shop:r1", Volumes: []Volume{{Source: m.volumesDir() + source, Target: "/x"}}}
+		if err := m.Validate(s); err == nil {
+			t.Errorf("source %q was accepted", source)
+		}
+	}
+}

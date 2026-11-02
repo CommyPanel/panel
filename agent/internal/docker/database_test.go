@@ -489,3 +489,23 @@ func TestDatabaseToolsRunOnlyInDatabaseServers(t *testing.T) {
 		t.Error("a container not named db-... was accepted as a database server")
 	}
 }
+
+func TestDatabaseDataIsNotRemovedWhenDockerCannotBeAskedWhatStillUsesIt(t *testing.T) {
+	dir := t.TempDir()
+	data := filepath.Join(dir, "databases", "main")
+	if err := os.MkdirAll(data, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(data, "PG_VERSION"), []byte("17"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// Nothing listens on this socket: Docker is down.
+	m := NewManager(Config{DataDir: dir}, NewUnixEngine(filepath.Join(dir, "no-docker.sock")))
+
+	if err := m.RemoveDatabaseData(context.Background(), "main"); err == nil {
+		t.Error("the data of a database server was removed without knowing whether it is in use")
+	}
+	if _, err := os.Stat(filepath.Join(data, "PG_VERSION")); err != nil {
+		t.Errorf("the data is gone: %v", err)
+	}
+}

@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 
+	"commypanel/agent/internal/statedir"
 	"commypanel/agent/internal/validate"
 )
 
@@ -47,7 +48,7 @@ type Config struct {
 func (c Config) withDefaults() Config {
 	if c.StateDir == "" {
 		// Only for development and tests; a real install passes --state-dir.
-		c.StateDir = filepath.Join(c.DataDir, "agent-state")
+		c.StateDir = statedir.Default(c.DataDir)
 	}
 	if c.DefaultMemoryMB == 0 {
 		c.DefaultMemoryMB = 512
@@ -225,6 +226,10 @@ func (m *Manager) Validate(s ContainerSpec) error {
 // of database servers, anything else only from the volumes of apps. An app's
 // image therefore cannot mount a database server's files, nor the other way round.
 func (m *Manager) resolveMount(source string, database bool) (string, error) {
+	// Docker reads a bind as source:target:options, so these would change what is mounted.
+	if strings.ContainsAny(source, ":,\n\r\x00") {
+		return "", &validate.InputError{Msg: "invalid volume source"}
+	}
 	if database {
 		return validate.ResolveUnder(m.databasesDir(), source)
 	}

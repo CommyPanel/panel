@@ -151,7 +151,7 @@ func (m *Manager) copyDump(server, file string) (string, error) {
 	}
 	defer src.Close()
 
-	tmpDir, err := m.stateDir("tmp")
+	tmpDir, err := m.scratch()
 	if err != nil {
 		return "", err
 	}

@@ -282,7 +282,7 @@ func (m *Manager) RemoveDatabaseData(ctx context.Context, server string) error {
 		slog.Info("dry-run: would remove database data", "path", resolved)
 		return nil
 	}
-	if user, err := m.mountedBy(ctx, resolved); err != nil {
+	if user, err := m.mountedBy(ctx, resolved, true); err != nil {
 		return err
 	} else if user != "" {
 		return &validate.InputError{Msg: fmt.Sprintf("container %s still has this database's data mounted; remove it first", user)}
@@ -321,7 +321,7 @@ func (m *Manager) DumpDatabase(ctx context.Context, t DatabaseTarget, db string)
 		return "", &validate.InputError{Msg: "dumps are not available in dry-run mode"}
 	}
 
-	tmpDir, err := m.stateDir("tmp")
+	tmpDir, err := m.scratch()
 	if err != nil {
 		return "", err
 	}

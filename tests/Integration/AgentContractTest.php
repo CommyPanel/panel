@@ -31,6 +31,7 @@ beforeEach(function () {
         $this->dir.'/agent', '--dry-run',
         '--socket', $this->socket,
         '--data-dir', $this->dir.'/data',
+        '--state-dir', $this->dir.'/state',
         '--nginx-sites-dir', $this->dir.'/sites',
         '--allow-uid', (string) posix_geteuid(),
     ]);
@@ -208,7 +209,7 @@ it('issues, reads and removes a certificate in dry-run mode', function () {
     expect($info->domains)->toBe(['shop.example.com', 'www.shop.example.com'])
         ->and($info->notAfter->getTimestamp())->toBeGreaterThan(time() + 80 * 86400);
 
-    $key = $this->dir.'/data/certs/shop/privkey.pem';
+    $key = $this->dir.'/state/certs/shop/privkey.pem';
     expect($key)->toBeFile()
         ->and(decoct(fileperms($key) & 0777))->toBe('600')
         ->and($this->driver->certificateInfo('shop')?->domains)->toBe(['shop.example.com', 'www.shop.example.com']);
@@ -216,7 +217,7 @@ it('issues, reads and removes a certificate in dry-run mode', function () {
     $this->driver->removeCertificate('shop');
 
     expect($this->driver->certificateInfo('shop'))->toBeNull()
-        ->and($this->dir.'/data/certs/shop')->not->toBeDirectory();
+        ->and($this->dir.'/state/certs/shop')->not->toBeDirectory();
 });
 
 it('renders an HTTPS nginx site that points at the stored certificate', function () {
@@ -227,8 +228,8 @@ it('renders an HTTPS nginx site that points at the stored certificate', function
 
     expect($conf)->toContain('listen 443 ssl;')
         ->toContain('return 301 https://$host$request_uri;')
-        ->toContain('ssl_certificate '.$this->dir.'/data/certs/shop/fullchain.pem;')
-        ->toContain('ssl_certificate_key '.$this->dir.'/data/certs/shop/privkey.pem;');
+        ->toContain('ssl_certificate '.$this->dir.'/state/certs/shop/fullchain.pem;')
+        ->toContain('ssl_certificate_key '.$this->dir.'/state/certs/shop/privkey.pem;');
 });
 
 it('rejects a certificate request the agent finds invalid', function () {
@@ -250,7 +251,7 @@ it('is refused when the caller is not on the allow-list', function () {
     $other = $this->dir.'/other.sock';
     $agent = Process::start([
         $this->dir.'/agent', '--dry-run', '--socket', $other,
-        '--data-dir', $this->dir.'/data', '--nginx-sites-dir', $this->dir.'/sites',
+        '--data-dir', $this->dir.'/data', '--state-dir', $this->dir.'/state', '--nginx-sites-dir', $this->dir.'/sites',
         '--allow-uid', '1',
     ]);
     for ($i = 0; $i < 50 && ! file_exists($other); $i++) {

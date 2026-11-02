@@ -26,6 +26,7 @@ import (
 
 	"golang.org/x/crypto/acme"
 
+	"commypanel/agent/internal/statedir"
 	"commypanel/agent/internal/validate"
 )
 
@@ -47,7 +48,8 @@ var (
 // fields exist so tests can point the manager at a fake CA.
 type Config struct {
 	DataDir       string
-	DryRun        bool // issue self-signed certificates and never contact a CA
+	StateDir      string // the agent's private folder: certificates, account keys, challenge files
+	DryRun        bool   // issue self-signed certificates and never contact a CA
 	ProductionURL string
 	StagingURL    string
 	HTTPClient    *http.Client
@@ -56,6 +58,9 @@ type Config struct {
 }
 
 func (c Config) withDefaults() Config {
+	if c.StateDir == "" {
+		c.StateDir = statedir.Default(c.DataDir) // development and tests; a real install passes --state-dir
+	}
 	if c.ProductionURL == "" {
 		c.ProductionURL = ProductionURL
 	}
@@ -100,8 +105,8 @@ type Manager struct {
 
 func NewManager(cfg Config) *Manager { return &Manager{cfg: cfg.withDefaults()} }
 
-func (m *Manager) certDir(name string) string { return filepath.Join(m.cfg.DataDir, "certs", name) }
-func (m *Manager) webroot() string            { return filepath.Join(m.cfg.DataDir, "acme-webroot") }
+func (m *Manager) certDir(name string) string { return filepath.Join(m.cfg.StateDir, "certs", name) }
+func (m *Manager) webroot() string            { return filepath.Join(m.cfg.StateDir, "acme-webroot") }
 
 // Validate checks a request without doing anything.
 func (m *Manager) Validate(r Request) error {
@@ -130,7 +135,7 @@ func (m *Manager) Validate(r Request) error {
 	return nil
 }
 
-// Issue obtains a certificate and stores it under <data>/certs/<name>.
+// Issue obtains a certificate and stores it under <state>/certs/<name>.
 func (m *Manager) Issue(ctx context.Context, r Request) (Info, error) {
 	if err := m.Validate(r); err != nil {
 		return Info{}, err
@@ -295,7 +300,7 @@ func (m *Manager) authorize(ctx context.Context, client *acme.Client, authzURL s
 
 // accountKey loads or creates the ACME account key for one CA.
 func (m *Manager) accountKey(label string) (crypto.Signer, error) {
-	path := filepath.Join(m.cfg.DataDir, "acme", label+"-account.pem")
+	path := filepath.Join(m.cfg.StateDir, "acme", label+"-account.pem")
 
 	if data, err := os.ReadFile(path); err == nil {
 		block, _ := pem.Decode(data)

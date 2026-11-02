@@ -131,8 +131,8 @@ func TestTheStateDirectoryMustBePrivate(t *testing.T) {
 	if _, err := m.stateDir("tmp"); err != nil {
 		t.Fatalf("a fresh state directory: %v", err)
 	}
-	if info, _ := os.Stat(state); info.Mode().Perm() != 0o700 {
-		t.Errorf("state dir is %v, want 0700", info.Mode().Perm())
+	if info, _ := os.Stat(state); info.Mode().Perm()&0o022 != 0 {
+		t.Errorf("state dir is %v, others must not be able to write to it", info.Mode().Perm())
 	}
 
 	// A folder others can write to is not trusted, however it came about.

@@ -125,9 +125,32 @@ type Options struct {
 	Info func(ctx context.Context) system.Info
 }
 
-type Server struct{ opts Options }
+type Server struct {
+	opts Options
+	// heavy limits the jobs that write big files (dumps, restores, volume
+	// archives) to a few at a time, so repeated requests cannot fill the disk or
+	// the machine's memory and CPU.
+	heavy chan struct{}
+}
 
-func New(opts Options) *Server { return &Server{opts: opts} }
+// maxHeavyJobs is how many dumps, restores and volume archives may run at once.
+const maxHeavyJobs = 2
+
+func New(opts Options) *Server {
+	return &Server{opts: opts, heavy: make(chan struct{}, maxHeavyJobs)}
+}
+
+// startHeavy takes one of the few places for a big job, or answers that the
+// agent is busy. The caller defers the returned function.
+func (s *Server) startHeavy(w http.ResponseWriter) (done func(), ok bool) {
+	select {
+	case s.heavy <- struct{}{}:
+		return func() { <-s.heavy }, true
+	default:
+		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "a backup or restore is already running; try again when it has finished"})
+		return nil, false
+	}
+}
 
 // Handler returns the HTTP handler with authorization applied to every route.
 func (s *Server) Handler() http.Handler {
@@ -540,6 +563,11 @@ func (s *Server) databaseDump(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &body) {
 		return
 	}
+	done, ok := s.startHeavy(w)
+	if !ok {
+		return
+	}
+	defer done()
 	path, err := s.opts.Docker.DumpDatabase(r.Context(), body.DatabaseTarget, body.Database)
 	if err != nil {
 		s.respond(w, err)
@@ -584,6 +612,11 @@ func (s *Server) databaseRestore(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &body) {
 		return
 	}
+	done, ok := s.startHeavy(w)
+	if !ok {
+		return
+	}
+	defer done()
 	s.respond(w, s.opts.Docker.RestoreDatabase(r.Context(), body.DatabaseTarget, body.Database, body.User, body.Server, body.File))
 }
 
@@ -696,6 +729,11 @@ func (s *Server) backupVolume(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &body) {
 		return
 	}
+	done, ok := s.startHeavy(w)
+	if !ok {
+		return
+	}
+	defer done()
 	dir, err := s.opts.Docker.ScratchDir()
 	if err != nil {
 		s.respond(w, err)

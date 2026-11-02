@@ -35,7 +35,7 @@ func (f *fakeRunner) Run(_ context.Context, name string, args ...string) ([]byte
 func newManager(t *testing.T, run Runner, dry bool) (*Manager, string) {
 	t.Helper()
 	dir := t.TempDir()
-	return NewManager(Config{SitesDir: filepath.Join(dir, "sites"), DataDir: filepath.Join(dir, "data"), DryRun: dry}, run), dir
+	return NewManager(Config{SitesDir: filepath.Join(dir, "sites"), DataDir: filepath.Join(dir, "data"), StateDir: filepath.Join(dir, "state"), DryRun: dry}, run), dir
 }
 
 var site = Site{Name: "demo", Domains: []string{"demo.example.com", "www.example.com"}, UpstreamPort: 20001}
@@ -71,8 +71,8 @@ func TestRenderWithCertificate(t *testing.T) {
 	for _, want := range []string{
 		"listen 443 ssl;",
 		"return 301 https://$host$request_uri;",
-		"ssl_certificate " + filepath.Join(dir, "data", "certs", "demo") + "/fullchain.pem;",
-		"ssl_certificate_key " + filepath.Join(dir, "data", "certs", "demo") + "/privkey.pem;",
+		"ssl_certificate " + filepath.Join(dir, "state", "certs", "demo") + "/fullchain.pem;",
+		"ssl_certificate_key " + filepath.Join(dir, "state", "certs", "demo") + "/privkey.pem;",
 	} {
 		if !strings.Contains(conf, want) {
 			t.Errorf("config missing %q:\n%s", want, conf)

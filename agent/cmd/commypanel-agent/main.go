@@ -23,6 +23,7 @@ import (
 	"commypanel/agent/internal/docker"
 	"commypanel/agent/internal/nginx"
 	"commypanel/agent/internal/server"
+	"commypanel/agent/internal/statedir"
 	"commypanel/agent/internal/system"
 	"commypanel/agent/internal/terminal"
 	"commypanel/agent/internal/usage"
@@ -91,14 +92,19 @@ func run() error {
 		return errors.New("must run as root (use --dry-run for development)")
 	}
 
-	mgr := nginx.NewManager(nginx.Config{SitesDir: *sitesDir, DataDir: *dataDir, DryRun: *dryRun, TerminalSocket: *termSocket}, nil)
+	// The agent's private folder is checked before anything is written to it.
+	if err := statedir.Prepare(*stateDir); err != nil {
+		return fmt.Errorf("state directory: %w", err)
+	}
+
+	mgr := nginx.NewManager(nginx.Config{SitesDir: *sitesDir, DataDir: *dataDir, StateDir: *stateDir, DryRun: *dryRun, TerminalSocket: *termSocket}, nil)
 	dockerMgr := docker.NewManager(docker.Config{
 		DataDir: *dataDir, StateDir: *stateDir, DryRun: *dryRun,
 		DefaultMemoryMB: *defMemory, DefaultCPUs: *defCPUs,
 		BuildMemoryMB: *buildMem, BuildCPUs: *buildCPUs,
 	}, docker.NewUnixEngine(*dockerSock))
 	dockerMgr.CleanScratch()
-	certMgr := certs.NewManager(certs.Config{DataDir: *dataDir, DryRun: *dryRun, UserAgent: "commypanel-agent/" + version})
+	certMgr := certs.NewManager(certs.Config{DataDir: *dataDir, StateDir: *stateDir, DryRun: *dryRun, UserAgent: "commypanel-agent/" + version})
 	sampler := usage.New(usage.Config{DataDir: *dataDir, Containers: dockerMgr})
 	var tickets *terminal.Tickets
 	if *termSocket != "" {

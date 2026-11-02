@@ -16,7 +16,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"commypanel/agent/internal/certs"
 	"commypanel/agent/internal/docker"
@@ -990,5 +992,46 @@ func TestVolumeBackupRouteStreamsAGzippedArchiveAndLeavesNoCopy(t *testing.T) {
 	}
 	if rec := do(t, s, "POST", "/v1/volumes/backup", `{"app":"shop","name":"missing"}`); rec.Code == 200 {
 		t.Errorf("a missing volume was backed up")
+	}
+}
+
+// blockingDocker holds every dump until it is released, to have several running at once.
+type blockingDocker struct {
+	fakeDocker
+	release chan struct{}
+}
+
+func (b *blockingDocker) DumpDatabase(ctx context.Context, t docker.DatabaseTarget, db string) (string, error) {
+	<-b.release
+	return b.fakeDocker.DumpDatabase(ctx, t, db)
+}
+
+func TestOnlyAFewBigJobsRunAtOnce(t *testing.T) {
+	d := &blockingDocker{release: make(chan struct{})}
+	s := New(Options{Nginx: &fakeNginx{}, Docker: d, Authorize: AllowAll()})
+	body := `{"container":"db-main","engine":"postgres","root_password":"abcdefghijklmnop1234","database":"shop"}`
+
+	var wg sync.WaitGroup
+	for i := 0; i < maxHeavyJobs; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			do(t, s, "POST", "/v1/databases/dump", body)
+		}()
+	}
+	// Wait until both hold their place.
+	for i := 0; i < 200 && len(s.heavy) < maxHeavyJobs; i++ {
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	if rec := do(t, s, "POST", "/v1/databases/dump", body); rec.Code != 429 {
+		t.Errorf("a third dump got %d, want 429", rec.Code)
+	}
+
+	close(d.release)
+	wg.Wait()
+
+	if rec := do(t, s, "POST", "/v1/databases/dump", body); rec.Code != 200 {
+		t.Errorf("after they finished a dump got %d", rec.Code)
 	}
 }

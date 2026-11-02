@@ -57,7 +57,7 @@ func (m *Manager) RemoveVolumes(ctx context.Context, app, name string) error {
 		slog.Info("dry-run: would remove volume data", "path", resolved)
 		return nil
 	}
-	if user, err := m.mountedBy(ctx, resolved); err != nil {
+	if user, err := m.mountedBy(ctx, resolved, false); err != nil {
 		return err
 	} else if user != "" {
 		return &validate.InputError{Msg: fmt.Sprintf("container %s still has this volume mounted; deploy the app without it first", user)}
@@ -71,7 +71,7 @@ func (m *Manager) RemoveVolumes(ctx context.Context, app, name string) error {
 // mountedBy returns the name of a container that has path (or something inside
 // it) mounted, or "". When the Docker daemon cannot be reached nothing can be
 // running, so there is nothing to protect.
-func (m *Manager) mountedBy(ctx context.Context, path string) (string, error) {
+func (m *Manager) mountedBy(ctx context.Context, path string, strict bool) (string, error) {
 	var raw []struct {
 		Names  []string `json:"Names"`
 		Mounts []struct {
@@ -80,6 +80,9 @@ func (m *Manager) mountedBy(ctx context.Context, path string) (string, error) {
 	}
 	err := m.engine.doJSON(ctx, "GET", "/containers/json", url.Values{"all": {"true"}}, nil, &raw)
 	if errors.Is(err, ErrUnavailable) {
+		if strict {
+			return "", &validate.InputError{Msg: "Docker is not running, so it cannot be checked that nothing still uses this folder"}
+		}
 		return "", nil
 	}
 	if err != nil {

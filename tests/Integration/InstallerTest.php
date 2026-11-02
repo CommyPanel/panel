@@ -78,7 +78,7 @@ it('gives the agent only the panel user as caller and runs the panel as that use
         ->toContain('--data-dir /var/lib/commypanel')
         ->toContain('--state-dir /var/lib/commypanel-agent')
         ->toContain('StateDirectory=commypanel-agent')
-        ->toContain('StateDirectoryMode=0700')
+        ->toContain('StateDirectoryMode=0711')
         ->toContain('--nginx-sites-dir /etc/nginx/commypanel')
         ->toContain('NoNewPrivileges=yes')
         ->not->toContain('User=');

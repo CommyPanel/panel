@@ -3,6 +3,7 @@ package nginx
 
 import (
 	"bytes"
+	"commypanel/agent/internal/statedir"
 	"context"
 	"errors"
 	"fmt"
@@ -133,7 +134,8 @@ func (execRunner) Run(ctx context.Context, name string, args ...string) ([]byte,
 // Config locates the files the manager works with.
 type Config struct {
 	SitesDir string // directory included by the main nginx.conf
-	DataDir  string // panel data dir (certs, ACME webroot)
+	DataDir  string // panel data dir
+	StateDir string // the agent's private folder (certificates, ACME webroot)
 	DryRun   bool   // write files but never run nginx
 	// TerminalSocket is the agent's terminal socket. When set, the panel's own
 	// site (and only that one) proxies /terminal to it as a WebSocket.
@@ -151,6 +153,9 @@ type Manager struct {
 func NewManager(cfg Config, run Runner) *Manager {
 	if run == nil {
 		run = execRunner{}
+	}
+	if cfg.StateDir == "" {
+		cfg.StateDir = statedir.Default(cfg.DataDir) // development and tests; a real install passes --state-dir
 	}
 	return &Manager{cfg: cfg, run: run}
 }
@@ -267,10 +272,10 @@ server {
 // exists) the file is removed again and the error returned.
 func (m *Manager) EnsureDefaultSite(ctx context.Context) error {
 	var buf bytes.Buffer
-	if err := defaultTmpl.Execute(&buf, struct{ Webroot string }{filepath.Join(m.cfg.DataDir, "acme-webroot")}); err != nil {
+	if err := defaultTmpl.Execute(&buf, struct{ Webroot string }{filepath.Join(m.cfg.StateDir, "acme-webroot")}); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Join(m.cfg.DataDir, "acme-webroot"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(m.cfg.StateDir, "acme-webroot"), 0o755); err != nil {
 		return err
 	}
 	path := filepath.Join(m.cfg.SitesDir, "00-commypanel-default.conf")
@@ -305,7 +310,7 @@ func (m *Manager) Render(s Site) (string, error) {
 	}{
 		ServerNames: strings.Join(s.served(), " "),
 		Redirects:   s.Redirects,
-		Webroot:     filepath.Join(m.cfg.DataDir, "acme-webroot"),
+		Webroot:     filepath.Join(m.cfg.StateDir, "acme-webroot"),
 		Port:        s.UpstreamPort,
 		Custom:      custom,
 	}
@@ -316,7 +321,7 @@ func (m *Manager) Render(s Site) (string, error) {
 		data.ModernHTTP2 = m.modernHTTP2() // only HTTPS sites use HTTP/2
 	}
 	if s.Certificate != "" {
-		data.CertDir = filepath.Join(m.cfg.DataDir, "certs", s.Certificate)
+		data.CertDir = filepath.Join(m.cfg.StateDir, "certs", s.Certificate)
 	}
 	var buf bytes.Buffer
 	if err := siteTmpl.Execute(&buf, data); err != nil {

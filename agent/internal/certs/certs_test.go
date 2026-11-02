@@ -20,7 +20,7 @@ func setup(t *testing.T) (*Manager, *fakeCA, string) {
 	t.Helper()
 	dir := t.TempDir()
 	ca := newFakeCA(t, filepath.Join(dir, "acme-webroot"))
-	m := NewManager(Config{DataDir: dir, ProductionURL: ca.directoryURL(), StagingURL: "http://127.0.0.1:1/never", Timeout: 30 * time.Second})
+	m := NewManager(Config{DataDir: dir, StateDir: dir, ProductionURL: ca.directoryURL(), StagingURL: "http://127.0.0.1:1/never", Timeout: 30 * time.Second})
 	return m, ca, dir
 }
 
@@ -119,7 +119,7 @@ func TestStagingUsesTheStagingDirectory(t *testing.T) {
 	dir := t.TempDir()
 	prod := newFakeCA(t, filepath.Join(dir, "acme-webroot"))
 	staging := newFakeCA(t, filepath.Join(dir, "acme-webroot"))
-	m := NewManager(Config{DataDir: dir, ProductionURL: prod.directoryURL(), StagingURL: staging.directoryURL()})
+	m := NewManager(Config{DataDir: dir, StateDir: dir, ProductionURL: prod.directoryURL(), StagingURL: staging.directoryURL()})
 
 	req := request("shop.example.com")
 	req.Staging = true
@@ -253,7 +253,7 @@ func (n noNetwork) RoundTrip(*http.Request) (*http.Response, error) {
 
 func TestDryRunIssuesASelfSignedCertificateOffline(t *testing.T) {
 	dir := t.TempDir()
-	m := NewManager(Config{DataDir: dir, DryRun: true, HTTPClient: &http.Client{Transport: noNetwork{t}}})
+	m := NewManager(Config{DataDir: dir, StateDir: dir, DryRun: true, HTTPClient: &http.Client{Transport: noNetwork{t}}})
 
 	info, err := m.Issue(context.Background(), request("shop.example.com"))
 	if err != nil {

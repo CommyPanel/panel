@@ -19,10 +19,12 @@ Restart=always
 RestartSec=2
 RuntimeDirectory=commypanel commypanel-terminal
 RuntimeDirectoryMode=0755
-# The agent's own scratch space and records. Root only, and outside the data
-# directory, which the panel user owns.
+# The agent's own folder: scratch files, the record of its dumps, TLS private keys,
+# the ACME account key and the ACME challenge files. Owned by root and outside the
+# data directory, which the panel user owns. 0711 lets nginx reach the challenge
+# folder inside it (it lists nothing); every other folder in it is root only.
 StateDirectory=commypanel-agent
-StateDirectoryMode=0700
+StateDirectoryMode=0711
 LimitNOFILE=65536
 
 # The agent needs root for Docker and nginx, but not much else.

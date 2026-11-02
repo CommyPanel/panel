@@ -513,8 +513,9 @@ create_user_and_dirs() {
     fi
 
     log "Preparing directories"
-    # 0751: nginx must be able to reach acme-webroot below, but not list anything.
-    mkd 0751 commypanel commypanel "$(p "$DATA_DIR")"
+    # Only the panel user: nginx no longer needs to reach anything in here (the ACME
+    # challenge files live in the agent's own folder, /var/lib/commypanel-agent).
+    mkd 0750 commypanel commypanel "$(p "$DATA_DIR")"
     mkd 0700 commypanel commypanel "$(p "$DATA_DIR/db")"
     mkd 0700 commypanel commypanel "$(p "$DATA_DIR/tmp")"
     mkd 0750 commypanel commypanel "$(p "$DATA_DIR/builds")"
