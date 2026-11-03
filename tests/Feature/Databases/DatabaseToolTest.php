@@ -3,6 +3,8 @@
 use App\Databases\DatabaseServers;
 use App\Databases\DatabaseTools;
 use App\Databases\ManageDatabases;
+use App\Dns\PanelDomain;
+use App\Dns\ServerAddress;
 use App\Enums\DatabaseEngine;
 use App\Host\Drivers\FakeHostDriver;
 use App\Host\HostDriver;
@@ -84,11 +86,25 @@ describe('starting', function () {
     });
 
     it('reaches the tools on the address the person is using, IPv6 included', function () {
+        app(PanelDomain::class)->set('commy.example.com');
+        app(ServerAddress::class)->save('203.0.113.7', '2001:db8::7');
+
         ($this->confirmed)()->postJson('http://commy.example.com'.($this->url)($this->shop))->assertOk();
         ($this->confirmed)()->postJson('http://[2001:db8::7]'.($this->url)($this->blog))->assertOk();
+        ($this->confirmed)()->postJson('http://203.0.113.7'.($this->url)($this->sales))->assertOk();
 
         $bases = collect($this->host->actions())->where('action', 'startDatabaseTool')->pluck('args.public_base')->all();
-        expect($bases)->toBe(['https://commy.example.com:2053', 'https://[2001:db8::7]:2053']);
+        expect($bases)->toBe(['https://commy.example.com:2053', 'https://[2001:db8::7]:2053', 'https://203.0.113.7:2053']);
+    });
+
+    it('never sends a ticket to a name the panel does not answer on, whatever the Host header says', function () {
+        app(PanelDomain::class)->set('commy.example.com');
+        app(ServerAddress::class)->save('203.0.113.7', null);
+
+        ($this->confirmed)()->postJson('http://evil.example'.($this->url)($this->shop))->assertOk();
+
+        $call = collect($this->host->actions())->firstWhere('action', 'startDatabaseTool');
+        expect($call['args']['public_base'])->toBe('https://commy.example.com:2053');
     });
 
     it('says why it cannot start', function () {

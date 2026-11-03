@@ -2,6 +2,8 @@
 
 namespace App\Databases;
 
+use App\Dns\PanelDomain;
+use App\Dns\ServerAddress;
 use App\Host\Data\DatabaseToolSession;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
@@ -22,7 +24,11 @@ class DatabaseTools
     /** How long the agent keeps a tool open without use. Shown to people; the agent enforces it. */
     public const IDLE_MINUTES = 15;
 
-    public function __construct(private readonly HostDriver $host) {}
+    public function __construct(
+        private readonly HostDriver $host,
+        private readonly PanelDomain $panel,
+        private readonly ServerAddress $address,
+    ) {}
 
     public static function toolName(ManagedDatabase|DatabaseServer $of): string
     {
@@ -121,11 +127,19 @@ class DatabaseTools
     }
 
     /**
-     * Where the browser reaches the tools: the address it is using for the panel, on the tools port.
+     * Where the browser reaches the tools: the address it is using for the panel, on the tools
+     * port. Only an address the panel really answers on is used (its domain, the server's own
+     * addresses, localhost); a Host header that is anything else (a forged one) is replaced by the
+     * panel's domain or the server's address, so a ticket is never sent to a name somebody else chose.
      */
     public function publicBase(Request $request): string
     {
-        $host = $request->getHost();
+        $host = strtolower($request->getHost());
+        $known = array_values(array_filter([$this->panel->name(), $this->address->ipv4(), $this->address->ipv6()]));
+
+        if ($known !== [] && ! in_array(trim($host, '[]'), [...$known, 'localhost', '127.0.0.1', '::1'], true)) {
+            $host = $known[0];
+        }
 
         if (str_contains($host, ':') && ! str_starts_with($host, '[')) {
             $host = '['.$host.']'; // an IPv6 address

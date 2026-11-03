@@ -241,6 +241,12 @@ class App extends Model
             $base = 'panel-app';
         }
 
+        // db-<slug> is the container and network of a database server, and dbtool-... of a
+        // database tool; an app with such a name would share its network or be mistaken for one.
+        if (str_starts_with($base, 'db-') || str_starts_with($base, 'dbtool')) {
+            $base = 'app-'.$base;
+        }
+
         $slug = $base;
         $suffix = 2;
 

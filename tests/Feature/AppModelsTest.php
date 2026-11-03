@@ -79,3 +79,13 @@ it('deletes deployments and variables with their app', function () {
     expect(Deployment::query()->count())->toBe(0)
         ->and(AppEnvVar::query()->count())->toBe(0);
 });
+
+it('never gives an app the name of a database server or a database tool', function () {
+    expect(App::generateSlug('db-main'))->toBe('app-db-main')
+        ->and(App::generateSlug('DB Main'))->toBe('app-db-main')
+        ->and(App::generateSlug('dbtool'))->toBe('app-dbtool')
+        ->and(App::generateSlug('dbtool-1'))->toBe('app-dbtool-1')
+        // Names that merely contain it, or start with the letters, are fine.
+        ->and(App::generateSlug('dbx'))->toBe('dbx')
+        ->and(App::generateSlug('my db'))->toBe('my-db');
+});

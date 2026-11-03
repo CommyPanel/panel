@@ -36,7 +36,7 @@ class DatabaseToolController extends Controller
             return response()->json(['error' => $e->getMessage()], 422);
         }
 
-        $audit->record('database.tool_started', $request->user(), ['server' => $server->slug, 'database' => $database->name, 'tool' => $session->tool]);
+        $audit->record('database.tool_started', $request->user(), ['server' => $database->server->slug, 'database' => $database->name, 'tool' => $session->tool]);
 
         return response()->json(['session' => $session->id, 'stage' => $session->stage]);
     }
@@ -64,7 +64,7 @@ class DatabaseToolController extends Controller
             return response()->json(['error' => $e->getMessage()], 422);
         }
 
-        $audit->record('database.tool_opened', $request->user(), ['server' => $server->slug, 'database' => $database->name, 'tool' => DatabaseTools::toolName($database)]);
+        $audit->record('database.tool_opened', $request->user(), ['server' => $database->server->slug, 'database' => $database->name, 'tool' => DatabaseTools::toolName($database)]);
 
         return response()->json(['url' => $url]);
     }
@@ -77,7 +77,7 @@ class DatabaseToolController extends Controller
             return response()->json(['error' => $e->getMessage()], 502);
         }
 
-        $audit->record('database.tool_closed', $request->user(), ['server' => $server->slug, 'database' => $database->name, 'tool' => DatabaseTools::toolName($database)]);
+        $audit->record('database.tool_closed', $request->user(), ['server' => $database->server->slug, 'database' => $database->name, 'tool' => DatabaseTools::toolName($database)]);
 
         return response()->json(['ok' => true]);
     }
