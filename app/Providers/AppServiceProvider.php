@@ -97,6 +97,12 @@ class AppServiceProvider extends ServiceProvider
         // Push webhooks are public; a sender cannot make the panel do much
         // without the secret, but it should not be able to keep it busy either.
         RateLimiter::for('webhooks', fn (Request $request) => Limit::perMinute(30)->by($request->ip()));
+
+        // The API: a token gets 60 calls a minute, and a caller without a valid token (a guess)
+        // gets only 20 a minute per address, which is far more than a person fumbling needs.
+        RateLimiter::for('api', fn (Request $request) => $request->user() !== null && $request->bearerToken() !== null
+                    ? Limit::perMinute(60)->by('token:'.sha1((string) $request->bearerToken()))
+                    : Limit::perMinute(20)->by($request->ip()));
     }
 
     /**
