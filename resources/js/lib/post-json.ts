@@ -36,3 +36,21 @@ export async function postJson<T>(
 
     return (await response.json()) as T;
 }
+
+/**
+ * POST without a page visit and without reading the answer. The server answers with a
+ * redirect back to the page, which is not followed: what is wanted is only that it
+ * did the work (a DNS check), after which the page asks again for its own data.
+ */
+export async function postQuietly(
+    url: string,
+    body: Record<string, unknown> = {},
+): Promise<void> {
+    await fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: jsonHeaders(),
+        body: JSON.stringify(body),
+        redirect: 'manual',
+    });
+}

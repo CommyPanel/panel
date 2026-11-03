@@ -1,19 +1,19 @@
 import { Link, router, useForm } from '@inertiajs/react';
 import { ExternalLink, Lock, RefreshCw } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { FormEvent } from 'react';
 import DashboardController from '@/actions/App/Http/Controllers/DashboardController';
 import WelcomeController from '@/actions/App/Http/Controllers/WelcomeController';
-import { Stepper } from '@/components/apps/setup-steps';
 import { RecordsTable } from '@/components/domains/domain-card';
 import { ServerAddressNote } from '@/components/domains/server-address-card';
-import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import AppLayout from '@/layouts/app-layout';
+import { useProgress } from '@/hooks/use-progress';
+import SetupLayout from '@/layouts/setup-layout';
 import { formatDate } from '@/lib/format';
+import { postQuietly } from '@/lib/post-json';
 import type { HttpsSettings, ServerAddress } from '@/types';
 
 type Panel = {
@@ -34,50 +34,46 @@ type Panel = {
 type Props = { https: HttpsSettings; server: ServerAddress; panel: Panel };
 
 export default function Welcome({ https, server, panel }: Props) {
-    const issuing = panel.certificate.status === 'issuing';
-
-    // Issuing takes a little while; follow it without a manual refresh.
-    useEffect(() => {
-        if (!issuing) return;
-        const timer = setInterval(
-            () => router.reload({ only: ['panel'] }),
-            2000,
-        );
-        return () => clearInterval(timer);
-    }, [issuing]);
+    // The page follows DNS and the certificate by itself: it re-checks DNS while that is
+    // not right yet, and keeps looking until the certificate is in place or has failed.
+    const waitingForDns =
+        panel.domain !== null && panel.dns?.status !== 'verified';
+    const waitingForCertificate =
+        panel.domain !== null &&
+        https.enabled &&
+        panel.dns?.status === 'verified' &&
+        (panel.certificate.status === 'none' ||
+            panel.certificate.status === 'issuing');
+    const progress = useProgress({
+        active: waitingForDns || waitingForCertificate,
+        only: ['panel'],
+        checks: waitingForDns
+            ? () => postQuietly(WelcomeController.check().url, { auto: true })
+            : undefined,
+    });
 
     return (
-        <AppLayout title="Welcome">
-            <PageHeader
-                title="Welcome to CommyPanel"
-                description="Two quick steps to serve the panel on your own domain with HTTPS. You can skip both and do them later."
-            />
-            <Stepper
-                index={https.enabled ? 2 : 1}
-                steps={[
-                    { id: 'admin', label: 'Admin account' },
-                    { id: 'https', label: "Let's Encrypt" },
-                    { id: 'domain', label: 'Panel domain' },
-                ]}
-            />
-            <div className="space-y-6">
-                {!https.enabled ? (
-                    <TermsStep https={https} />
-                ) : (
-                    <DomainStep panel={panel} server={server} />
-                )}
-                <div className="flex flex-wrap gap-2">
-                    <Link
-                        href={DashboardController.url()}
-                        className="btn btn-primary"
-                    >
-                        {https.enabled && panel.certificate.status === 'active'
-                            ? 'Finish'
-                            : 'Skip for now'}
-                    </Link>
-                </div>
+        <SetupLayout
+            title="Welcome to CommyPanel"
+            description="Two quick steps to serve the panel on your own domain with HTTPS. You can skip both and do them later."
+            step={https.enabled ? 2 : 1}
+        >
+            {!https.enabled ? (
+                <TermsStep https={https} />
+            ) : (
+                <DomainStep panel={panel} server={server} progress={progress} />
+            )}
+            <div className="flex flex-wrap justify-end gap-2">
+                <Link
+                    href={DashboardController.url()}
+                    className="btn btn-primary"
+                >
+                    {https.enabled && panel.certificate.status === 'active'
+                        ? 'Finish'
+                        : 'Skip for now'}
+                </Link>
             </div>
-        </AppLayout>
+        </SetupLayout>
     );
 }
 
@@ -153,16 +149,18 @@ function TermsStep({ https }: { https: HttpsSettings }) {
 function DomainStep({
     panel,
     server,
+    progress,
 }: {
     panel: Panel;
     server: ServerAddress;
+    progress: { waiting: boolean; gaveUp: boolean };
 }) {
     return panel.domain === null ? (
         <ChooseDomain />
     ) : (
         <>
             <ServerAddressNote server={server} />
-            <DomainStatus panel={panel} server={server} />
+            <DomainStatus panel={panel} server={server} progress={progress} />
         </>
     );
 }
@@ -201,9 +199,11 @@ function ChooseDomain() {
 function DomainStatus({
     panel,
     server,
+    progress,
 }: {
     panel: Panel;
     server: ServerAddress;
+    progress: { waiting: boolean; gaveUp: boolean };
 }) {
     const [checking, setChecking] = useState(false);
     const { certificate, dns } = panel;
@@ -296,6 +296,27 @@ function DomainStatus({
                             {certificate.error ??
                                 'The certificate could not be issued.'}
                         </Alert>
+                    )}
+                    {progress.waiting && (
+                        <p
+                            className="text-sm text-base-content/70"
+                            role="status"
+                        >
+                            Checking by itself every 5 seconds. This page
+                            updates when DNS is right and again when the
+                            certificate is installed; DNS changes can take a few
+                            minutes, sometimes longer.
+                        </p>
+                    )}
+                    {progress.gaveUp && (
+                        <p
+                            className="text-sm text-base-content/70"
+                            role="status"
+                        >
+                            Stopped checking automatically after half an hour.
+                            CommyPanel still re-checks every five minutes; press
+                            Check DNS to look again now.
+                        </p>
                     )}
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-sm text-base-content/70">

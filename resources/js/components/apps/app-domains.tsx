@@ -1,5 +1,6 @@
 import { useForm } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
+import { useDomainProgress } from '@/hooks/use-domain-progress';
 import { ServerAddressNote } from '@/components/domains/server-address-card';
 import type { FormEvent } from 'react';
 import AppDomainController from '@/actions/App/Http/Controllers/AppDomainController';
@@ -138,9 +139,25 @@ export function AppDomains({
     domains: DomainRow[];
     server: ServerAddress;
 }) {
+    const progress = useDomainProgress(domains, ['app']);
+
     return (
         <div className="space-y-6">
             <ServerAddressNote server={server} />
+            {progress.waiting && (
+                <p className="text-sm text-base-content/70" role="status">
+                    Waiting for DNS or the certificate. This page checks by
+                    itself every 5 seconds and updates when something changes;
+                    DNS changes can take a few minutes, sometimes longer.
+                </p>
+            )}
+            {progress.gaveUp && (
+                <p className="text-sm text-base-content/70" role="status">
+                    Stopped checking automatically after half an hour.
+                    CommyPanel still re-checks every five minutes; press Check
+                    DNS to look again now.
+                </p>
+            )}
             <AddAppDomainCard slug={slug} />
             {domains.map((domain) => (
                 <DomainCard key={domain.id} domain={domain} server={server} />

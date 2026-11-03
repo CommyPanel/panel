@@ -61,9 +61,11 @@ class WelcomeController extends Controller
         return redirect()->route('welcome');
     }
 
-    public function check(ConfigurePanelDomain $configure): RedirectResponse
+    public function check(Request $request, ConfigurePanelDomain $configure): RedirectResponse
     {
-        $configure->check(retry: true);
+        // The page checks by itself while it waits (`auto`); only a person asking
+        // again retries a certificate that failed.
+        $configure->check(retry: ! $request->boolean('auto'));
 
         return redirect()->route('welcome');
     }

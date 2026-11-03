@@ -14,6 +14,7 @@ import { PageHeader } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
 import { Tabs, tabPanelProps } from '@/components/ui/tabs';
 import type { TabItem } from '@/components/ui/tabs';
+import { useDomainProgress } from '@/hooks/use-domain-progress';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate, timeAgo } from '@/lib/format';
 import type {
@@ -228,6 +229,8 @@ function PanelCard({ panel }: { panel: PanelSummary }) {
 }
 
 export default function Index({ server, https, panel, domains }: Props) {
+    useDomainProgress(domains, ['domains', 'panel']);
+
     const [tab, setTab] = useState<TabId>(initialTab);
 
     const select = (id: TabId) => {

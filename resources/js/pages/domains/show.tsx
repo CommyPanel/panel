@@ -14,6 +14,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { useDomainProgress } from '@/hooks/use-domain-progress';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/format';
 import type { DomainCertificate, DomainRow, ServerAddress } from '@/types';
@@ -48,6 +49,8 @@ export default function Show({
     certificate,
     redirected_from,
 }: Props) {
+    useDomainProgress([domain], ['domain', 'certificate', 'server']);
+
     const [checking, setChecking] = useState(false);
     const [confirm, setConfirm] = useState(false);
     const [removing, setRemoving] = useState(false);

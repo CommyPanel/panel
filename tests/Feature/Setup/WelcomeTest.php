@@ -122,6 +122,23 @@ describe('panel domain', function () {
         Queue::assertPushed(IssuePanelCertificateJob::class, 1);
     });
 
+    it('does not retry a failed certificate when the page checks by itself', function () {
+        Queue::fake();
+        app(HttpsSettings::class)->enable(null);
+        $this->dns->records['panel.example.com'] = ['a' => ['203.0.113.7']];
+        $this->post('/welcome/domain', ['domain' => 'panel.example.com']);
+        $this->panel->markIssuing();
+        $this->panel->markFailed('Boom', false);
+        Queue::fake();
+
+        // The page re-checks DNS every few seconds while it waits; that must not keep
+        // asking Let's Encrypt again after a failure.
+        $this->post('/welcome/domain/check', ['auto' => true]);
+
+        Queue::assertNothingPushed();
+        expect($this->panel->dnsVerified())->toBeTrue();
+    });
+
     it('clears the domain and its site', function () {
         $this->panel->set('panel.example.com');
 
