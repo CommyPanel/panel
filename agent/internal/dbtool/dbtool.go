@@ -482,6 +482,36 @@ func (m *Manager) RunReaper(ctx context.Context) {
 	}
 }
 
+// Shutdown closes every session and removes its container, and waits for that. It runs when
+// the agent stops, so that a tool never outlives the agent that watches it.
+func (m *Manager) Shutdown() {
+	m.mu.Lock()
+	var all []*session
+	for id, s := range m.sessions {
+		all = append(all, s)
+		delete(m.sessions, id)
+	}
+	m.mu.Unlock()
+
+	var wg sync.WaitGroup
+	for _, s := range all {
+		wg.Add(1)
+		go func(s *session) {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+			_ = m.runner.Stop(ctx, s.name)
+			_ = m.runner.Remove(ctx, s.name)
+		}(s)
+	}
+	wg.Wait()
+
+	// And anything a session was still starting when it was closed.
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	m.Cleanup(ctx)
+}
+
 // Cleanup removes the tool containers a crash or a restart left behind. Sessions
 // are in memory only, so none of them can still be in use.
 func (m *Manager) Cleanup(ctx context.Context) {

@@ -87,21 +87,23 @@ func ToolNetwork(server string) string { return "commypanel-db-" + server }
 
 // RunTool starts a database tool next to its database server: on that server's
 // own network and nowhere else, without privileges, with small limits, published
-// on the loopback only, never restarted by Docker, and logged in as the one
-// database user it was given. Its environment holds that user's password.
+// on the loopback only and never restarted by Docker. It is logged in, from outside, as the
+// one database user it was given; the password is not in its environment.
 func (m *Manager) RunTool(ctx context.Context, t ToolSpec) error {
 	if err := t.validate(); err != nil {
 		return err
 	}
 	_, image, containerPort, _ := ToolFor(t.Engine)
 
+	// The container never holds the password. Both tools show their login form to anyone who
+	// reaches the container's port, and the agent logs in from outside, for the browser it lets
+	// in (see package dbtool). A process on this machine that finds the port therefore meets
+	// a login form, not a logged-in session.
 	env := map[string]string{}
 	switch t.Tool {
 	case "phpmyadmin":
 		env["PMA_HOST"] = "db-" + t.Server
 		env["PMA_PORT"] = "3306"
-		env["PMA_USER"] = t.User
-		env["PMA_PASSWORD"] = t.Password
 		env["PMA_ABSOLUTE_URI"] = t.BaseURL
 		env["UPLOAD_LIMIT"] = "128M"
 		env["HIDE_PHP_VERSION"] = "true"

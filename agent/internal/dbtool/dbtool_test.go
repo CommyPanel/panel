@@ -103,11 +103,13 @@ func (c *fakeClock) Add(d time.Duration) {
 
 // rig is a manager with a fake Docker, a fake clock and a fake tool to talk to.
 type rig struct {
-	m        *Manager
-	runner   *fakeRunner
-	clock    *fakeClock
-	upstream *httptest.Server
-	seen     chan *http.Request
+	loginMu   sync.Mutex
+	loginForm url.Values // what the agent posted to log in to phpMyAdmin
+	m         *Manager
+	runner    *fakeRunner
+	clock     *fakeClock
+	upstream  *httptest.Server
+	seen      chan *http.Request
 }
 
 func newRig(t *testing.T, handler http.HandlerFunc) *rig {
@@ -119,6 +121,9 @@ func newRig(t *testing.T, handler http.HandlerFunc) *rig {
 		select {
 		case r.seen <- clone:
 		default:
+		}
+		if r.pmaLogin(w, req) {
+			return
 		}
 		if handler != nil {
 			handler(w, req)
@@ -137,6 +142,38 @@ func newRig(t *testing.T, handler http.HandlerFunc) *rig {
 		MaxUpload:    1 << 10,
 	})
 	return r
+}
+
+// pmaLogin plays phpMyAdmin's login page, which is all the agent meets before it logs in. It
+// returns true when it answered. Its cookies are marked Secure and carry the __Secure- prefix,
+// as the real ones do, and the session cookie is sent twice with a new value the second time.
+func (r *rig) pmaLogin(w http.ResponseWriter, req *http.Request) bool {
+	if req.URL.Path != "/index.php" || req.URL.RawQuery != "" {
+		return false
+	}
+	switch req.Method {
+	case "GET":
+		http.SetCookie(w, &http.Cookie{Name: "__Secure-phpMyAdmin_https", Value: "first", Path: "/", Secure: true})
+		http.SetCookie(w, &http.Cookie{Name: "__Secure-pma_lang_https", Value: "en", Path: "/", Secure: true})
+		_, _ = io.WriteString(w, `<form><input type="hidden" name="token" value="abc123"><input type="hidden" name="set_session" value="def456"></form>`)
+	case "POST":
+		_ = req.ParseForm()
+		r.loginMu.Lock()
+		r.loginForm = req.PostForm
+		r.loginMu.Unlock()
+		cookie, _ := req.Cookie("__Secure-phpMyAdmin_https")
+		if req.PostForm.Get("pma_password") != pw || cookie == nil || cookie.Value != "first" {
+			_, _ = io.WriteString(w, "login form again")
+			return true
+		}
+		http.SetCookie(w, &http.Cookie{Name: "__Secure-phpMyAdmin_https", Value: "first", Path: "/", Secure: true})
+		http.SetCookie(w, &http.Cookie{Name: "__Secure-phpMyAdmin_https", Value: "second", Path: "/", Secure: true})
+		http.SetCookie(w, &http.Cookie{Name: "__Secure-pmaAuth-1_https", Value: "auth", Path: "/", Secure: true})
+		http.SetCookie(w, &http.Cookie{Name: "laravel_session", Value: "not-the-tools", Path: "/"})
+		w.Header().Set("Location", "/s/whatever/index.php?route=/")
+		w.WriteHeader(http.StatusFound)
+	}
+	return true
 }
 
 func request(engine string) StartRequest {
@@ -358,11 +395,15 @@ func TestOpeningSendsTheBrowserToTheDatabaseWithAnOwnCookie(t *testing.T) {
 	if loc := rec.Header().Get("Location"); loc != "/s/"+v.ID+"/index.php?route=/database/structure&db=shop" {
 		t.Errorf("location = %s", loc)
 	}
-	cookies := rec.Result().Cookies()
-	if len(cookies) != 1 {
-		t.Fatalf("cookies = %v", cookies)
+	var c *http.Cookie
+	for _, ck := range rec.Result().Cookies() {
+		if ck.Name == "cpdbtool_"+v.ID {
+			c = ck
+		}
 	}
-	c := cookies[0]
+	if c == nil {
+		t.Fatalf("no session cookie in %v", rec.Result().Cookies())
+	}
 	if c.Name != "cpdbtool_"+v.ID || c.Path != "/s/"+v.ID+"/" || !c.Secure || !c.HttpOnly || c.SameSite != http.SameSiteStrictMode || len(c.Value) < 40 {
 		t.Errorf("cookie = %+v", c)
 	}
@@ -373,7 +414,7 @@ func TestTheProxyNeedsTheCookieOfThatSession(t *testing.T) {
 	v := r.start(t, "mariadb")
 	cookies := r.browse(t, v.ID)
 
-	if rec := get(r, "/s/"+v.ID+"/index.php", cookies); rec.Code != 200 || !strings.Contains(rec.Body.String(), "tool") {
+	if rec := get(r, "/s/"+v.ID+"/page.php", cookies); rec.Code != 200 || !strings.Contains(rec.Body.String(), "tool") {
 		t.Fatalf("with the cookie: %d %s", rec.Code, rec.Body)
 	}
 	for name, c := range map[string][]*http.Cookie{
@@ -381,11 +422,11 @@ func TestTheProxyNeedsTheCookieOfThatSession(t *testing.T) {
 		"a wrong value": {{Name: "cpdbtool_" + v.ID, Value: strings.Repeat("x", 43)}},
 		"another name":  {{Name: "cpdbtool_other", Value: cookies[0].Value}},
 	} {
-		if rec := get(r, "/s/"+v.ID+"/index.php", c); rec.Code != http.StatusNotFound {
+		if rec := get(r, "/s/"+v.ID+"/page.php", c); rec.Code != http.StatusNotFound {
 			t.Errorf("%s: %d", name, rec.Code)
 		}
 	}
-	if rec := get(r, "/s/nosuchsession/index.php", cookies); rec.Code != http.StatusNotFound {
+	if rec := get(r, "/s/nosuchsession/page.php", cookies); rec.Code != http.StatusNotFound {
 		t.Errorf("an unknown session: %d", rec.Code)
 	}
 	for _, path := range []string{"/", "/s", "/admin", "/open/x", "/s/"} {
@@ -439,8 +480,15 @@ func TestOnlyTheToolsOwnCookiesReachTheToolAndNothingElseDoes(t *testing.T) {
 	for _, c := range seen.Cookies() {
 		got[c.Name] = c.Value
 	}
-	if len(got) != 2 || got["__Secure-phpMyAdmin_https"] != "tool-session" || got["pma_lang_https"] != "en" {
-		t.Errorf("cookies the tool saw: %v", got)
+	// The tool's own cookies get through (the ones it made at login, and the ones the browser added) ...
+	if got["pma_lang_https"] != "en" || got["__Secure-pmaAuth-1_https"] != "auth" || got["__Secure-phpMyAdmin_https"] == "" {
+		t.Errorf("the tool's own cookies did not get through: %v", got)
+	}
+	// ... and nothing that is the panel's, or ours.
+	for name := range got {
+		if name == "commypanel_session" || name == "XSRF-TOKEN" || strings.HasPrefix(name, "cpdbtool_") {
+			t.Errorf("the tool saw the cookie %s", name)
+		}
 	}
 	if seen.Header.Get("Authorization") != "" || strings.Contains(seen.Header.Get("X-Forwarded-For"), "6.6.6.6") {
 		t.Errorf("headers the tool saw: %v", seen.Header)
@@ -458,7 +506,7 @@ func TestACookieTheToolSetsStaysInsideTheSessionAndOthersAreDropped(t *testing.T
 	v := r.start(t, "mariadb")
 	cookies := r.browse(t, v.ID)
 
-	rec := get(r, "/s/"+v.ID+"/index.php", cookies)
+	rec := get(r, "/s/"+v.ID+"/page.php", cookies)
 
 	set := rec.Result().Cookies()
 	if len(set) != 1 || set[0].Name != "__Secure-phpMyAdmin_https" {
@@ -518,7 +566,7 @@ func TestOnlyPlainRequestsOfAReasonableSizeAreProxied(t *testing.T) {
 	cookies := r.browse(t, v.ID)
 
 	for _, method := range []string{"PUT", "DELETE", "PATCH", "OPTIONS", "TRACE", "CONNECT"} {
-		req := httptest.NewRequest(method, "/s/"+v.ID+"/index.php", nil)
+		req := httptest.NewRequest(method, "/s/"+v.ID+"/page.php", nil)
 		for _, c := range cookies {
 			req.AddCookie(c)
 		}
@@ -570,7 +618,7 @@ func TestASessionClosesAfterFifteenMinutesWithoutUse(t *testing.T) {
 
 	// Use keeps it open.
 	r.clock.Add(14 * time.Minute)
-	get(r, "/s/"+v.ID+"/index.php", cookies)
+	get(r, "/s/"+v.ID+"/page.php", cookies)
 	r.clock.Add(14 * time.Minute)
 	r.m.Reap()
 	if _, ok := r.m.Status(v.ID); !ok {
@@ -589,7 +637,7 @@ func TestASessionClosesAfterFifteenMinutesWithoutUse(t *testing.T) {
 	if len(r.runner.removedNames()) != 1 {
 		t.Errorf("the container was not removed: %v", r.runner.removedNames())
 	}
-	if rec := get(r, "/s/"+v.ID+"/index.php", cookies); rec.Code != http.StatusNotFound {
+	if rec := get(r, "/s/"+v.ID+"/page.php", cookies); rec.Code != http.StatusNotFound {
 		t.Errorf("a closed session still answers: %d", rec.Code)
 	}
 }
@@ -601,7 +649,7 @@ func TestNoSessionLivesPastItsMaximumAge(t *testing.T) {
 
 	for i := 0; i < 20; i++ { // in constant use for five hours
 		r.clock.Add(15 * time.Minute)
-		get(r, "/s/"+v.ID+"/index.php", cookies)
+		get(r, "/s/"+v.ID+"/page.php", cookies)
 		r.m.Reap()
 	}
 	if _, ok := r.m.Status(v.ID); ok {
@@ -695,5 +743,115 @@ func TestAnAdminerThatRefusesTheLoginIsReportedAndTheTicketIsSpent(t *testing.T)
 	}
 	if rec := get(r, "/open?t="+ticket, nil); rec.Code != http.StatusNotFound {
 		t.Errorf("the ticket was not spent: %d", rec.Code)
+	}
+}
+
+func TestPhpMyAdminIsLoggedInByTheAgentAndOnlyItsOwnCookiesAreHandedOver(t *testing.T) {
+	r := newRig(t, nil)
+	v := r.start(t, "mariadb")
+	ticket, _ := r.m.Ticket(v.ID)
+
+	rec := get(r, "/open?t="+ticket, nil)
+
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/s/"+v.ID+"/index.php?route=/database/structure&db=shop" {
+		t.Fatalf("%d %s", rec.Code, rec.Header().Get("Location"))
+	}
+	r.loginMu.Lock()
+	form := r.loginForm
+	r.loginMu.Unlock()
+	if form.Get("pma_username") != "shop" || form.Get("pma_password") != pw || form.Get("token") != "abc123" || form.Get("set_session") != "def456" || form.Get("server") != "1" {
+		t.Errorf("login form = %v", form)
+	}
+	names := map[string]string{}
+	for _, c := range rec.Result().Cookies() {
+		names[c.Name] = c.Value
+		if c.Path != "/s/"+v.ID+"/" || !c.Secure || !c.HttpOnly || c.SameSite != http.SameSiteStrictMode {
+			t.Errorf("cookie %+v", c)
+		}
+	}
+	// The last value of the session cookie wins, the __Secure- names are kept, and
+	// what the tool has no business setting is dropped.
+	if names["__Secure-phpMyAdmin_https"] != "second" || names["__Secure-pmaAuth-1_https"] != "auth" || names["cpdbtool_"+v.ID] == "" {
+		t.Errorf("cookies = %v", names)
+	}
+	if _, bad := names["laravel_session"]; bad {
+		t.Error("a cookie that is not the tool's was handed to the browser")
+	}
+	if strings.Contains(rec.Body.String(), pw) || strings.Contains(rec.Header().Get("Location"), pw) {
+		t.Error("the password reached the browser")
+	}
+}
+
+func TestAPhpMyAdminThatRefusesTheLoginIsReportedAndTheTicketIsSpent(t *testing.T) {
+	r := newRig(t, nil)
+	v := r.start(t, "mariadb")
+	// The database user's password changed after the session started: the login is refused.
+	r.m.mu.Lock()
+	r.m.sessions[v.ID].password = "WrongPassword1234567890"
+	r.m.mu.Unlock()
+	ticket, _ := r.m.Ticket(v.ID)
+
+	if rec := get(r, "/open?t="+ticket, nil); rec.Code != http.StatusBadGateway {
+		t.Errorf("%d", rec.Code)
+	}
+	if rec := get(r, "/open?t="+ticket, nil); rec.Code != http.StatusNotFound {
+		t.Errorf("the ticket was not spent: %d", rec.Code)
+	}
+}
+
+func TestWhatTheToolSaysAboutTheWholeHostIsDropped(t *testing.T) {
+	r := newRig(t, func(w http.ResponseWriter, _ *http.Request) {
+		h := w.Header()
+		h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		h.Set("Clear-Site-Data", `"cookies"`)
+		h.Set("Refresh", "0; url=https://evil.example/")
+		h.Set("Content-Location", "https://evil.example/")
+		h.Set("Link", "<https://evil.example/>; rel=preload")
+		h.Set("Access-Control-Allow-Origin", "*")
+		h.Set("Cache-Control", "public, max-age=600")
+		h.Set("Referrer-Policy", "unsafe-url")
+	})
+	v := r.start(t, "mariadb")
+	cookies := r.browse(t, v.ID)
+
+	rec := get(r, "/s/"+v.ID+"/page.php", cookies)
+
+	for _, name := range []string{"Strict-Transport-Security", "Clear-Site-Data", "Refresh", "Content-Location", "Link", "Access-Control-Allow-Origin"} {
+		if rec.Header().Get(name) != "" {
+			t.Errorf("%s reached the browser: %q", name, rec.Header().Get(name))
+		}
+	}
+	// One value each: the tool's for what it chose, ours for the rest.
+	if got := rec.Header().Values("Cache-Control"); len(got) != 1 || got[0] != "public, max-age=600" {
+		t.Errorf("Cache-Control = %v", got)
+	}
+	if got := rec.Header().Values("X-Content-Type-Options"); len(got) != 1 || got[0] != "nosniff" {
+		t.Errorf("X-Content-Type-Options = %v", got)
+	}
+	if got := rec.Header().Values("Referrer-Policy"); len(got) != 1 || got[0] != "no-referrer" {
+		t.Errorf("Referrer-Policy = %v", got)
+	}
+	if rec.Header().Get("Content-Security-Policy") != "frame-ancestors 'none'" {
+		t.Errorf("CSP = %q", rec.Header().Get("Content-Security-Policy"))
+	}
+}
+
+func TestStoppingTheAgentClosesEveryToolAtOnce(t *testing.T) {
+	r := newRig(t, nil)
+	a := r.start(t, "mariadb")
+	other := request("mariadb")
+	other.Database = "blog"
+	b, _ := r.m.Start(other)
+	r.waitStage(t, b.ID, StageReady)
+	r.runner.left = []string{"dbtool-straggler00"}
+
+	r.m.Shutdown()
+
+	if _, ok := r.m.Status(a.ID); ok {
+		t.Error("a session survived the shutdown")
+	}
+	removed := strings.Join(r.runner.removedNames(), " ")
+	if len(r.runner.removedNames()) != 3 || !strings.Contains(removed, "dbtool-straggler00") {
+		t.Errorf("removed %v", r.runner.removedNames())
 	}
 }

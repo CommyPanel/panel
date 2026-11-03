@@ -37,12 +37,14 @@ func TestAToolRunsOnItsDatabaseServersNetworkAloneAndWithoutPrivileges(t *testin
 		`"com.commypanel.dbtool":"true"`,
 		`"com.commypanel.managed":"true"`,
 		`PMA_HOST=db-main`,
-		`PMA_USER=shop`,
 		`PMA_ABSOLUTE_URI=` + toolBase,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the container does not have %s\n%s", want, body)
 		}
+	}
+	if strings.Contains(body, userPw) || strings.Contains(body, "PMA_PASSWORD") || strings.Contains(body, "PMA_USER") {
+		t.Errorf("the password, or a login, is in the container's environment: %s", body)
 	}
 	if strings.Contains(body, `"Binds":["`) {
 		t.Errorf("a tool must not mount anything: %s", body)
@@ -61,7 +63,7 @@ func TestAdminerIsTheToolForPostgres(t *testing.T) {
 		t.Errorf("body = %s", body)
 	}
 	if strings.Contains(body, userPw) {
-		t.Errorf("Adminer logs in through the agent; the password must not be in its environment: %s", body)
+		t.Errorf("the password must not be in the environment: %s", body)
 	}
 }
 

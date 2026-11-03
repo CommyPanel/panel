@@ -119,6 +119,8 @@ func run() error {
 	defer endTools()
 	if *toolSocket != "" && !*dryRun {
 		tools = dbtool.New(toolCtx, dockerMgr, dbtool.Config{})
+		// A tool must not outlive the agent that watches it and closes it after 15 minutes.
+		defer tools.Shutdown()
 	}
 	srv := server.New(server.Options{Nginx: mgr, DBTools: toolsFor(tools), Docker: dockerMgr, Volumes: volumefs.New(*dataDir), Terminal: ticketIssuer(tickets), Certs: certMgr, Unit: system.NewDockerUnit(*dryRun), Usage: sampler,
 		Authorize: authorize, Version: version, DryRun: *dryRun,

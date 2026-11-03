@@ -6,9 +6,9 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"net/http/cookiejar"
 	"net/http/httputil"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -60,23 +60,15 @@ func (m *Manager) open(w http.ResponseWriter, r *http.Request) {
 	}
 	m.touch(s)
 
-	landing := s.prefix + "/"
-	var carry []*http.Cookie
-
-	switch s.Tool {
-	case "phpmyadmin":
-		landing = s.prefix + "/index.php?route=/database/structure&db=" + url.QueryEscape(s.Database)
-	case "adminer":
-		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
-		defer cancel()
-		cookies, query, err := m.adminerLogin(ctx, s)
-		if err != nil {
-			slog.Warn("could not log in to Adminer", "server", s.Server, "err", err)
-			http.Error(w, "The tool did not accept the login. Open the database from CommyPanel again.", http.StatusBadGateway)
-			return
-		}
-		carry = cookies
-		landing = s.prefix + "/" + query
+	// Both tools show a login form to whoever reaches them; the agent logs in from here, so the
+	// password never passes through the browser and never sits in a container.
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+	carry, landing, err := m.login(ctx, s)
+	if err != nil {
+		slog.Warn("could not log in to the database tool", "tool", s.Tool, "server", s.Server, "err", err)
+		http.Error(w, "The tool did not accept the login. Open the database from CommyPanel again.", http.StatusBadGateway)
+		return
 	}
 
 	http.SetCookie(w, m.cookieFor(s, authCookie+s.ID, m.grantCookie(s)))
@@ -92,54 +84,124 @@ func (m *Manager) cookieFor(s *session, name, value string) *http.Cookie {
 	return &http.Cookie{Name: name, Value: value, Path: s.prefix + "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteStrictMode}
 }
 
-// adminerLogin logs in to Adminer from here, so the database user's password
-// never passes through the browser. It returns the cookies Adminer made and the
-// query string it sends a logged-in person to.
-func (m *Manager) adminerLogin(ctx context.Context, s *session) ([]*http.Cookie, string, error) {
-	jar, _ := cookiejar.New(nil)
-	client := &http.Client{Jar: jar, Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	base := fmt.Sprintf("http://%s:%d/", m.cfg.Upstream, s.port)
+// toolBrowser is a minimal browser for the login: it keeps cookies by hand, because
+// phpMyAdmin's are marked Secure and a cookie jar will not hold those over plain http.
+type toolBrowser struct {
+	client  *http.Client
+	base    string
+	cookies map[string]string
+	order   []string
+}
 
-	get, _ := http.NewRequestWithContext(ctx, http.MethodGet, base, nil)
-	resp, err := client.Do(get)
+func newToolBrowser(base string) *toolBrowser {
+	return &toolBrowser{
+		client:  &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }},
+		base:    base,
+		cookies: map[string]string{},
+	}
+}
+
+func (b *toolBrowser) do(ctx context.Context, method, path string, form url.Values) (*http.Response, string, error) {
+	var body io.Reader
+	if form != nil {
+		body = strings.NewReader(form.Encode())
+	}
+	req, err := http.NewRequestWithContext(ctx, method, b.base+path, body)
 	if err != nil {
 		return nil, "", err
 	}
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
-	resp.Body.Close()
-
-	form := url.Values{
-		"auth[driver]":   {"pgsql"},
-		"auth[server]":   {"db-" + s.Server},
-		"auth[username]": {s.user},
-		"auth[password]": {s.password},
-		"auth[db]":       {s.Database},
+	if form != nil {
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
-	post, _ := http.NewRequestWithContext(ctx, http.MethodPost, base, strings.NewReader(form.Encode()))
-	post.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	resp, err = client.Do(post)
+	for _, name := range b.order {
+		req.AddCookie(&http.Cookie{Name: name, Value: b.cookies[name]})
+	}
+	resp, err := b.client.Do(req)
 	if err != nil {
 		return nil, "", err
 	}
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
-	resp.Body.Close()
-
-	location := resp.Header.Get("Location")
-	if resp.StatusCode != http.StatusFound || !strings.HasPrefix(location, "?") {
-		return nil, "", fmt.Errorf("unexpected answer to the login (%d)", resp.StatusCode)
+	defer resp.Body.Close()
+	text, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+	for _, c := range resp.Cookies() {
+		if _, known := b.cookies[c.Name]; !known {
+			b.order = append(b.order, c.Name)
+		}
+		b.cookies[c.Name] = c.Value // the last one the tool sent wins
 	}
+	return resp, string(text), nil
+}
 
-	u, _ := url.Parse(base)
+var (
+	pmaTokenRe   = regexp.MustCompile(`name="token" value="([0-9a-f]+)"`)
+	pmaSessionRe = regexp.MustCompile(`name="set_session" value="([0-9a-f]+)"`)
+)
+
+// login logs in to the session's tool as the database's own user. It returns the
+// cookies the tool made, which are what lets the browser in, and the path to send
+// the person to.
+func (m *Manager) login(ctx context.Context, s *session) ([]*http.Cookie, string, error) {
+	b := newToolBrowser(fmt.Sprintf("http://%s:%d", m.cfg.Upstream, s.port))
+
+	switch s.Tool {
+	case "phpmyadmin":
+		_, page, err := b.do(ctx, http.MethodGet, "/index.php", nil)
+		if err != nil {
+			return nil, "", err
+		}
+		token, session := pmaTokenRe.FindStringSubmatch(page), pmaSessionRe.FindStringSubmatch(page)
+		if token == nil || session == nil {
+			return nil, "", fmt.Errorf("phpMyAdmin showed no login form")
+		}
+		resp, _, err := b.do(ctx, http.MethodPost, "/index.php", url.Values{
+			"set_session":  {session[1]},
+			"pma_username": {s.user},
+			"pma_password": {s.password},
+			"server":       {"1"},
+			"route":        {"/"},
+			"lang":         {"en"},
+			"token":        {token[1]},
+		})
+		if err != nil {
+			return nil, "", err
+		}
+		// A login that worked is sent on (302); a refusal shows the form again.
+		if resp.StatusCode != http.StatusFound {
+			return nil, "", fmt.Errorf("phpMyAdmin did not accept the login (%d)", resp.StatusCode)
+		}
+		return b.owned(s), s.prefix + "/index.php?route=/database/structure&db=" + url.QueryEscape(s.Database), nil
+
+	case "adminer":
+		if _, _, err := b.do(ctx, http.MethodGet, "/", nil); err != nil {
+			return nil, "", err
+		}
+		resp, _, err := b.do(ctx, http.MethodPost, "/", url.Values{
+			"auth[driver]":   {"pgsql"},
+			"auth[server]":   {"db-" + s.Server},
+			"auth[username]": {s.user},
+			"auth[password]": {s.password},
+			"auth[db]":       {s.Database},
+		})
+		if err != nil {
+			return nil, "", err
+		}
+		location := resp.Header.Get("Location")
+		if resp.StatusCode != http.StatusFound || !strings.HasPrefix(location, "?") {
+			return nil, "", fmt.Errorf("Adminer did not accept the login (%d)", resp.StatusCode)
+		}
+		return b.owned(s), s.prefix + "/" + location, nil
+	}
+	return nil, "", fmt.Errorf("unknown tool %q", s.Tool)
+}
+
+// owned are the cookies the tool made that belong to it, in the order it made them.
+func (b *toolBrowser) owned(s *session) []*http.Cookie {
 	var out []*http.Cookie
-	for _, c := range jar.Cookies(u) {
-		if hasPrefix(c.Name, cookiePrefixes["adminer"]) {
-			out = append(out, c)
+	for _, name := range b.order {
+		if hasPrefix(name, cookiePrefixes[s.Tool]) {
+			out = append(out, &http.Cookie{Name: name, Value: b.cookies[name]})
 		}
 	}
-	if len(out) == 0 {
-		return nil, "", fmt.Errorf("Adminer set no session")
-	}
-	return out, location, nil
+	return out
 }
 
 // proxy passes a request to the session's tool, after checking the browser
@@ -151,8 +213,9 @@ func (m *Manager) proxy(w http.ResponseWriter, r *http.Request) {
 
 	m.mu.Lock()
 	s := m.sessions[id]
+	ready := s != nil && s.Stage == StageReady
 	m.mu.Unlock()
-	if s == nil || s.Stage != StageReady {
+	if !ready {
 		notFound(w)
 		return
 	}
@@ -180,6 +243,11 @@ func (m *Manager) proxy(w http.ResponseWriter, r *http.Request) {
 
 	m.touch(s)
 	r.Body = http.MaxBytesReader(w, r.Body, m.cfg.MaxUpload)
+
+	// What the tool says about these is what counts; ours are the fallback in shape().
+	for _, h := range []string{"Cache-Control", "Referrer-Policy", "X-Content-Type-Options"} {
+		w.Header().Del(h)
+	}
 
 	target := &url.URL{Scheme: "http", Host: fmt.Sprintf("%s:%d", m.cfg.Upstream, s.port)}
 	proxy := &httputil.ReverseProxy{
@@ -258,12 +326,23 @@ func (m *Manager) shape(s *session, target *url.URL, resp *http.Response) error 
 		}
 	}
 
-	h.Del("Server")
-	h.Del("X-Powered-By")
+	// Headers that reach beyond the tool's own page: the browser keeps them for the whole host,
+	// which the panel shares (a different port is not a different host to these).
+	for _, name := range []string{
+		"Server", "X-Powered-By", "Strict-Transport-Security", "Clear-Site-Data", "Refresh",
+		"Content-Location", "Link", "Public-Key-Pins", "Alt-Svc", "Report-To", "Reporting-Endpoints",
+		"Access-Control-Allow-Origin", "Access-Control-Allow-Credentials", "Access-Control-Allow-Headers",
+		"Access-Control-Allow-Methods", "Access-Control-Expose-Headers", "Access-Control-Max-Age",
+	} {
+		h.Del(name)
+	}
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Referrer-Policy", "no-referrer")
 	if h.Get("X-Frame-Options") == "" {
 		h.Set("X-Frame-Options", "DENY")
+	}
+	if h.Get("Content-Security-Policy") == "" {
+		h.Set("Content-Security-Policy", "frame-ancestors 'none'")
 	}
 	if h.Get("Cache-Control") == "" {
 		h.Set("Cache-Control", "no-store")

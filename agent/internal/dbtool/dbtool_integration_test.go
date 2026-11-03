@@ -136,6 +136,31 @@ func TestRealTools(t *testing.T) {
 				t.Errorf("mounts = %+v", tool.Mounts)
 			}
 
+			// Anything on this machine that finds the container's port directly meets the login form,
+			// not a logged-in session: the password is not in the container.
+			for _, p := range tool.Ports {
+				direct, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/", p.Host))
+				if err != nil {
+					t.Fatal(err)
+				}
+				page, _ := io.ReadAll(io.LimitReader(direct.Body, 2<<20))
+				direct.Body.Close()
+				want := "pma_username"
+				if c.engine == "postgres" {
+					want = "auth[username]"
+				}
+				if !strings.Contains(string(page), want) {
+					t.Errorf("the container's own port does not show a login form:\n%.400s", page)
+				}
+				if strings.Contains(string(page), "shop") && !strings.Contains(string(page), want) {
+					t.Error("the container's own port is logged in")
+				}
+			}
+			inspect, _ := exec.Command("docker", "inspect", "-f", "{{range .Config.Env}}{{println .}}{{end}}", tool.Name).CombinedOutput()
+			if strings.Contains(string(inspect), userPw) || strings.Contains(string(inspect), "PMA_USER") || strings.Contains(string(inspect), "PMA_PASSWORD") {
+				t.Errorf("the container's environment holds the login:\n%s", inspect)
+			}
+
 			// A browser: no redirects followed, cookies kept by hand (the proxy marks
 			// them Secure, and this test talks plain http).
 			jar := map[string]string{}
