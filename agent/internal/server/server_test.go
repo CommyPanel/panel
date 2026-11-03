@@ -1002,6 +1002,9 @@ type blockingDocker struct {
 	release chan struct{}
 }
 
+// RegisterDump is called by two dumps at once here; the shared fake it would append to is not for that.
+func (b *blockingDocker) RegisterDump(string) error { return nil }
+
 func (b *blockingDocker) DumpDatabase(ctx context.Context, t docker.DatabaseTarget, db string) (string, error) {
 	<-b.release
 	return b.fakeDocker.DumpDatabase(ctx, t, db)

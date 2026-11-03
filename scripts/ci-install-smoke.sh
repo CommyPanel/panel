@@ -86,11 +86,24 @@ check_address_detection() {
     case "$out" in *'"ipv4":['*'"ipv6":['*) ok "the agent lists the public addresses on the interfaces" ;; *) fail "the agent's addresses call answered: ${out:-nothing}" ;; esac
 }
 
+# Database tools (phpMyAdmin, Adminer) are served on a port of their own, which nginx hands to
+# the agent's tool socket. Without a ticket every answer is the same plain 404.
+check_tools_port() {
+    local code
+    [ -S /run/commypanel-dbtool/dbtool.sock ] || fail "the database tool socket is missing"
+    code="$(curl -sk -o /dev/null -w '%{http_code}' 'https://127.0.0.1:2053/open?t=nothing' || true)"
+    [ "$code" = 404 ] || fail "the database tool port answered $code instead of the agent's 404"
+    code="$(curl -sk -o /dev/null -w '%{http_code}' 'https://127.0.0.1:2053/s/anything/' || true)"
+    [ "$code" = 404 ] || fail "a tool session address answered $code without a session"
+    ok "the database tool port reaches the agent"
+}
+
 install_it "install"
 check_running
 check_page
 check_acme_webroot
 check_address_detection
+check_tools_port
 
 install_it "upgrade over the same version"
 check_running
