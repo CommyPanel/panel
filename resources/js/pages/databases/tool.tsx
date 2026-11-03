@@ -34,7 +34,7 @@ async function call(
         method,
         credentials: 'same-origin',
         headers: jsonHeaders(),
-        body: method === 'POST' ? '{}' : undefined,
+        ...(method === 'POST' ? { body: '{}' } : {}),
     });
 
     return {
