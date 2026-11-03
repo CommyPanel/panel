@@ -2,6 +2,7 @@
 
 use App\Auth\Permissions;
 use App\Http\Controllers\ApiTokenController;
+use App\Http\Controllers\AppAutoDeployController;
 use App\Http\Controllers\AppContainerController;
 use App\Http\Controllers\AppController;
 use App\Http\Controllers\AppDomainController;
@@ -115,6 +116,7 @@ Route::middleware('auth')->group(function () {
             Route::post('deploy-key', [DeployKeyController::class, 'store'])->name('deploy-key.store');
             Route::post('git-token', [GitTokenController::class, 'store'])->name('git-token.store');
             Route::delete('git-token', [GitTokenController::class, 'destroy'])->name('git-token.destroy');
+            Route::put('auto-deploy', [AppAutoDeployController::class, 'update'])->name('auto-deploy.update');
             Route::post('webhook', [AppWebhookController::class, 'store'])->name('webhook.store');
             Route::delete('webhook', [AppWebhookController::class, 'destroy'])->name('webhook.destroy');
             Route::post('source', [AppSourceController::class, 'upload'])->name('source.upload');

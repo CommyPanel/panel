@@ -1,6 +1,7 @@
 import { router } from '@inertiajs/react';
 import { Webhook } from 'lucide-react';
 import { useState } from 'react';
+import AppAutoDeployController from '@/actions/App/Http/Controllers/AppAutoDeployController';
 import AppWebhookController from '@/actions/App/Http/Controllers/AppWebhookController';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,71 @@ function CopyField({ label, value }: { label: string; value: string }) {
     );
 }
 
+/** Deploy on push for an app read through the GitHub App: one switch, confirmed either way. */
+function GitHubAutoDeploy({
+    slug,
+    webhook,
+}: {
+    slug: string;
+    webhook: AppWebhook;
+}) {
+    const [busy, setBusy] = useState(false);
+    const [asking, setAsking] = useState(false);
+    const turningOn = !webhook.enabled;
+
+    const apply = () =>
+        router.put(
+            AppAutoDeployController.update(slug),
+            { enabled: turningOn },
+            {
+                preserveScroll: true,
+                onStart: () => setBusy(true),
+                onFinish: () => {
+                    setBusy(false);
+                    setAsking(false);
+                },
+            },
+        );
+
+    return (
+        <Card
+            title="Deploy on push"
+            description="Deploy automatically when the branch is pushed on GitHub. GitHub signs every call; anything else is refused."
+        >
+            <label className="flex cursor-pointer items-center gap-3">
+                <input
+                    type="checkbox"
+                    role="switch"
+                    className="toggle toggle-primary"
+                    checked={webhook.enabled}
+                    onChange={() => setAsking(true)}
+                />
+                <span className="text-sm">
+                    {webhook.enabled
+                        ? `On: a push to ${webhook.branch} deploys this app.`
+                        : 'Off: only the Deploy button deploys this app.'}
+                </span>
+            </label>
+            <ConfirmModal
+                open={asking}
+                title={
+                    turningOn
+                        ? 'Deploy on every push?'
+                        : 'Stop deploying on push?'
+                }
+                confirmLabel={turningOn ? 'Turn on' : 'Turn off'}
+                loading={busy}
+                onConfirm={apply}
+                onClose={() => setAsking(false)}
+            >
+                {turningOn
+                    ? `From now on, every push to ${webhook.branch} on GitHub builds and deploys this app by itself, with no further question. A failed build keeps the running version serving. A stopped app is not started. You can turn this off again here.`
+                    : `Pushes to ${webhook.branch} no longer deploy this app. Nothing running changes; use the Deploy button when you want a new version.`}
+            </ConfirmModal>
+        </Card>
+    );
+}
+
 /** Deploy on push: the webhook URL and secret to add to the Git host. */
 export function WebhookCard({
     slug,
@@ -50,6 +116,10 @@ export function WebhookCard({
 }) {
     const [busy, setBusy] = useState(false);
     const [confirm, setConfirm] = useState<'renew' | 'off' | null>(null);
+
+    if (webhook.github) {
+        return <GitHubAutoDeploy slug={slug} webhook={webhook} />;
+    }
 
     const send = (action: 'renew' | 'off' | 'on') => {
         const options = {

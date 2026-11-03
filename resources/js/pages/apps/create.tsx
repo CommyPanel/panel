@@ -38,7 +38,7 @@ export default function Create({ github }: { github: GitHubRepos | null }) {
                   {
                       value: 'github',
                       title: 'GitHub repository',
-                      text: 'Pick one of the repositories you gave CommyPanel access to. Deploys on every push.',
+                      text: 'Pick one of the repositories you gave CommyPanel access to.',
                       icon: GitPullRequest,
                   },
               ]

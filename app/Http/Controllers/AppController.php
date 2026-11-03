@@ -103,6 +103,11 @@ class AppController extends Controller
             return null;
         }
 
+        // Read through the GitHub App: one switch, no address or secret to copy.
+        if ($app->github_repo !== null) {
+            return ['github' => true, 'enabled' => $app->github_auto_deploy, 'branch' => $app->git_branch, 'provider' => 'GitHub', 'settings_url' => null, 'steps' => []];
+        }
+
         $provider = GitProvider::fromUrl((string) $app->git_url);
         $help = $provider->webhookInstructions((string) $app->git_url);
         $data = ['enabled' => $app->webhook_id !== null, 'provider' => $provider->label(), 'settings_url' => $help['url'], 'steps' => $help['steps']];

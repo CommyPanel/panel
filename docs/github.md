@@ -14,6 +14,8 @@ branch deploys it.
 3. Install the app on your account and choose which repositories it may read. Come back to the panel and
    press "I installed it" (GitHub also sends you back by itself).
 4. Create an app > GitHub repository, pick the repository.
+5. Optional: on the app's Settings tab, switch on **Deploy on push**. It is off by default, and the panel asks
+   you to confirm turning it on or off.
 
 ## What it can do
 

@@ -61,6 +61,7 @@ class GitHubWebhookController extends Controller
         $apps = App::query()
             ->whereRaw('lower(github_repo) = ?', [strtolower($repo)])
             ->whereNull('setup_step')
+            ->where('github_auto_deploy', true)
             ->where('source_type', SourceType::Git->value)
             ->get();
 

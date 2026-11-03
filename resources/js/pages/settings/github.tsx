@@ -260,8 +260,8 @@ export default function GitHub({
                                 deployable.
                             </li>
                             <li>
-                                A push to an app&apos;s branch deploys it
-                                automatically.
+                                Deploying on every push is a switch on each app,
+                                off until you turn it on.
                             </li>
                             <li>
                                 The panel contacts github.com only when you use

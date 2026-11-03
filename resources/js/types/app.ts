@@ -128,6 +128,9 @@ export type TokenHelp = {
 /** The app's push webhook; null for uploaded apps. */
 export type AppWebhook = {
     enabled: boolean;
+    /** Read through the GitHub App: a single switch instead of an address and secret. */
+    github?: boolean;
+    branch?: string;
     provider: string;
     /** Where to add the webhook on the Git host. */
     settings_url: string | null;

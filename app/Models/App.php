@@ -31,6 +31,8 @@ use Illuminate\Support\Str;
  * @property string|null $deploy_key_public
  * @property string|null $git_token
  * @property string|null $git_token_username
+ * @property string|null $github_repo
+ * @property bool $github_auto_deploy
  * @property string|null $webhook_id
  * @property string|null $webhook_secret
  * @property string|null $nginx_custom
@@ -70,6 +72,7 @@ class App extends Model
             'deploy_key_private' => 'encrypted',
             'git_token' => 'encrypted',
             'webhook_secret' => 'encrypted',
+            'github_auto_deploy' => 'boolean',
         ];
     }
 

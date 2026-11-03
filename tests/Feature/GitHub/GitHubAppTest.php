@@ -242,7 +242,7 @@ describe('the webhook', function () {
         Queue::fake();
         ($this->create)();
         ($this->install)();
-        $this->shop = App::factory()->create(['slug' => 'shop', 'github_repo' => 'acme/shop', 'git_branch' => 'develop', 'git_url' => 'https://github.com/acme/shop.git', 'setup_step' => null]);
+        $this->shop = App::factory()->create(['slug' => 'shop', 'github_repo' => 'acme/shop', 'git_branch' => 'develop', 'git_url' => 'https://github.com/acme/shop.git', 'setup_step' => null, 'github_auto_deploy' => true]);
         $this->push = function (array $payload = [], ?string $secret = 'whsec_shared', string $event = 'push') {
             $payload = [...['ref' => 'refs/heads/develop', 'after' => str_repeat('a', 40), 'repository' => ['full_name' => 'acme/shop'], 'installation' => ['id' => 99]], ...$payload];
             $body = json_encode($payload);
@@ -304,9 +304,50 @@ describe('the webhook', function () {
         expect(Deployment::query()->count())->toBe(App::query()->find($this->shop->id)->status() === AppStatus::Stopped ? 0 : 1);
     });
 
+    it('does nothing for an app that has deploy on push off', function () {
+        $this->shop->forceFill(['github_auto_deploy' => false])->save();
+
+        ($this->push)()->assertStatus(202);
+
+        expect(Deployment::query()->count())->toBe(0);
+    });
+
     it('does not answer when GitHub is not connected', function () {
         app(GitHubApp::class)->disconnect();
 
         ($this->push)()->assertNotFound();
+    });
+});
+
+describe('the deploy on push switch', function () {
+    beforeEach(function () {
+        $this->shop = App::factory()->create(['slug' => 'shop', 'github_repo' => 'acme/shop', 'git_branch' => 'develop', 'setup_step' => null]);
+    });
+
+    it('is off for a new app and is changed, audited, by people who may update apps', function () {
+        expect($this->shop->fresh()->github_auto_deploy)->toBeFalse();
+
+        $this->actingAs($this->user)->put('/apps/shop/auto-deploy', ['enabled' => true])->assertSessionHasNoErrors();
+        expect($this->shop->fresh()->github_auto_deploy)->toBeTrue()
+            ->and(AuditLog::query()->where('action', 'app.auto_deploy_enabled')->exists())->toBeTrue();
+
+        $this->actingAs($this->user)->put('/apps/shop/auto-deploy', ['enabled' => false]);
+        expect($this->shop->fresh()->github_auto_deploy)->toBeFalse()
+            ->and(AuditLog::query()->where('action', 'app.auto_deploy_disabled')->exists())->toBeTrue();
+    });
+
+    it('needs the update permission and only exists for apps read through GitHub', function () {
+        $viewer = User::factory()->regular()->create();
+        $viewer->givePermissionTo('apps.view');
+        $this->actingAs($viewer)->put('/apps/shop/auto-deploy', ['enabled' => true])->assertForbidden();
+
+        App::factory()->create(['slug' => 'plain', 'setup_step' => null]);
+        $this->actingAs($this->user)->put('/apps/plain/auto-deploy', ['enabled' => true])->assertNotFound();
+        $this->actingAs($this->user)->put('/apps/shop/auto-deploy', ['enabled' => 'maybe'])->assertSessionHasErrors('enabled');
+    });
+
+    it('is what the app page shows instead of an address and a secret', function () {
+        $this->actingAs($this->user)->get('/apps/shop')->assertInertia(fn (Assert $page) => $page
+            ->where('webhook.github', true)->where('webhook.enabled', false)->where('webhook.branch', 'develop')->missing('webhook.secret')->missing('webhook.url'));
     });
 });
