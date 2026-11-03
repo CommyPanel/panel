@@ -5,6 +5,8 @@ export type DatabaseServer = {
     name: string;
     engine: 'mariadb' | 'mysql' | 'postgres';
     engine_label: string;
+    /** The tool a database of this server opens in: phpMyAdmin or Adminer. */
+    tool: string;
     version: string;
     status: DatabaseStatus;
     status_label: string;

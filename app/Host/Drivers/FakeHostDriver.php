@@ -8,6 +8,7 @@ use App\Host\Data\ContainerInfo;
 use App\Host\Data\ContainerSpec;
 use App\Host\Data\ContainerUsage;
 use App\Host\Data\DatabaseTarget;
+use App\Host\Data\DatabaseToolSession;
 use App\Host\Data\DockerDiagnosis;
 use App\Host\Data\DockerInfo;
 use App\Host\Data\HostInfo;
@@ -32,6 +33,7 @@ use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Records host operations instead of performing them.
@@ -68,6 +70,12 @@ class FakeHostDriver implements HostDriver
 
     private ?PublicAddresses $publicAddresses = null;
 
+    /** @var array{0: string, 1: string|null} */
+    private array $toolStage = ['ready', null];
+
+    /** @var array<string, array{tool: string, server: string, database: string}> */
+    private array $toolSessions = [];
+
     /** @var list<string> images that were pulled */
     private array $pulledImages = [];
 
@@ -87,7 +95,7 @@ class FakeHostDriver implements HostDriver
     private const DOCKER_ACTIONS = [
         'buildImage', 'runContainer', 'runTask', 'stopContainer', 'startContainer', 'restartContainer',
         'removeContainer', 'containerLogs', 'pruneDanglingImages', 'removeImage', 'removeNetwork',
-        'pullImage', 'databaseReady', 'dumpDatabase', 'restoreDatabase', 'backupVolume', 'createDatabase', 'dropDatabase', 'setDatabasePassword', 'connectNetwork', 'disconnectNetwork', 'pruneLinkNetworks',
+        'pullImage', 'databaseReady', 'dumpDatabase', 'restoreDatabase', 'backupVolume', 'startDatabaseTool', 'databaseToolStatus', 'databaseToolTicket', 'stopDatabaseTool', 'createDatabase', 'dropDatabase', 'setDatabasePassword', 'connectNetwork', 'disconnectNetwork', 'pruneLinkNetworks',
     ];
 
     /**
@@ -492,6 +500,51 @@ class FakeHostDriver implements HostDriver
         $this->record('backupVolume', ['app' => $app, 'name' => $name]);
 
         file_put_contents($toPath, gzencode("fake archive of {$app}/{$name}"));
+    }
+
+    /**
+     * How far the fake tool sessions get (tests): 'ready' by default, or 'pulling', 'failed'.
+     */
+    public function setToolStage(string $stage, ?string $error = null): void
+    {
+        $this->toolStage = [$stage, $error];
+    }
+
+    public function startDatabaseTool(string $engine, string $server, string $database, string $user, #[\SensitiveParameter] string $password, string $publicBase): DatabaseToolSession
+    {
+        $this->record('startDatabaseTool', ['engine' => $engine, 'server' => $server, 'database' => $database, 'user' => $user, 'public_base' => $publicBase]);
+
+        $id = Str::random(24);
+        $tool = $engine === 'postgres' ? 'adminer' : 'phpmyadmin';
+        $this->toolSessions[$id] = ['tool' => $tool, 'server' => $server, 'database' => $database];
+
+        return new DatabaseToolSession($id, $this->toolStage[0] === 'ready' ? 'pulling' : $this->toolStage[0], $tool, $server, $database, $this->toolStage[1]);
+    }
+
+    public function databaseToolStatus(string $session): ?DatabaseToolSession
+    {
+        $this->record('databaseToolStatus', ['session' => $session]);
+
+        $s = $this->toolSessions[$session] ?? null;
+
+        return $s === null ? null : new DatabaseToolSession($session, $this->toolStage[0], $s['tool'], $s['server'], $s['database'], $this->toolStage[1]);
+    }
+
+    public function databaseToolTicket(string $session): string
+    {
+        $this->record('databaseToolTicket', ['session' => $session]);
+
+        if (! isset($this->toolSessions[$session])) {
+            throw new HostOperationFailed('Agent error: the database tool is not ready');
+        }
+
+        return 'ticket-'.Str::random(37);
+    }
+
+    public function stopDatabaseTool(string $session): void
+    {
+        $this->record('stopDatabaseTool', ['session' => $session]);
+        unset($this->toolSessions[$session]);
     }
 
     public function restoreDatabase(DatabaseTarget $server, string $database, string $user, string $serverSlug, string $file): void

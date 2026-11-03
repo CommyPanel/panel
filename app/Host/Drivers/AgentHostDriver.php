@@ -8,6 +8,7 @@ use App\Host\Data\ContainerInfo;
 use App\Host\Data\ContainerSpec;
 use App\Host\Data\ContainerUsage;
 use App\Host\Data\DatabaseTarget;
+use App\Host\Data\DatabaseToolSession;
 use App\Host\Data\DockerDiagnosis;
 use App\Host\Data\DockerInfo;
 use App\Host\Data\HostInfo;
@@ -565,6 +566,71 @@ class AgentHostDriver implements HostDriver
                 @unlink($partial);
             }
         }
+    }
+
+    public function startDatabaseTool(string $engine, string $server, string $database, string $user, #[\SensitiveParameter] string $password, string $publicBase): DatabaseToolSession
+    {
+        ResourceName::assertValid($server);
+
+        $data = $this->send('post', '/v1/dbtools/start', [
+            'engine' => $engine, 'server' => $server, 'database' => $database,
+            'user' => $user, 'password' => $password, 'public_base' => $publicBase,
+        ]);
+
+        return $this->toolSession($data);
+    }
+
+    public function databaseToolStatus(string $session): ?DatabaseToolSession
+    {
+        $this->assertSession($session);
+
+        $response = $this->request(fn () => $this->client(timeout: 8)->get('/v1/dbtools/'.$session));
+
+        if ($response->status() === 404) {
+            return null;
+        }
+
+        return $this->toolSession($this->handle($response));
+    }
+
+    public function databaseToolTicket(string $session): string
+    {
+        $this->assertSession($session);
+        $ticket = $this->send('post', '/v1/dbtools/'.$session.'/ticket')['ticket'] ?? null;
+
+        if (! is_string($ticket) || $ticket === '') {
+            throw new HostOperationFailed('The agent did not give a ticket.');
+        }
+
+        return $ticket;
+    }
+
+    public function stopDatabaseTool(string $session): void
+    {
+        $this->assertSession($session);
+        $this->send('post', '/v1/dbtools/'.$session.'/stop');
+    }
+
+    private function assertSession(string $session): void
+    {
+        if (preg_match('/^[A-Za-z0-9_-]{16,64}$/', $session) !== 1) {
+            throw new InvalidArgumentException('Invalid tool session.');
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function toolSession(array $data): DatabaseToolSession
+    {
+        return new DatabaseToolSession(
+            id: (string) ($data['id'] ?? ''),
+            stage: (string) ($data['stage'] ?? ''),
+            tool: (string) ($data['tool'] ?? ''),
+            server: (string) ($data['server'] ?? ''),
+            database: (string) ($data['database'] ?? ''),
+            error: isset($data['error']) ? (string) $data['error'] : null,
+        );
     }
 
     public function restoreDatabase(DatabaseTarget $server, string $database, string $user, string $serverSlug, string $file): void

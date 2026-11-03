@@ -119,6 +119,7 @@ describe('route protection', function () {
         'databases.view' => [['get', '/databases'], ['get', '/databases/main']],
         'databases.manage' => [['post', '/databases'], ['post', '/databases/main/start'], ['post', '/databases/main/stop'], ['post', '/databases/main/restart'], ['post', '/databases/main/retry'], ['delete', '/databases/main'], ['post', '/databases/main/databases'], ['delete', '/databases/main/databases/1'], ['post', '/databases/main/databases/1/password'], ['post', '/databases/main/databases/1/backup'], ['get', '/databases/main/backups/shop-20260101-000000.sql.gz'], ['delete', '/databases/main/backups/shop-20260101-000000.sql.gz']],
         'databases.credentials' => [['get', '/databases/main/databases/1/credentials']],
+        'databases.tools' => [['get', '/databases/main/databases/1/tool'], ['post', '/databases/main/databases/1/tool'], ['get', '/databases/main/databases/1/tool/abcdefghijklmnopqrstuvwx'], ['post', '/databases/main/databases/1/tool/abcdefghijklmnopqrstuvwx/open'], ['post', '/databases/main/databases/1/tool/abcdefghijklmnopqrstuvwx/stop']],
         'apps.logs' => [['get', '/apps/shop/logs'], ['get', '/apps/shop/logs/download']],
         'apps.control' => [['post', '/apps/shop/stop'], ['post', '/apps/shop/start'], ['post', '/apps/shop/restart']],
         'apps.deactivate' => [['post', '/apps/shop/deactivate'], ['post', '/apps/shop/activate']],

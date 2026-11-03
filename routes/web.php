@@ -24,6 +24,7 @@ use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DatabaseBackupController;
 use App\Http\Controllers\DatabaseServerController;
+use App\Http\Controllers\DatabaseToolController;
 use App\Http\Controllers\DeployKeyController;
 use App\Http\Controllers\DeploymentController;
 use App\Http\Controllers\DomainController;
@@ -186,6 +187,15 @@ Route::middleware('auth')->group(function () {
             Route::post('{server:slug}/backups/{name}/restore', [DatabaseBackupController::class, 'restore'])->where('name', '[a-z0-9_.-]+')->middleware('password.confirm')->name('backups.restore');
             Route::delete('{server:slug}/backups/{name}', [DatabaseBackupController::class, 'destroy'])->where('name', '[a-z0-9_.-]+')->middleware('password.confirm')->name('backups.destroy');
             Route::post('{server:slug}/databases/{database}/password', [ManagedDatabaseController::class, 'password'])->whereNumber('database')->middleware('password.confirm')->name('databases.password');
+        });
+
+        // phpMyAdmin and Adminer: a page that starts the tool and follows it, and the calls it makes.
+        Route::middleware(['can:'.Permissions::DATABASES_TOOLS, 'password.confirm'])->where(['database' => '[0-9]+', 'session' => '[A-Za-z0-9_-]{16,64}'])->group(function () {
+            Route::get('{server:slug}/databases/{database}/tool', [DatabaseToolController::class, 'show'])->name('databases.tool.show');
+            Route::post('{server:slug}/databases/{database}/tool', [DatabaseToolController::class, 'start'])->middleware('throttle:10,1')->name('databases.tool.start');
+            Route::get('{server:slug}/databases/{database}/tool/{session}', [DatabaseToolController::class, 'status'])->name('databases.tool.status');
+            Route::post('{server:slug}/databases/{database}/tool/{session}/open', [DatabaseToolController::class, 'open'])->middleware('throttle:20,1')->name('databases.tool.open');
+            Route::post('{server:slug}/databases/{database}/tool/{session}/stop', [DatabaseToolController::class, 'stop'])->name('databases.tool.stop');
         });
 
         Route::get('{server:slug}/databases/{database}/credentials', [ManagedDatabaseController::class, 'credentials'])

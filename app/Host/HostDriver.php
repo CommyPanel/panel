@@ -7,6 +7,7 @@ use App\Host\Data\CertificateRequest;
 use App\Host\Data\ContainerInfo;
 use App\Host\Data\ContainerSpec;
 use App\Host\Data\DatabaseTarget;
+use App\Host\Data\DatabaseToolSession;
 use App\Host\Data\DockerDiagnosis;
 use App\Host\Data\DockerInfo;
 use App\Host\Data\HostInfo;
@@ -266,6 +267,38 @@ interface HostDriver
      * @throws HostOperationFailed
      */
     public function backupVolume(string $app, string $name, string $toPath): void;
+
+    /**
+     * Begin opening a database in its tool (phpMyAdmin for MySQL and MariaDB, Adminer for
+     * PostgreSQL): the agent starts a short-lived container next to the database server,
+     * logged in as that database's own user, and removes it after 15 minutes without use.
+     * Returns at once; follow it with databaseToolStatus. `$publicBase` is the web address of
+     * the tools port as the browser reaches it, such as https://panel.example.com:2053.
+     *
+     * @throws HostOperationFailed
+     */
+    public function startDatabaseTool(string $engine, string $server, string $database, string $user, #[\SensitiveParameter] string $password, string $publicBase): DatabaseToolSession;
+
+    /**
+     * How far a tool session is, or null when there is none (it ended, or the agent restarted).
+     *
+     * @throws HostOperationFailed
+     */
+    public function databaseToolStatus(string $session): ?DatabaseToolSession;
+
+    /**
+     * The single-use secret that lets a browser into a ready tool session.
+     *
+     * @throws HostOperationFailed
+     */
+    public function databaseToolTicket(string $session): string;
+
+    /**
+     * Close a tool session and remove its container.
+     *
+     * @throws HostOperationFailed
+     */
+    public function stopDatabaseTool(string $session): void;
 
     /**
      * Delete the data folder of a database server, which must have no container.

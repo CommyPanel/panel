@@ -45,6 +45,8 @@ final class Permissions
 
     public const DATABASES_CREDENTIALS = 'databases.credentials';
 
+    public const DATABASES_TOOLS = 'databases.tools';
+
     public const APPS_LINKS = 'apps.links';
 
     public const BACKUPS_VIEW = 'backups.view';
@@ -95,6 +97,7 @@ final class Permissions
             self::DATABASES_VIEW => ['group' => 'Databases', 'label' => 'View databases', 'description' => 'See the database servers, the databases on them and which apps use them. Passwords and connection strings are not shown.'],
             self::DATABASES_MANAGE => ['group' => 'Databases', 'label' => 'Manage databases', 'description' => 'Create, start, stop and delete database servers, and create, drop and change the password of databases on them. Deleting a server deletes the data of every database on it.'],
             self::DATABASES_CREDENTIALS => ['group' => 'Databases', 'label' => 'See database passwords', 'description' => 'Show a database\'s password and connection string. Asks for the password unless it was confirmed recently, and every time it is shown is recorded in the audit log.'],
+            self::DATABASES_TOOLS => ['group' => 'Databases', 'label' => 'Open databases in phpMyAdmin or Adminer', 'description' => 'Open a database in phpMyAdmin (MySQL, MariaDB) or Adminer (PostgreSQL), logged in as that database\'s own user: read, change and delete its data, run SQL and import or export dumps. Asks for the password unless it was confirmed recently, and every opening is recorded in the audit log. Treat it like the database\'s password.'],
             self::APPS_LINKS => ['group' => 'Apps', 'label' => 'Link apps to databases and other apps', 'description' => 'Let an app reach a database, or another app, over a private network made for that link. A linked app can use the database it is given, and its connection details are added to its environment variables.'],
             self::BACKUPS_VIEW => ['group' => 'Server', 'label' => 'View backups', 'description' => 'See the list of the panel\'s backups, when they were made and how big they are.'],
             self::BACKUPS_MANAGE => ['group' => 'Server', 'label' => 'Manage backups', 'description' => 'Take a backup now, download one and delete one. A backup holds everything in the panel\'s database, including the encrypted secrets of apps and databases, so downloading asks for the password and is recorded in the audit log.'],

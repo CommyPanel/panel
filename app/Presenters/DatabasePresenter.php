@@ -2,6 +2,7 @@
 
 namespace App\Presenters;
 
+use App\Databases\DatabaseTools;
 use App\Models\DatabaseServer;
 use App\Models\ManagedDatabase;
 
@@ -21,6 +22,8 @@ class DatabasePresenter
             'name' => $server->name,
             'engine' => $server->engine->value,
             'engine_label' => $server->engine->label(),
+            // The tool a database of this server opens in: phpMyAdmin for MySQL and MariaDB, Adminer for PostgreSQL.
+            'tool' => DatabaseTools::toolName($server),
             'version' => $server->version,
             'status' => $server->status->value,
             'status_label' => $server->status->label(),

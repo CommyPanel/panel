@@ -3,6 +3,7 @@ import {
     Archive,
     ArrowLeft,
     Download,
+    ExternalLink,
     KeyRound,
     Play,
     Plus,
@@ -15,6 +16,7 @@ import {
 import { useEffect, useState } from 'react';
 import DatabaseBackupController from '@/actions/App/Http/Controllers/DatabaseBackupController';
 import DatabaseServerController from '@/actions/App/Http/Controllers/DatabaseServerController';
+import DatabaseToolController from '@/actions/App/Http/Controllers/DatabaseToolController';
 import ManagedDatabaseController from '@/actions/App/Http/Controllers/ManagedDatabaseController';
 import { AddDatabaseModal } from '@/components/databases/add-database-modal';
 import { CredentialsModal } from '@/components/databases/credentials-modal';
@@ -394,7 +396,7 @@ export default function Show({ server, databases, backups, keep }: Props) {
                                                     <span className="badge-soft ml-2 badge badge-error">
                                                         Restore failed
                                                     </span>
-                                                    <p className="mt-1 text-sm break-words text-base-content/70">
+                                                    <p className="mt-1 max-w-sm text-sm break-words text-base-content/70">
                                                         {database.restore.error}
                                                     </p>
                                                 </>
@@ -414,72 +416,101 @@ export default function Show({ server, databases, backups, keep }: Props) {
                                                 ))
                                             )}
                                         </td>
-                                        <td className="text-right whitespace-nowrap">
-                                            {can('databases.credentials') && (
-                                                <Button
-                                                    variant="soft"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        showCredentials(
-                                                            database,
-                                                        )
-                                                    }
-                                                >
-                                                    <KeyRound
-                                                        className="size-4"
-                                                        aria-hidden
-                                                    />
-                                                    Connection
-                                                </Button>
-                                            )}
-                                            {manage && running && (
-                                                <>
+                                        <td className="min-w-72">
+                                            <div className="flex flex-wrap justify-end gap-1">
+                                                {can(
+                                                    'databases.credentials',
+                                                ) && (
                                                     <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        loading={busy}
-                                                        onClick={() =>
-                                                            backUp(database)
-                                                        }
-                                                    >
-                                                        <Archive
-                                                            className="size-4"
-                                                            aria-hidden
-                                                        />
-                                                        Back up
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
+                                                        variant="soft"
                                                         size="sm"
                                                         onClick={() =>
-                                                            setRotating(
+                                                            showCredentials(
                                                                 database,
                                                             )
                                                         }
                                                     >
-                                                        <RotateCw
+                                                        <KeyRound
                                                             className="size-4"
                                                             aria-hidden
                                                         />
-                                                        New password
+                                                        Connection
                                                     </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            setDropping(
-                                                                database,
-                                                            )
-                                                        }
-                                                    >
-                                                        <Trash2
-                                                            className="size-4"
-                                                            aria-hidden
-                                                        />
-                                                        Delete
-                                                    </Button>
-                                                </>
-                                            )}
+                                                )}
+                                                {can('databases.tools') &&
+                                                    running &&
+                                                    !database.restore && (
+                                                        <a
+                                                            href={
+                                                                DatabaseToolController.show(
+                                                                    {
+                                                                        server: server.slug,
+                                                                        database:
+                                                                            database.id,
+                                                                    },
+                                                                ).url
+                                                            }
+                                                            target="_blank"
+                                                            rel="noopener"
+                                                            className="btn btn-soft btn-sm"
+                                                            title={`Opens ${server.tool} in a new tab, logged in to this database only. It closes by itself after 15 minutes without activity.`}
+                                                        >
+                                                            <ExternalLink
+                                                                className="size-4"
+                                                                aria-hidden
+                                                            />
+                                                            {server.tool}
+                                                        </a>
+                                                    )}
+                                                {manage && running && (
+                                                    <>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            loading={busy}
+                                                            onClick={() =>
+                                                                backUp(database)
+                                                            }
+                                                        >
+                                                            <Archive
+                                                                className="size-4"
+                                                                aria-hidden
+                                                            />
+                                                            Back up
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                setRotating(
+                                                                    database,
+                                                                )
+                                                            }
+                                                        >
+                                                            <RotateCw
+                                                                className="size-4"
+                                                                aria-hidden
+                                                            />
+                                                            New password
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                setDropping(
+                                                                    database,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Trash2
+                                                                className="size-4"
+                                                                aria-hidden
+                                                            />
+                                                            Delete
+                                                        </Button>
+                                                    </>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
