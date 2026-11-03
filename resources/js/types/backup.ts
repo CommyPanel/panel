@@ -26,3 +26,13 @@ export type AlertSettings = {
     last_ok_at: string | null;
     last_error: string | null;
 };
+
+export type GitHubState = {
+    connected: boolean;
+    installed: boolean;
+    name: string | null;
+    slug: string | null;
+    account: string | null;
+    install_url: string | null;
+    settings_url: string | null;
+};

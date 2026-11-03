@@ -7,6 +7,7 @@ use App\Deploy\Deployer;
 use App\Deploy\DestroyApp;
 use App\Deploy\EnvParser;
 use App\Deploy\LockedException;
+use App\Deploy\Source\AccessState;
 use App\Deploy\Source\GitCredentials;
 use App\Deploy\Source\GitProvider;
 use App\Deploy\Source\GitUrl;
@@ -16,6 +17,7 @@ use App\Deploy\Source\UploadStorage;
 use App\Dns\ServerAddress;
 use App\Enums\SetupStep;
 use App\Enums\SourceType;
+use App\GitHub\GitHubFailed;
 use App\Http\Requests\FinishSetupRequest;
 use App\Models\App;
 use App\Models\AppEnvVar;
@@ -75,7 +77,12 @@ class AppSetupController extends Controller
             $app->forceFill(['git_branch' => $data['git_branch'], 'source_verified_at' => null])->save();
         }
 
-        $credentials = GitCredentials::forApp($app);
+        try {
+            $credentials = GitCredentials::forApp($app);
+        } catch (GitHubFailed $e) {
+            return response()->json(['state' => AccessState::Unreachable->value, 'message' => $e->getMessage(), 'ready' => false, 'branches' => []]);
+        }
+
         $result = $checker->check((string) $app->git_url, $app->git_branch, $credentials);
 
         // Deployments should use the address the working credentials need.

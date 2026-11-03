@@ -11,6 +11,8 @@ use App\Dns\PanelDomain;
 use App\Dns\ServerAddress;
 use App\Enums\SetupStep;
 use App\Enums\SourceType;
+use App\GitHub\GitHubApp;
+use App\GitHub\GitHubFailed;
 use App\Http\Requests\StoreAppRequest;
 use App\Http\Requests\UpdateAppRequest;
 use App\Models\App;
@@ -32,22 +34,36 @@ class AppController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(GitHubApp $github): Response
     {
-        return Inertia::render('apps/create');
+        $repos = ['repositories' => [], 'error' => null];
+
+        if ($github->installed()) {
+            try {
+                $repos['repositories'] = $github->repositories();
+            } catch (GitHubFailed $e) {
+                $repos['error'] = $e->getMessage();
+            }
+        }
+
+        return Inertia::render('apps/create', [
+            'github' => $github->installed() ? $repos : null,
+        ]);
     }
 
     public function store(StoreAppRequest $request, AuditLogger $audit): RedirectResponse
     {
         $data = $request->validated();
-        $git = $data['source'] === SourceType::Git->value;
+        $github = $data['source'] === 'github';
+        $git = $github || $data['source'] === SourceType::Git->value;
 
         $app = App::query()->create([
             'name' => $data['name'],
             'slug' => App::generateSlug($data['name']),
             'stack_hint' => $data['stack_hint'] ?? null,
-            'source_type' => $data['source'],
-            'git_url' => $git ? $data['git_url'] : null,
+            'source_type' => $git ? SourceType::Git : SourceType::Upload,
+            'git_url' => $github ? "https://github.com/{$data['github_repo']}.git" : ($git ? $data['git_url'] : null),
+            'github_repo' => $github ? $data['github_repo'] : null,
             'git_branch' => $git ? $data['git_branch'] : 'main',
             'setup_step' => SetupStep::Source,
         ]);

@@ -2,6 +2,8 @@
 
 namespace App\Deploy\Source;
 
+use App\GitHub\GitHubApp;
+use App\GitHub\GitHubFailed;
 use App\Models\App;
 use InvalidArgumentException;
 
@@ -49,10 +51,17 @@ final readonly class GitCredentials
     }
 
     /**
-     * What an app's deployments use: its access token wins over its deploy key.
+     * What an app's deployments use: for an app read through the panel's GitHub App, a fresh
+     * token for that one repository; otherwise its access token, which wins over its deploy key.
+     *
+     * @throws GitHubFailed when the GitHub App cannot give access
      */
     public static function forApp(App $app): ?self
     {
+        if ($app->github_repo !== null) {
+            return self::token('x-access-token', app(GitHubApp::class)->installationToken($app->github_repo));
+        }
+
         if ($app->git_token !== null && $app->git_token_username !== null) {
             return self::token($app->git_token_username, $app->git_token);
         }

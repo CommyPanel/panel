@@ -30,6 +30,7 @@ use App\Http\Controllers\DeployKeyController;
 use App\Http\Controllers\DeploymentController;
 use App\Http\Controllers\DomainController;
 use App\Http\Controllers\EnvVarController;
+use App\Http\Controllers\GitHubController;
 use App\Http\Controllers\GitTokenController;
 use App\Http\Controllers\HttpsController;
 use App\Http\Controllers\ManagedDatabaseController;
@@ -261,6 +262,15 @@ Route::middleware('auth')->group(function () {
         Route::delete('/settings/backups/remote', [BackupRemoteController::class, 'destroy'])->middleware('password.confirm')->name('settings.backups.remote.destroy');
         Route::get('/settings/backups/{name}', [BackupController::class, 'download'])->where('name', $name)->middleware('password.confirm')->name('settings.backups.download');
         Route::delete('/settings/backups/{name}', [BackupController::class, 'destroy'])->where('name', $name)->middleware('password.confirm')->name('settings.backups.destroy');
+    });
+
+    Route::middleware('can:'.Permissions::GITHUB_MANAGE)->group(function () {
+        Route::get('/settings/github', [GitHubController::class, 'index'])->name('settings.github');
+        Route::post('/settings/github/prepare', [GitHubController::class, 'prepare'])->middleware('password.confirm')->name('settings.github.prepare');
+        Route::get('/settings/github/callback', [GitHubController::class, 'callback'])->middleware('throttle:10,1')->name('settings.github.callback');
+        Route::get('/settings/github/installed', [GitHubController::class, 'installed'])->middleware('throttle:10,1')->name('settings.github.installed');
+        Route::post('/settings/github/refresh', [GitHubController::class, 'refresh'])->middleware('throttle:10,1')->name('settings.github.refresh');
+        Route::delete('/settings/github', [GitHubController::class, 'destroy'])->middleware('password.confirm')->name('settings.github.destroy');
     });
 
     Route::middleware('can:'.Permissions::NOTIFICATIONS_MANAGE)->group(function () {

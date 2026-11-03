@@ -1,9 +1,10 @@
 import { Link, useForm } from '@inertiajs/react';
-import { GitBranch, Upload } from 'lucide-react';
+import { GitBranch, GitPullRequest, Upload } from 'lucide-react';
 import type { FormEvent } from 'react';
 import AppController from '@/actions/App/Http/Controllers/AppController';
 import { SetupSteps } from '@/components/apps/setup-steps';
 import { PageHeader } from '@/components/page-header';
+import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,13 +12,19 @@ import { Select } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 
-export default function Create() {
+type GitHubRepos = {
+    repositories: { name: string; branch: string; private: boolean }[];
+    error: string | null;
+};
+
+export default function Create({ github }: { github: GitHubRepos | null }) {
     const form = useForm({
         name: '',
         stack_hint: '',
         source: 'git',
         git_url: '',
         git_branch: 'main',
+        github_repo: '',
     });
 
     const submit = (event: FormEvent) => {
@@ -26,6 +33,16 @@ export default function Create() {
     };
 
     const sources = [
+        ...(github
+            ? [
+                  {
+                      value: 'github',
+                      title: 'GitHub repository',
+                      text: 'Pick one of the repositories you gave CommyPanel access to. Deploys on every push.',
+                      icon: GitPullRequest,
+                  },
+              ]
+            : []),
         {
             value: 'git',
             title: 'Git repository',
@@ -46,7 +63,10 @@ export default function Create() {
                 title="New app"
                 description="Tell us what to run and where the code lives. You will get a live view while it is built."
             />
-            <SetupSteps current="basics" source={form.data.source} />
+            <SetupSteps
+                current="basics"
+                source={form.data.source === 'upload' ? 'upload' : 'git'}
+            />
             <form onSubmit={submit} className="space-y-6">
                 <Card title="1. The basics">
                     <Input
@@ -113,6 +133,48 @@ export default function Create() {
                             ))}
                         </div>
                     </fieldset>
+                    {form.data.source === 'github' && github && (
+                        <>
+                            {github.error && (
+                                <Alert variant="error">{github.error}</Alert>
+                            )}
+                            <Select
+                                label="Repository"
+                                required
+                                value={form.data.github_repo}
+                                onChange={(e) => {
+                                    const repo = github.repositories.find(
+                                        (r) => r.name === e.target.value,
+                                    );
+                                    form.setData((data) => ({
+                                        ...data,
+                                        github_repo: e.target.value,
+                                        git_branch:
+                                            repo?.branch ?? data.git_branch,
+                                    }));
+                                }}
+                                error={form.errors.github_repo}
+                                hint="Missing one? Give the CommyPanel app access to it on GitHub, then reload this page."
+                            >
+                                <option value="">Choose a repository</option>
+                                {github.repositories.map((repo) => (
+                                    <option key={repo.name} value={repo.name}>
+                                        {repo.name}
+                                        {repo.private ? ' (private)' : ''}
+                                    </option>
+                                ))}
+                            </Select>
+                            <Input
+                                label="Branch"
+                                required
+                                value={form.data.git_branch}
+                                onChange={(e) =>
+                                    form.setData('git_branch', e.target.value)
+                                }
+                                error={form.errors.git_branch}
+                            />
+                        </>
+                    )}
                     {form.data.source === 'git' && (
                         <>
                             <Input

@@ -4,6 +4,7 @@ namespace App\Deploy\Source;
 
 use App\Deploy\DeploymentFailed;
 use App\Enums\SourceType;
+use App\GitHub\GitHubFailed;
 use App\Models\App;
 use Illuminate\Support\Facades\File;
 
@@ -35,7 +36,11 @@ class GitSourceFetcher implements SourceFetcher
             throw new DeploymentFailed('The Git branch name is not valid.');
         }
 
-        $credentials = GitCredentials::forApp($app);
+        try {
+            $credentials = GitCredentials::forApp($app);
+        } catch (GitHubFailed $e) {
+            throw new DeploymentFailed($e->getMessage(), 0, $e);
+        }
 
         if ($credentials?->isToken()) {
             $url = $credentials->remote($url) ?? throw new DeploymentFailed('Access tokens work over https://, and this Git address cannot be turned into one.');

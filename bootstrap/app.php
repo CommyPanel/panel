@@ -1,6 +1,7 @@
 <?php
 
 use App\Exceptions\PanelNotMigrated;
+use App\Http\Controllers\GitHubWebhookController;
 use App\Http\Controllers\PushWebhookController;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\LimitApiFailures;
@@ -26,6 +27,9 @@ return Application::configure(basePath: dirname(__DIR__))
             Route::post('webhooks/deploy/{hook}', PushWebhookController::class)
                 ->middleware('throttle:webhooks')
                 ->name('webhooks.deploy');
+            Route::post('webhooks/github', GitHubWebhookController::class)
+                ->middleware('throttle:webhooks')
+                ->name('webhooks.github');
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {

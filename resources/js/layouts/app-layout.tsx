@@ -2,6 +2,7 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Bell,
     Braces,
+    GitBranch,
     Boxes,
     Database,
     DatabaseBackup,
@@ -125,6 +126,12 @@ const NAV: { heading: string; items: NavItem[] }[] = [
                 label: 'Backups',
                 icon: DatabaseBackup,
                 permission: 'backups.view',
+            },
+            {
+                href: '/settings/github',
+                label: 'GitHub',
+                icon: GitBranch,
+                permission: 'github.manage',
             },
             {
                 href: '/settings/notifications',
