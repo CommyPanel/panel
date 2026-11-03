@@ -176,6 +176,42 @@ it('honours a custom panel port everywhere', function () {
         ->and(($this->read)('/etc/commypanel/install.conf'))->toContain('PANEL_PORT=9443');
 });
 
+it('serves database tools on a port of their own, the same everywhere', function () {
+    ($this->setup)();
+
+    $nginx = ($this->read)('/etc/nginx/conf.d/10-commypanel-panel.conf');
+    $unit = ($this->read)('/etc/systemd/system/commypanel-agent.service');
+
+    // 2053 is one of the ports Cloudflare's proxy also passes (443, 2053, 2083, 2087, 2096, 8443).
+    expect($nginx)->toContain('listen 2053 ssl default_server;')
+        ->toContain('proxy_pass http://unix:/run/commypanel-dbtool/dbtool.sock;')
+        ->toContain('client_max_body_size 130m;')
+        ->and($unit)->toContain('--dbtool-socket /run/commypanel-dbtool/dbtool.sock')
+        ->toContain('--dbtool-socket-group www-data')
+        ->toContain('--tools-port 2053')
+        ->toContain('RuntimeDirectory=commypanel commypanel-terminal commypanel-dbtool')
+        ->and(($this->read)('/etc/commypanel/env'))->toContain('COMMYPANEL_TOOLS_PORT=2053')
+        ->and(($this->read)('/etc/commypanel/install.conf'))->toContain('TOOLS_PORT=2053');
+});
+
+it('honours a custom tools port, keeps it across upgrades, and refuses bad ones', function () {
+    ($this->setup)([], ['COMMYPANEL_TOOLS_PORT' => '2083']);
+    expect(($this->read)('/etc/nginx/conf.d/10-commypanel-panel.conf'))->toContain('listen 2083 ssl default_server;')
+        ->and(($this->read)('/etc/systemd/system/commypanel-agent.service'))->toContain('--tools-port 2083')
+        ->and(($this->read)('/etc/commypanel/install.conf'))->toContain('TOOLS_PORT=2083');
+
+    // An upgrade that does not say otherwise keeps the stored port.
+    ($this->setup)();
+    expect(($this->read)('/etc/nginx/conf.d/10-commypanel-panel.conf'))->toContain('listen 2083 ssl default_server;')
+        ->and(($this->read)('/etc/commypanel/env'))->toContain('COMMYPANEL_TOOLS_PORT=2083');
+
+    foreach (['80', '8080', '8081', '70000', 'abc', '1023', '8443'] as $port) {
+        expect(($this->setup)(['--tools-port', $port])->failed())->toBeTrue("tools port {$port} should be rejected");
+    }
+    // It may not be the panel's own port either.
+    expect(($this->setup)(['--panel-port', '9443', '--tools-port', '9443'])->failed())->toBeTrue();
+});
+
 it('is safe to run again: the key, port and address survive an upgrade', function () {
     ($this->setup)(['--panel-port', '9443']);
     $before = ($this->read)('/etc/commypanel/env');

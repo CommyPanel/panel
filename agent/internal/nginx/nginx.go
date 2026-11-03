@@ -140,6 +140,12 @@ type Config struct {
 	// TerminalSocket is the agent's terminal socket. When set, the panel's own
 	// site (and only that one) proxies /terminal to it as a WebSocket.
 	TerminalSocket string
+	// ToolsSocket and ToolsPort are the agent's database tool socket and the port
+	// databases tools are served on. When both are set, the panel's own site (and only
+	// that one) also gets a server on that port, with its certificate, which is what
+	// keeps the tools on another origin than the panel.
+	ToolsSocket string
+	ToolsPort   int
 }
 
 type Manager struct {
@@ -217,7 +223,33 @@ server {
         proxy_pass http://127.0.0.1:{{.Port}};
     }
 }
-{{range .Redirects}}
+{{if and .CertDir .ToolsSocket}}
+# Database tools (phpMyAdmin, Adminer) on a port of their own: a browser treats it as
+# another website than the panel. Everything goes to the agent's tool socket, which accepts
+# only a single-use ticket and the cookie it hands out.
+server {
+    listen {{.ToolsPort}} ssl;
+    listen [::]:{{.ToolsPort}} ssl;
+    server_name {{.ServerNames}};
+
+    ssl_certificate {{.CertDir}}/fullchain.pem;
+    ssl_certificate_key {{.CertDir}}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    server_tokens off;
+    client_max_body_size 130m;
+
+    location / {
+        proxy_pass http://unix:{{.ToolsSocket}};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_read_timeout 900s;
+        proxy_send_timeout 900s;
+    }
+}
+{{end}}{{range .Redirects}}
 server {
     listen 80;
     listen [::]:80;
@@ -303,10 +335,10 @@ func (m *Manager) Render(s Site) (string, error) {
 		return "", err
 	}
 	data := struct {
-		ServerNames, Webroot, CertDir, Custom, TerminalSocket string
-		Port                                                  int
-		ModernHTTP2                                           bool
-		Redirects                                             []Redirect
+		ServerNames, Webroot, CertDir, Custom, TerminalSocket, ToolsSocket string
+		Port, ToolsPort                                                    int
+		ModernHTTP2                                                        bool
+		Redirects                                                          []Redirect
 	}{
 		ServerNames: strings.Join(s.served(), " "),
 		Redirects:   s.Redirects,
@@ -316,6 +348,7 @@ func (m *Manager) Render(s Site) (string, error) {
 	}
 	if s.Name == panelSiteName {
 		data.TerminalSocket = m.cfg.TerminalSocket
+		data.ToolsSocket, data.ToolsPort = m.cfg.ToolsSocket, m.cfg.ToolsPort
 	}
 	if s.Certificate != "" {
 		data.ModernHTTP2 = m.modernHTTP2() // only HTTPS sites use HTTP/2

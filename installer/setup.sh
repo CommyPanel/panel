@@ -24,6 +24,10 @@ DATA_DIR="/var/lib/commypanel"
 CONF_DIR="/etc/commypanel"
 NGINX_DIR="/etc/nginx"
 PANEL_PORT="${COMMYPANEL_PANEL_PORT:-8443}"
+# The port database tools (phpMyAdmin, Adminer) are served on. It is another port than the
+# panel on purpose: a browser keeps different ports apart, so a tool can never act as the
+# panel. 2053 is one Cloudflare also proxies (443, 2053, 2083, 2087, 2096 and 8443 are).
+TOOLS_PORT="${COMMYPANEL_TOOLS_PORT:-2053}"
 # Loopback-only plain-HTTP listener: the agent proxies the panel's own domain to it.
 PANEL_INTERNAL_PORT=8081
 LOG_FILE="/var/log/commypanel-install.log"
@@ -40,6 +44,7 @@ exec 3>&1
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --panel-port) PANEL_PORT="${2:?--panel-port needs a value}"; shift 2 ;;
+        --tools-port) TOOLS_PORT="${2:?--tools-port needs a value}"; shift 2 ;;
         --no-docker) SKIP_DOCKER=1; shift ;;
         --upgrade) UPGRADE_FLAG=1; shift ;;
         --render-only) RENDER_ONLY=1; shift ;;
@@ -57,6 +62,13 @@ case "$PANEL_PORT" in
 esac
 if [ "$PANEL_PORT" -lt 1024 ] || [ "$PANEL_PORT" -gt 65535 ] || [ "$PANEL_PORT" = 8080 ]; then
     printf 'error: --panel-port must be between 1024 and 65535 (and not 8080, which apps commonly use).\n' >&2
+    exit 1
+fi
+case "$TOOLS_PORT" in
+    ""|*[!0-9]*) printf 'error: --tools-port must be a number.\n' >&2; exit 1 ;;
+esac
+if [ "$TOOLS_PORT" -lt 1024 ] || [ "$TOOLS_PORT" -gt 65535 ] || [ "$TOOLS_PORT" = 8080 ] || [ "$TOOLS_PORT" = "$PANEL_PORT" ] || [ "$TOOLS_PORT" = "$PANEL_INTERNAL_PORT" ]; then
+    printf 'error: --tools-port must be between 1024 and 65535 and differ from the panel port (and not 8080 or 8081).\n' >&2
     exit 1
 fi
 if [ "$RENDER_ONLY" = 1 ] && [ -z "$ROOT" ]; then
@@ -266,6 +278,7 @@ render() {
         -e "s#@@DATA_DIR@@#$(sed_escape "$DATA_DIR")#g" \
         -e "s#@@CONF_DIR@@#$(sed_escape "$CONF_DIR")#g" \
         -e "s#@@PANEL_PORT@@#$(sed_escape "$PANEL_PORT")#g" \
+        -e "s#@@TOOLS_PORT@@#$(sed_escape "$TOOLS_PORT")#g" \
         -e "s#@@PANEL_INTERNAL_PORT@@#$(sed_escape "$PANEL_INTERNAL_PORT")#g" \
         -e "s#@@PANEL_UID@@#$(sed_escape "${PANEL_UID:-}")#g" \
         -e "s#@@PHP_BIN@@#$(sed_escape "${PHP_BIN:-}")#g" \
@@ -386,14 +399,20 @@ preflight() {
         *) die "setup.sh must run from $PREFIX/releases/<version> (use install.sh)." ;;
     esac
 
+    local owner
     if [ "$UPGRADE" = 0 ]; then
-        local owner
         for port in 80 "$PANEL_PORT"; do
             owner="$(port_owner "$port")"
             if [ -n "$owner" ] && [ "$owner" != "nginx" ]; then
                 die "Port $port is already used by '$owner'. Stop it first (for example: systemctl disable --now $owner)."
             fi
         done
+    fi
+    # The port for database tools is checked on an upgrade too, since a server installed
+    # before it existed may already use it for something else.
+    owner="$(port_owner "$TOOLS_PORT")"
+    if [ -n "$owner" ] && [ "$owner" != "nginx" ]; then
+        die "Port $TOOLS_PORT (for database tools) is already used by '$owner'. Choose another with COMMYPANEL_TOOLS_PORT=<port>, for example 2083 (Cloudflare proxies 2053, 2083, 2087 and 2096)."
     fi
 
     local mem_kb
@@ -799,6 +818,7 @@ prepare_system() {
     fi
     write_env
     conf_set PANEL_PORT "$PANEL_PORT"
+    conf_set TOOLS_PORT "$TOOLS_PORT"
     conf_set SERVER_ADDR "$SERVER_ADDR"
     ensure_panel_certificate
 }
@@ -850,6 +870,9 @@ main() {
     if [ "$UPGRADE" = 1 ]; then
         stored_port="$(conf_get PANEL_PORT)"
         if [ -n "$stored_port" ]; then PANEL_PORT="$stored_port"; fi
+        # Kept across upgrades unless a new one is asked for with COMMYPANEL_TOOLS_PORT or --tools-port.
+        stored_tools="$(conf_get TOOLS_PORT)"
+        if [ -n "$stored_tools" ] && [ -z "${COMMYPANEL_TOOLS_PORT:-}" ] && [ "$TOOLS_PORT" = 2053 ]; then TOOLS_PORT="$stored_tools"; fi
         banner "Upgrading to $VERSION"
     else
         banner "Installing $VERSION"
@@ -887,9 +910,9 @@ main() {
     say '\n%s%s CommyPanel %s is installed.%s\n\n' "$C_GREEN" "$MARK_OK" "$VERSION" "$C_RESET"
     say '  Create your admin account (works once, expires in 1 hour):\n\n    %s%s%s\n\n' "$C_BOLD" "${url:-run: sudo commypanel setup-url}" "$C_RESET"
     say '  Your browser will warn about the panel certificate: it is self-signed until you add a panel domain.\n\n'
-    say '  Open these ports in your firewall: 80, 443 and %s.\n' "$PANEL_PORT"
+    say '  Open these ports in your firewall: 80, 443, %s, and %s (for phpMyAdmin and Adminer).\n' "$PANEL_PORT" "$TOOLS_PORT"
     if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q 'Status: active'; then
-        say '  ufw is active here, so run:  sudo ufw allow 80,443,%s/tcp\n' "$PANEL_PORT"
+        say '  ufw is active here, so run:  sudo ufw allow 80,443,%s,%s/tcp\n' "$PANEL_PORT" "$TOOLS_PORT"
     fi
     say '\n  Manage the panel:  sudo commypanel help\n\n'
 }

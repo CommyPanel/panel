@@ -462,3 +462,57 @@ func TestPanelSiteWithoutTerminalsHasNoTerminalLocation(t *testing.T) {
 		t.Errorf("terminals are off, yet:\n%s", conf)
 	}
 }
+
+func TestOnlyThePanelSiteServesDatabaseToolsAndOnlyOverHTTPS(t *testing.T) {
+	m, _ := newManager(t, nil, true)
+	m.cfg.ToolsSocket = "/run/commypanel-dbtool/dbtool.sock"
+	m.cfg.ToolsPort = 2053
+
+	// The panel with a certificate: a server of its own on the tools port, with that certificate.
+	panel := Site{Name: "panel", Domains: []string{"panel.example.com"}, UpstreamPort: 8081, Certificate: "panel"}
+	conf, err := m.Render(panel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"listen 2053 ssl;",
+		"listen [::]:2053 ssl;",
+		"proxy_pass http://unix:/run/commypanel-dbtool/dbtool.sock;",
+		"client_max_body_size 130m;",
+		"proxy_request_buffering off;",
+	} {
+		if !strings.Contains(conf, want) {
+			t.Errorf("panel site is missing %q:\n%s", want, conf)
+		}
+	}
+	// It is another server block than the panel's 443 one, with the same certificate.
+	idx := strings.Index(conf, "listen 2053 ssl;")
+	if strings.Count(conf[:idx], "server {") < 3 || !strings.Contains(conf[idx:], "ssl_certificate ") {
+		t.Errorf("the tools server must be its own block with the certificate:\n%s", conf)
+	}
+
+	// No certificate yet: no tools server (it would have nothing to be served with).
+	plain := Site{Name: "panel", Domains: []string{"panel.example.com"}, UpstreamPort: 8081}
+	conf, _ = m.Render(plain)
+	if strings.Contains(conf, "2053") || strings.Contains(conf, "dbtool") {
+		t.Errorf("a panel site without a certificate must not serve tools:\n%s", conf)
+	}
+
+	// An app never gets the tools, and cannot reach the socket by custom directives.
+	app := Site{Name: "shop", Domains: []string{"shop.example.com"}, UpstreamPort: 20001, Certificate: "shop"}
+	conf, _ = m.Render(app)
+	if strings.Contains(conf, "2053") || strings.Contains(conf, "dbtool") {
+		t.Errorf("an app site must not serve tools:\n%s", conf)
+	}
+	app.Custom = "location /x {\n proxy_pass http://unix:/run/commypanel-dbtool/dbtool.sock;\n}"
+	if _, err := m.Render(app); err == nil {
+		t.Error("custom directives reached the tool socket")
+	}
+
+	// Without a tool socket there is nothing to serve.
+	m.cfg.ToolsSocket = ""
+	conf, _ = m.Render(panel)
+	if strings.Contains(conf, "2053") {
+		t.Errorf("tools are off but the site serves them:\n%s", conf)
+	}
+}
