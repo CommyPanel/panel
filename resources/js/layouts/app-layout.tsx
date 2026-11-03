@@ -1,5 +1,6 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
+    Braces,
     Boxes,
     Database,
     DatabaseBackup,
@@ -106,6 +107,11 @@ const NAV: { heading: string; items: NavItem[] }[] = [
                 href: '/settings/security',
                 label: 'Security',
                 icon: ShieldCheck,
+            },
+            {
+                href: '/settings/tokens',
+                label: 'API tokens',
+                icon: Braces,
             },
             {
                 href: '/settings/audit-log',

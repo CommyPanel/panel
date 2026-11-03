@@ -1,6 +1,7 @@
 <?php
 
 use App\Auth\Permissions;
+use App\Http\Controllers\ApiTokenController;
 use App\Http\Controllers\AppContainerController;
 use App\Http\Controllers\AppController;
 use App\Http\Controllers\AppDomainController;
@@ -59,6 +60,11 @@ Route::middleware('auth')->group(function () {
     Route::inertia('/settings/security', 'settings/security')
         ->middleware('password.confirm')
         ->name('settings.security');
+
+    // A person's own API tokens: they carry only what that person may do (see App\Api\TokenAccess).
+    Route::get('/settings/tokens', [ApiTokenController::class, 'index'])->name('settings.tokens');
+    Route::post('/settings/tokens', [ApiTokenController::class, 'store'])->middleware('password.confirm')->name('settings.tokens.store');
+    Route::delete('/settings/tokens/{token}', [ApiTokenController::class, 'destroy'])->whereNumber('token')->middleware('password.confirm')->name('settings.tokens.destroy');
 
     // Everything below is guarded by a permission (see App\Auth\Permissions).
     // `create` must be registered before `show`, or /apps/create would match /apps/{app}.
