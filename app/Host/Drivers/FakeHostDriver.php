@@ -17,6 +17,7 @@ use App\Host\Data\NetworkInfo;
 use App\Host\Data\NginxSite;
 use App\Host\Data\NginxStatus;
 use App\Host\Data\NginxTestResult;
+use App\Host\Data\PublicAddresses;
 use App\Host\Data\ResourceName;
 use App\Host\Data\ResourceUsage;
 use App\Host\Data\SystemStatus;
@@ -65,6 +66,8 @@ class FakeHostDriver implements HostDriver
 
     private ?string $restoreFails = null;
 
+    private ?PublicAddresses $publicAddresses = null;
+
     /** @var list<string> images that were pulled */
     private array $pulledImages = [];
 
@@ -98,6 +101,20 @@ class FakeHostDriver implements HostDriver
     public function systemStatus(): SystemStatus
     {
         return new SystemStatus(dockerAvailable: ! $this->dockerDown, nginxAvailable: true, diskFreeBytes: $this->diskFreeBytes, diskTotalBytes: 100 * 1024 ** 3);
+    }
+
+    /**
+     * What the fake server's interfaces carry (tests); by default a public IPv4 address.
+     */
+    public function setPublicAddresses(PublicAddresses $addresses): void
+    {
+        $this->publicAddresses = $addresses;
+    }
+
+    public function publicAddresses(): PublicAddresses
+    {
+        // None by default, so a fake server needs its address set by hand unless a test says otherwise.
+        return $this->publicAddresses ?? new PublicAddresses;
     }
 
     public function systemInfo(): HostInfo

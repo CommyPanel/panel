@@ -8,6 +8,7 @@ import {
     DomainStatusMark,
     DomainTlsMark,
 } from '@/components/domains/domain-marks';
+import { ServerAddressNote } from '@/components/domains/server-address-card';
 import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -150,6 +151,7 @@ export default function Show({
                         </div>
 
                         <RecordsTable domain={domain.name} server={server} />
+                        <ServerAddressNote server={server} />
                     </Card>
                 </div>
 

@@ -1035,3 +1035,14 @@ func TestOnlyAFewBigJobsRunAtOnce(t *testing.T) {
 		t.Errorf("after they finished a dump got %d", rec.Code)
 	}
 }
+
+func TestAddressesRouteAnswersWithThePublicAddressesOfThisMachine(t *testing.T) {
+	s := New(Options{Nginx: &fakeNginx{}, Authorize: AllowAll(), Addresses: func() system.Addresses {
+		return system.Addresses{IPv4: []string{"65.21.10.20"}, IPv6: []string{}, PrimaryIPv4: "65.21.10.20"}
+	}})
+
+	rec := do(t, s, "GET", "/v1/system/addresses", "")
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"ipv4":["65.21.10.20"]`) || !strings.Contains(rec.Body.String(), `"primary_ipv4":"65.21.10.20"`) {
+		t.Errorf("addresses: %d %s", rec.Code, rec.Body)
+	}
+}

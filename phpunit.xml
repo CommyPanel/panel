@@ -29,6 +29,7 @@
         <env name="DB_CONNECTION" value="main"/>
         <env name="DB_MAIN_DATABASE" value=":memory:"/>
         <env name="HOST_DRIVER" value="fake"/>
+        <env name="COMMYPANEL_ADDRESS_LOOKUP" value="false"/>
                 <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

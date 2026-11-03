@@ -481,13 +481,6 @@ function DomainStep({ app, server }: { app: AppSetup; server: ServerAddress }) {
                 title="4. Domain"
                 description="Optional: point a domain at this app. You can also do it after the first deployment; the app is reachable only through its domains."
             >
-                {!server.ipv4 && !server.ipv6 && (
-                    <Alert variant="warning">
-                        The server address is not set yet, so the DNS records
-                        cannot be shown. Set it on the Domains page, or add the
-                        domain later.
-                    </Alert>
-                )}
                 <p className="text-sm text-base-content/70">
                     Add a domain below, create the DNS records it shows, and
                     CommyPanel connects it and gets a certificate once DNS has

@@ -112,8 +112,9 @@ func run() error {
 	}
 	srv := server.New(server.Options{Nginx: mgr, Docker: dockerMgr, Volumes: volumefs.New(*dataDir), Terminal: ticketIssuer(tickets), Certs: certMgr, Unit: system.NewDockerUnit(*dryRun), Usage: sampler,
 		Authorize: authorize, Version: version, DryRun: *dryRun,
-		System: func() system.Status { return system.Collect(*dataDir) },
-		Info:   system.NewReader(*dataDir).Info,
+		System:    func() system.Status { return system.Collect(*dataDir) },
+		Info:      system.NewReader(*dataDir).Info,
+		Addresses: system.ReadAddresses,
 	})
 
 	ln, err := listen(*socket, *group, *dryRun)

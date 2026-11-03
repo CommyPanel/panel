@@ -40,6 +40,11 @@ return [
 
     // Loopback-only port where nginx serves the panel over plain HTTP, so the
     // agent-managed site for the panel's own domain can proxy to it.
+    // When the server has no public address on its own interfaces (it sits behind a NAT, as on
+    // AWS or Oracle), the panel asks api.ipify.org once, in the background, which address it
+    // connects from. Set this to false to never do that and enter the address by hand.
+    'address_lookup' => (bool) env('COMMYPANEL_ADDRESS_LOOKUP', true),
+
     // The panel warns on every page once the disk holding its data is this full.
     'disk' => [
         'warn_percent' => (int) env('DISK_WARN_PERCENT', 85),

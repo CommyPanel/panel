@@ -79,10 +79,18 @@ check_acme_webroot() {
     ok "nginx serves ACME challenge files from the agent's private folder"
 }
 
+# The panel finds the server's public address through the agent, as the panel user.
+check_address_detection() {
+    local out
+    out="$(runuser -u commypanel -- curl -s --unix-socket /run/commypanel/agent.sock http://agent/v1/system/addresses || true)"
+    case "$out" in *'"ipv4":['*'"ipv6":['*) ok "the agent lists the public addresses on the interfaces" ;; *) fail "the agent's addresses call answered: ${out:-nothing}" ;; esac
+}
+
 install_it "install"
 check_running
 check_page
 check_acme_webroot
+check_address_detection
 
 install_it "upgrade over the same version"
 check_running

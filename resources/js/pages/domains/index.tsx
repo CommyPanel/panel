@@ -297,10 +297,14 @@ export default function Index({ server, https, panel, domains }: Props) {
                             description="Domains are connected by checking that their DNS records point at the addresses saved here."
                         >
                             <p className="text-sm text-base-content/70">
-                                Use your server's public address, not a private
-                                one from behind a router or load balancer. If
-                                the server has both, save its IPv6 address too,
-                                so an AAAA record can be checked.
+                                CommyPanel finds this server's public address by
+                                itself, by reading it from the server's own
+                                network connection. Only a server behind a
+                                router or load balancer (as on some clouds) is
+                                looked up through api.ipify.org instead, and
+                                that can be switched off. If the wrong address
+                                was found, correct it here or wherever the
+                                address is shown.
                             </p>
                         </Card>
                     </div>

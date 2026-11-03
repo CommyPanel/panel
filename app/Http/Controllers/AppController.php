@@ -71,7 +71,7 @@ class AppController extends Controller
                 ->map(fn ($deployment) => AppPresenter::deployment($deployment))->values(),
             'env_keys' => $app->envVars()->orderBy('key')->pluck('key')->values(),
             'https' => ['enabled' => $https->enabled(), 'staging' => $https->staging()],
-            'server' => ['ipv4' => $server->ipv4(), 'ipv6' => $server->ipv6()],
+            'server' => $server->forPage(),
             'webhook' => $this->webhook($request, $app, $panel),
         ]);
     }

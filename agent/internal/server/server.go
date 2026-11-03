@@ -123,6 +123,8 @@ type Options struct {
 	System    func() system.Status
 	// Info gathers the host facts for the Server page.
 	Info func(ctx context.Context) system.Info
+	// Addresses reads the public IP addresses on this machine's interfaces.
+	Addresses func() system.Addresses
 }
 
 type Server struct {
@@ -157,6 +159,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/status", s.status)
 	mux.HandleFunc("GET /v1/system/info", s.systemInfo)
+	mux.HandleFunc("GET /v1/system/addresses", s.systemAddresses)
 	mux.HandleFunc("GET /v1/system/usage", s.systemUsage)
 	mux.HandleFunc("GET /v1/nginx/status", s.nginxStatus)
 	mux.HandleFunc("POST /v1/nginx/test", s.nginxTest)
@@ -283,6 +286,16 @@ func (s *Server) systemInfo(w http.ResponseWriter, r *http.Request) {
 		info = s.opts.Info(r.Context())
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"version": s.opts.Version, "dry_run": s.opts.DryRun, "info": info})
+}
+
+// systemAddresses answers with the public IP addresses on this machine's own
+// interfaces; nothing is sent over the network to find them.
+func (s *Server) systemAddresses(w http.ResponseWriter, r *http.Request) {
+	read := s.opts.Addresses
+	if read == nil {
+		read = system.ReadAddresses
+	}
+	writeJSON(w, http.StatusOK, read())
 }
 
 // systemUsage returns the latest CPU, memory, disk and network readings of the

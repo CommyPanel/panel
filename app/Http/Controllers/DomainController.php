@@ -26,7 +26,7 @@ class DomainController extends Controller
                 'certificate' => $panel->certificateStatus(),
                 'expires_at' => $panel->certificateExpiresAt()?->toIso8601String(),
             ],
-            'server' => ['ipv4' => $server->ipv4(), 'ipv6' => $server->ipv6()],
+            'server' => $server->forPage(),
             'https' => ['enabled' => $https->enabled(), 'email' => $https->email(), 'staging' => $https->staging()],
             'domains' => Domain::query()->with('app.certificate')->orderBy('name')->get()
                 ->map(fn (Domain $domain) => AppPresenter::domain($domain))->values(),
@@ -39,7 +39,7 @@ class DomainController extends Controller
         $certificate = $domain->app?->certificate;
 
         return Inertia::render('domains/show', [
-            'server' => ['ipv4' => $server->ipv4(), 'ipv6' => $server->ipv6()],
+            'server' => $server->forPage(),
             'domain' => AppPresenter::domain($domain),
             'certificate' => $certificate === null ? null : [
                 'status' => $certificate->status->value,

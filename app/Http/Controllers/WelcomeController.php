@@ -24,7 +24,7 @@ class WelcomeController extends Controller
 
         return Inertia::render('welcome', [
             'https' => ['enabled' => $https->enabled(), 'email' => $https->email(), 'staging' => $https->staging()],
-            'server' => ['ipv4' => $server->ipv4(), 'ipv6' => $server->ipv6()],
+            'server' => $server->forPage(),
             'panel' => [
                 'domain' => $name,
                 'dns' => $panel->dns(),

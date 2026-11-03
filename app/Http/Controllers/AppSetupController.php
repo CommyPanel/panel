@@ -57,7 +57,7 @@ class AppSetupController extends Controller
                 'name' => $provider->label(),
                 ...($app->deploy_key_public === null ? ['url' => null, 'steps' => []] : $provider->deployKeyInstructions((string) $app->git_url)),
             ],
-            'server' => ['ipv4' => $server->ipv4(), 'ipv6' => $server->ipv6()],
+            'server' => $server->forPage(),
             'limits' => ['max_archive_mb' => (int) config('commypanel.uploads.max_archive_mb')],
         ]);
     }

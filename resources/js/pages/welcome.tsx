@@ -6,7 +6,7 @@ import DashboardController from '@/actions/App/Http/Controllers/DashboardControl
 import WelcomeController from '@/actions/App/Http/Controllers/WelcomeController';
 import { Stepper } from '@/components/apps/setup-steps';
 import { RecordsTable } from '@/components/domains/domain-card';
-import { ServerAddressCard } from '@/components/domains/server-address-card';
+import { ServerAddressNote } from '@/components/domains/server-address-card';
 import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -161,9 +161,7 @@ function DomainStep({
         <ChooseDomain />
     ) : (
         <>
-            {!server.ipv4 && !server.ipv6 && (
-                <ServerAddressCard server={server} />
-            )}
+            <ServerAddressNote server={server} />
             <DomainStatus panel={panel} server={server} />
         </>
     );

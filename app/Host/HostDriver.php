@@ -16,6 +16,7 @@ use App\Host\Data\NetworkInfo;
 use App\Host\Data\NginxSite;
 use App\Host\Data\NginxStatus;
 use App\Host\Data\NginxTestResult;
+use App\Host\Data\PublicAddresses;
 use App\Host\Data\ResourceUsage;
 use App\Host\Data\SystemStatus;
 use App\Host\Data\TaskSpec;
@@ -40,6 +41,14 @@ interface HostDriver
      * @throws HostOperationFailed
      */
     public function systemInfo(): HostInfo;
+
+    /**
+     * The public IP addresses on the server's own network interfaces (nothing is
+     * looked up over the network).
+     *
+     * @throws HostOperationFailed
+     */
+    public function publicAddresses(): PublicAddresses;
 
     /**
      * How busy the host and its running containers are right now. CPU and

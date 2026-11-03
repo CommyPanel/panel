@@ -21,23 +21,25 @@ class ServerAddressController extends Controller
             throw ValidationException::withMessages(['ipv4' => 'Enter at least an IPv4 or an IPv6 address.']);
         }
 
-        $server->save($data['ipv4'] ?? null, $data['ipv6'] ?? null);
-        $audit->record('server.address_set', null, ['ipv4' => $data['ipv4'] ?? null, 'ipv6' => $data['ipv6'] ?? null]);
+        $before = ['ipv4' => $server->ipv4(), 'ipv6' => $server->ipv6(), 'source' => $server->source()];
+        $server->save($data['ipv4'] ?? null, $data['ipv6'] ?? null, 'manual');
+        $audit->record('server.address_set', $request->user(), ['ipv4' => $data['ipv4'] ?? null, 'ipv6' => $data['ipv6'] ?? null, 'before' => $before]);
 
         return back()->with('status', 'Server address saved.');
     }
 
-    public function detect(ServerAddress $server, AuditLogger $audit): RedirectResponse
+    public function detect(Request $request, ServerAddress $server, AuditLogger $audit): RedirectResponse
     {
         $found = $server->detect();
 
         if ($found['ipv4'] === null && $found['ipv6'] === null) {
-            return back()->withErrors(['ipv4' => 'Could not detect the public address automatically. Enter it by hand.']);
+            return back()->withErrors(['ipv4' => 'Could not find the public address of this server automatically. Enter it by hand.']);
         }
 
-        $server->save($found['ipv4'] ?? $server->ipv4(), $found['ipv6'] ?? $server->ipv6());
-        $audit->record('server.address_detected', null, $found);
+        // A family that is not found keeps what it was, so a failed lookup of one does not erase the other.
+        $server->save($found['ipv4'] ?? $server->ipv4(), $found['ipv6'] ?? $server->ipv6(), 'auto');
+        $audit->record('server.address_detected', $request->user(), $found);
 
-        return back()->with('status', 'Server address detected. Check that it is correct.');
+        return back()->with('status', 'Server address detected.');
     }
 }

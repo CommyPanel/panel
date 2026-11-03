@@ -75,6 +75,16 @@ it('serves the server page data against the real agent', function () {
     $this->driver->reloadNginx();
 });
 
+it('lists the public addresses of the machine it runs on', function () {
+    $found = $this->driver->publicAddresses();
+
+    // Whatever this machine has, every entry is a real address and the lists are lists.
+    expect($found->ipv4)->toBeArray()->and($found->ipv6)->toBeArray();
+    foreach ([...$found->ipv4, ...$found->ipv6] as $ip) {
+        expect(filter_var($ip, FILTER_VALIDATE_IP))->not->toBeFalse();
+    }
+});
+
 it('reports resource usage from the real sampler', function () {
     // The sampler takes its first reading at start-up and the next two seconds later.
     for ($i = 0; $i < 40 && ! $this->driver->resourceUsage()->host['ready']; $i++) {

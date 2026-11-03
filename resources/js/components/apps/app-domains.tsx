@@ -1,5 +1,6 @@
 import { useForm } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
+import { ServerAddressNote } from '@/components/domains/server-address-card';
 import type { FormEvent } from 'react';
 import AppDomainController from '@/actions/App/Http/Controllers/AppDomainController';
 import { DomainCard } from '@/components/domains/domain-card';
@@ -139,6 +140,7 @@ export function AppDomains({
 }) {
     return (
         <div className="space-y-6">
+            <ServerAddressNote server={server} />
             <AddAppDomainCard slug={slug} />
             {domains.map((domain) => (
                 <DomainCard key={domain.id} domain={domain} server={server} />

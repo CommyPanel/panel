@@ -394,3 +394,17 @@ it('writes a volume archive the agent sends to a file, and only keeps a real one
     expect(glob("{$dir}/*"))->toBe(["{$dir}/ok.tar.gz"]);
     File::deleteDirectory($dir);
 });
+
+it('reads the public addresses the agent found on the server, and drops anything that is not an address', function () {
+    Http::fake(['agent/v1/system/addresses' => Http::response([
+        'ipv4' => ['65.21.10.20', 'not-an-ip'], 'ipv6' => ['2a01:4f9::1'],
+        'primary_ipv4' => '65.21.10.20', 'primary_ipv6' => 'nope',
+    ])]);
+
+    $found = agentDriver()->publicAddresses();
+
+    expect($found->ipv4)->toBe(['65.21.10.20'])
+        ->and($found->ipv6)->toBe(['2a01:4f9::1'])
+        ->and($found->primaryIpv4)->toBe('65.21.10.20')
+        ->and($found->primaryIpv6)->toBeNull();
+});

@@ -18,6 +18,7 @@ use App\Host\Data\NetworkInfo;
 use App\Host\Data\NginxSite;
 use App\Host\Data\NginxStatus;
 use App\Host\Data\NginxTestResult;
+use App\Host\Data\PublicAddresses;
 use App\Host\Data\ResourceName;
 use App\Host\Data\ResourceUsage;
 use App\Host\Data\SystemStatus;
@@ -56,6 +57,15 @@ class AgentHostDriver implements HostDriver
             diskFreeBytes: (int) ($data['disk_free_bytes'] ?? 0),
             diskTotalBytes: (int) ($data['disk_total_bytes'] ?? 0),
         );
+    }
+
+    public function publicAddresses(): PublicAddresses
+    {
+        $data = $this->send('get', '/v1/system/addresses');
+        $clean = fn ($list) => array_values(array_filter(array_map('strval', (array) $list), fn (string $ip) => filter_var($ip, FILTER_VALIDATE_IP) !== false));
+        $one = fn ($ip) => is_string($ip) && filter_var($ip, FILTER_VALIDATE_IP) !== false ? $ip : null;
+
+        return new PublicAddresses($clean($data['ipv4'] ?? []), $clean($data['ipv6'] ?? []), $one($data['primary_ipv4'] ?? null), $one($data['primary_ipv6'] ?? null));
     }
 
     public function systemInfo(): HostInfo

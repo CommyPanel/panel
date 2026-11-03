@@ -67,6 +67,15 @@ Volume files are private data (databases, uploads), so browsing needs its own pe
 
 A volume you removed shows as **Not attached**, with its files. **Delete data** removes them (it asks for your password first, and is recorded). The agent refuses while any container still has that volume mounted, so deploy the app again first.
 
+## Domains and the server's address
+
+To connect a domain, CommyPanel shows the DNS records to create (an **A** record, and an **AAAA** record if the server has an IPv6 address) and checks that they point at this server. For that it has to know the server's public address, and it **finds it by itself**, in the background, the first time a page needs it. You do not press anything.
+
+- **First it reads the server's own network connection.** Most servers (Hetzner, DigitalOcean, bare metal) carry their public address on their network interface, so nothing leaves the machine. Private ranges (10.x, 172.16-31.x, 192.168.x), Docker's and VPN addresses, and carrier-grade NAT addresses are ignored.
+- **Only if there is no public address there** (a server behind a NAT, as on some clouds such as AWS or Oracle, where the provider's router owns the public address) it asks `api.ipify.org` once which address it connects from. This is the one place besides update checks and the S3 copy where the panel contacts the outside by itself. Set `COMMYPANEL_ADDRESS_LOOKUP=false` in `/etc/commypanel/env` to never do that and enter the address by hand.
+- **If nothing can be found**, the page says so and shows the two fields to fill in. It does not try again for ten minutes.
+- **Wrong address?** Everywhere the address is used (Domains > Server address, an app's Domains tab, the first-run page, a domain's page) there is a **Wrong IPs detected?** button that opens the two fields. What you enter is kept as yours and is never replaced by a detection; **Detect again** in the same form looks it up anew. Changing it is recorded in the audit log, with the address it replaced.
+
 ## Containers and networks
 
 The **Usage** tab lists the app's containers: the live release and, for a moment during a deployment, the previous one. For each it shows the state, the release, the network and address it has, the ports it publishes (only on the server's loopback address; nginx is what reaches them) and the volumes mounted into it. Below that are the networks those containers are on and everything attached to them. **Server > Docker** shows the same for every container, plus all networks CommyPanel created.

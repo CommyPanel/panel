@@ -16,7 +16,16 @@ export type DomainRow = {
     last_checked_at: string | null;
 };
 
-export type ServerAddress = { ipv4: string | null; ipv6: string | null };
+export type ServerAddress = {
+    ipv4: string | null;
+    ipv6: string | null;
+    /** 'auto' when the panel found it, 'manual' when a person entered it. */
+    source: 'auto' | 'manual' | null;
+    /** The panel is looking for it right now. */
+    detecting: boolean;
+    /** Nothing could be found; it has to be entered. */
+    failed: boolean;
+};
 
 export type HttpsSettings = {
     enabled: boolean;

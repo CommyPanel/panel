@@ -51,7 +51,8 @@ it('lists domains with status, problems and the server address', function () {
 
     $this->get('/domains')->assertInertia(fn (Assert $page) => $page
         ->component('domains/index')
-        ->where('server', ['ipv4' => '203.0.113.7', 'ipv6' => null])
+        ->where('server.ipv4', '203.0.113.7')
+        ->where('server.ipv6', null)
         ->has('domains', 2)
         ->where('domains.0.name', 'old.example.com')
         ->where('domains.0.status', 'misconfigured')
@@ -290,15 +291,13 @@ describe('server address', function () {
         expect(app(ServerAddress::class)->ipv6())->toBeNull();
     });
 
-    it('detects the address on request only', function () {
-        app(ServerAddress::class)->save(null, null);
+    it('can be detected again by hand, through the outside lookup behind a NAT', function () {
+        config(['commypanel.address_lookup' => true]);
+        app(ServerAddress::class)->save('198.51.100.1', null, 'manual');
         Http::fake([
             'api.ipify.org' => Http::response('198.51.100.20'),
             'api6.ipify.org' => Http::response('2001:db8::20'),
         ]);
-
-        $this->get('/domains');
-        Http::assertNothingSent();
 
         $this->post('/settings/server-address/detect')->assertSessionHasNoErrors();
 
@@ -307,6 +306,7 @@ describe('server address', function () {
     });
 
     it('keeps existing values when detection finds nothing for a family', function () {
+        config(['commypanel.address_lookup' => true]);
         app(ServerAddress::class)->save('198.51.100.1', '2001:db8::1');
         Http::fake([
             'api.ipify.org' => Http::response('198.51.100.20'),
@@ -320,6 +320,7 @@ describe('server address', function () {
     });
 
     it('reports failure and ignores garbage answers', function () {
+        config(['commypanel.address_lookup' => true]);
         app(ServerAddress::class)->save(null, null);
         Http::fake(['*' => Http::response('<html>nope</html>')]);
 
