@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"commypanel/agent/internal/certs"
+	"commypanel/agent/internal/dbtool"
 	"commypanel/agent/internal/docker"
 	"commypanel/agent/internal/nginx"
 	"commypanel/agent/internal/system"
@@ -1044,5 +1045,104 @@ func TestAddressesRouteAnswersWithThePublicAddressesOfThisMachine(t *testing.T) 
 	rec := do(t, s, "GET", "/v1/system/addresses", "")
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"ipv4":["65.21.10.20"]`) || !strings.Contains(rec.Body.String(), `"primary_ipv4":"65.21.10.20"`) {
 		t.Errorf("addresses: %d %s", rec.Code, rec.Body)
+	}
+}
+
+// fakeTools stands in for the database tool sessions.
+type fakeTools struct {
+	started dbtool.StartRequest
+	ready   bool
+	stopped []string
+	err     error
+}
+
+func (f *fakeTools) Start(req dbtool.StartRequest) (dbtool.View, error) {
+	f.started = req
+	if f.err != nil {
+		return dbtool.View{}, f.err
+	}
+	return dbtool.View{ID: "abcdefghijklmnopqrstuvwx", Stage: dbtool.StagePulling, Tool: "phpmyadmin", Server: req.Server, Database: req.Database}, nil
+}
+
+func (f *fakeTools) Status(id string) (dbtool.View, bool) {
+	if id != "abcdefghijklmnopqrstuvwx" {
+		return dbtool.View{}, false
+	}
+	stage := dbtool.StageStarting
+	if f.ready {
+		stage = dbtool.StageReady
+	}
+	return dbtool.View{ID: id, Stage: stage, Tool: "phpmyadmin"}, true
+}
+
+func (f *fakeTools) Ticket(id string) (string, error) {
+	if !f.ready {
+		return "", dbtool.ErrNotReady
+	}
+	return "ticket-for-" + id, nil
+}
+
+func (f *fakeTools) Stop(id string) { f.stopped = append(f.stopped, id) }
+
+func TestDatabaseToolRoutesStartFollowTicketAndStop(t *testing.T) {
+	tools := &fakeTools{}
+	s := New(Options{Nginx: &fakeNginx{}, DBTools: tools, Authorize: AllowAll()})
+	body := `{"engine":"mariadb","server":"main","database":"shop","user":"shop","password":"abcdefghijklmnop1234","public_base":"https://commy.example.com:2053"}`
+
+	rec := do(t, s, "POST", "/v1/dbtools/start", body)
+	if rec.Code != 202 || !strings.Contains(rec.Body.String(), `"stage":"pulling"`) || tools.started.Database != "shop" || tools.started.Password != "abcdefghijklmnop1234" {
+		t.Fatalf("start: %d %s", rec.Code, rec.Body)
+	}
+	if strings.Contains(rec.Body.String(), "abcdefghijklmnop1234") {
+		t.Error("the password is in the answer")
+	}
+
+	id := "abcdefghijklmnopqrstuvwx"
+	if rec := do(t, s, "GET", "/v1/dbtools/"+id, ""); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"stage":"starting"`) {
+		t.Errorf("status: %d %s", rec.Code, rec.Body)
+	}
+	if rec := do(t, s, "POST", "/v1/dbtools/"+id+"/ticket", ""); rec.Code != 400 {
+		t.Errorf("a ticket before it is ready: %d %s", rec.Code, rec.Body)
+	}
+	tools.ready = true
+	if rec := do(t, s, "POST", "/v1/dbtools/"+id+"/ticket", ""); rec.Code != 200 || !strings.Contains(rec.Body.String(), "ticket-for-"+id) {
+		t.Errorf("ticket: %d %s", rec.Code, rec.Body)
+	}
+	if rec := do(t, s, "POST", "/v1/dbtools/"+id+"/stop", ""); rec.Code != 200 || len(tools.stopped) != 1 {
+		t.Errorf("stop: %d %v", rec.Code, tools.stopped)
+	}
+}
+
+func TestDatabaseToolRoutesRefuseOddIDsAndUnknownSessionsAndBadInput(t *testing.T) {
+	tools := &fakeTools{err: &validate.InputError{Msg: "too many database tools are open"}}
+	s := New(Options{Nginx: &fakeNginx{}, DBTools: tools, Authorize: AllowAll()})
+
+	for _, id := range []string{"short", "has.dots.in.it.and.is.long", "../../etc/passwd/xxxxxxxx", strings.Repeat("a", 65)} {
+		// A path with .. is cleaned by the router, which answers with a redirect; the rest are refused.
+		if rec := do(t, s, "GET", "/v1/dbtools/"+id, ""); rec.Code != 404 && rec.Code != 307 {
+			t.Errorf("status of %q: %d", id, rec.Code)
+		}
+		if rec := do(t, s, "POST", "/v1/dbtools/"+id+"/stop", ""); rec.Code != 404 && rec.Code != 307 {
+			t.Errorf("stop of %q: %d", id, rec.Code)
+		}
+		if len(tools.stopped) != 0 {
+			t.Errorf("a session was stopped through %q", id)
+		}
+	}
+	if rec := do(t, s, "GET", "/v1/dbtools/zzzzzzzzzzzzzzzzzzzzzzzz", ""); rec.Code != 404 {
+		t.Errorf("an unknown session: %d", rec.Code)
+	}
+	if rec := do(t, s, "POST", "/v1/dbtools/start", `{"engine":"mariadb","unknown":1}`); rec.Code != 400 {
+		t.Errorf("an unknown field: %d", rec.Code)
+	}
+	if rec := do(t, s, "POST", "/v1/dbtools/start", `{"engine":"mariadb","server":"main","database":"shop","user":"shop","password":"abcdefghijklmnop1234","public_base":"https://a.example"}`); rec.Code != 400 || !strings.Contains(rec.Body.String(), "too many") {
+		t.Errorf("a refusal: %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestDatabaseToolsCanBeOff(t *testing.T) {
+	s := New(Options{Nginx: &fakeNginx{}, Authorize: AllowAll()})
+	if rec := do(t, s, "POST", "/v1/dbtools/start", `{}`); rec.Code != 501 {
+		t.Errorf("start with tools off: %d", rec.Code)
 	}
 }

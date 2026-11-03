@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"commypanel/agent/internal/certs"
+	"commypanel/agent/internal/dbtool"
 	"commypanel/agent/internal/docker"
 	"commypanel/agent/internal/nginx"
 	"commypanel/agent/internal/server"
@@ -64,6 +65,8 @@ func run() error {
 		buildMem   = flag.Int("build-memory-mb", 2048, "memory limit for image builds")
 		buildCPUs  = flag.Float64("build-cpus", 2, "CPU limit for image builds")
 		termSocket = flag.String("terminal-socket", "", "Unix socket for browser terminals (WebSocket); empty turns terminals off")
+		toolSocket = flag.String("dbtool-socket", "", "Unix socket for the web side of database tools (phpMyAdmin, Adminer); empty turns them off")
+		toolGroup  = flag.String("dbtool-socket-group", "www-data", "group that may connect to the database tool socket (the web server's)")
 		termGroup  = flag.String("terminal-socket-group", "www-data", "group that may connect to the terminal socket (the web server's)")
 		dryRun     = flag.Bool("dry-run", false, "write configs but never run nginx or Docker (development)")
 		allowed    uidList
@@ -110,7 +113,13 @@ func run() error {
 	if *termSocket != "" {
 		tickets = terminal.NewTickets(terminal.TicketTTL, 32)
 	}
-	srv := server.New(server.Options{Nginx: mgr, Docker: dockerMgr, Volumes: volumefs.New(*dataDir), Terminal: ticketIssuer(tickets), Certs: certMgr, Unit: system.NewDockerUnit(*dryRun), Usage: sampler,
+	var tools *dbtool.Manager
+	toolCtx, endTools := context.WithCancel(context.Background())
+	defer endTools()
+	if *toolSocket != "" && !*dryRun {
+		tools = dbtool.New(toolCtx, dockerMgr, dbtool.Config{})
+	}
+	srv := server.New(server.Options{Nginx: mgr, DBTools: toolsFor(tools), Docker: dockerMgr, Volumes: volumefs.New(*dataDir), Terminal: ticketIssuer(tickets), Certs: certMgr, Unit: system.NewDockerUnit(*dryRun), Usage: sampler,
 		Authorize: authorize, Version: version, DryRun: *dryRun,
 		System:    func() system.Status { return system.Collect(*dataDir) },
 		Info:      system.NewReader(*dataDir).Info,
@@ -177,11 +186,54 @@ func run() error {
 		slog.Info("terminals enabled", "socket", *termSocket)
 	}
 
+	go func() {
+		<-ctx.Done()
+		endTools()
+	}()
+	if tools != nil {
+		toolLn, err := listen(*toolSocket, *toolGroup, *dryRun)
+		if err != nil {
+			return fmt.Errorf("database tool socket: %w", err)
+		}
+		// Whatever an earlier run left behind (it kept sessions in memory only) is removed first.
+		tools.Cleanup(ctx)
+		go tools.RunReaper(ctx)
+		toolSrv := &http.Server{
+			Handler:           tools,
+			ReadHeaderTimeout: 10 * time.Second,
+			ReadTimeout:       15 * time.Minute, // a dump being imported
+			WriteTimeout:      15 * time.Minute,
+			IdleTimeout:       60 * time.Second,
+			MaxHeaderBytes:    32 << 10,
+		}
+		go func() {
+			<-ctx.Done()
+			shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = toolSrv.Shutdown(shutdown)
+		}()
+		go func() {
+			if err := toolSrv.Serve(toolLn); !errors.Is(err, http.ErrServerClosed) {
+				slog.Error("database tool socket stopped", "err", err)
+			}
+		}()
+		slog.Info("database tools enabled", "socket", *toolSocket)
+	}
+
 	slog.Info("agent listening", "socket", *socket, "version", version, "dry_run", *dryRun)
 	if err := httpSrv.Serve(ln); !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 	return nil
+}
+
+// toolsFor avoids handing the server a typed nil: with database tools off it
+// must see a nil interface so it can answer "not enabled".
+func toolsFor(t *dbtool.Manager) server.DBTools {
+	if t == nil {
+		return nil
+	}
+	return t
 }
 
 // ticketIssuer avoids handing the server a typed nil: with terminals off the

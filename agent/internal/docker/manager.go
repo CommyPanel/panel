@@ -92,6 +92,10 @@ type ContainerSpec struct {
 	// has there. They are how a link between an app and a database, or between
 	// two apps, is made: the pair meets on a network of their own.
 	Networks []NetworkAttach `json:"networks,omitempty"`
+
+	// Set only by the agent's own code (database tool sessions), never from a request.
+	extraLabels map[string]string
+	noRestart   bool
 }
 
 // NetworkAttach is an extra network for a container, and its names there.
@@ -311,16 +315,20 @@ func (m *Manager) createBody(s ContainerSpec) map[string]any {
 		"Memory":          int64(memMB) << 20,
 		"NanoCpus":        int64(cpus * 1e9),
 		"PidsLimit":       512,
-		"RestartPolicy":   map[string]any{"Name": "unless-stopped"},
+		"RestartPolicy":   map[string]any{"Name": restartPolicy(s)},
 		"SecurityOpt":     []string{"no-new-privileges:true"},
 		"CapDrop":         []string{"NET_RAW"},
 		"NetworkMode":     network,
 		"PublishAllPorts": false,
 	}
+	labels := map[string]string{ManagedLabel: "true"}
+	for k, v := range s.extraLabels {
+		labels[k] = v
+	}
 	body := map[string]any{
 		"Image":      s.Image,
 		"Env":        env,
-		"Labels":     map[string]string{ManagedLabel: "true"},
+		"Labels":     labels,
 		"HostConfig": host,
 	}
 	if len(s.Aliases) > 0 {
@@ -336,11 +344,25 @@ func (m *Manager) createBody(s ContainerSpec) map[string]any {
 	return body
 }
 
+func restartPolicy(s ContainerSpec) string {
+	if s.noRestart {
+		return "no"
+	}
+	return "unless-stopped"
+}
+
 // Run creates and starts a container.
 func (m *Manager) Run(ctx context.Context, s ContainerSpec) error {
 	if err := m.Validate(s); err != nil {
 		return err
 	}
+	return m.start(ctx, s)
+}
+
+// start creates and starts a container whose spec was already checked, by
+// Validate for a request from the panel or by the agent's own code for a
+// database tool.
+func (m *Manager) start(ctx context.Context, s ContainerSpec) error {
 	if m.cfg.DryRun {
 		slog.Info("dry-run: would run container", "name", s.Name, "image", s.Image)
 		return nil

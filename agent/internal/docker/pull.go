@@ -20,6 +20,20 @@ func (m *Manager) PullImage(ctx context.Context, image string) error {
 	if err := validate.DatabaseImage(image); err != nil {
 		return err
 	}
+	return m.pull(ctx, image)
+}
+
+// PullToolImage is PullImage for the database tools (phpMyAdmin, Adminer). It is
+// not offered to the panel directly; the database tool sessions call it with an
+// image the agent itself chose.
+func (m *Manager) PullToolImage(ctx context.Context, image string) error {
+	if err := validate.ToolImage(image); err != nil {
+		return err
+	}
+	return m.pull(ctx, image)
+}
+
+func (m *Manager) pull(ctx context.Context, image string) error {
 	if m.cfg.DryRun {
 		slog.Info("dry-run: would pull image", "image", image)
 		return nil

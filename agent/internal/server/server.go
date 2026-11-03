@@ -13,9 +13,11 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 
 	"commypanel/agent/internal/certs"
+	"commypanel/agent/internal/dbtool"
 	"commypanel/agent/internal/docker"
 	"commypanel/agent/internal/nginx"
 	"commypanel/agent/internal/peercred"
@@ -88,6 +90,16 @@ type Terminal interface {
 	Issue(container, origin string) (string, error)
 }
 
+// DBTools is the part of the database tool sessions the server needs: starting
+// one, asking how far it is, getting the one-time ticket that lets a browser in,
+// and closing it. The browser side is a separate socket.
+type DBTools interface {
+	Start(req dbtool.StartRequest) (dbtool.View, error)
+	Status(id string) (dbtool.View, bool)
+	Ticket(id string) (string, error)
+	Stop(id string)
+}
+
 // Certificates is the part of the certificate manager the server needs.
 type Certificates interface {
 	Issue(ctx context.Context, r certs.Request) (certs.Info, error)
@@ -114,6 +126,7 @@ type Options struct {
 	Docker    Docker
 	Volumes   Volumes
 	Terminal  Terminal
+	DBTools   DBTools
 	Certs     Certificates
 	Unit      DockerUnit
 	Usage     Usage
@@ -202,6 +215,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/terminal/tickets", s.terminalTicket)
 	mux.HandleFunc("POST /v1/volumes/remove", s.removeVolumes)
 	mux.HandleFunc("POST /v1/volumes/backup", s.backupVolume)
+	mux.HandleFunc("POST /v1/dbtools/start", s.dbtoolStart)
+	mux.HandleFunc("GET /v1/dbtools/{id}", s.dbtoolStatus)
+	mux.HandleFunc("POST /v1/dbtools/{id}/ticket", s.dbtoolTicket)
+	mux.HandleFunc("POST /v1/dbtools/{id}/stop", s.dbtoolStop)
 	mux.HandleFunc("GET /v1/volumes/{app}", s.listVolumes)
 	mux.HandleFunc("GET /v1/volumes/{app}/{name}/dir", s.volumeDir)
 	mux.HandleFunc("GET /v1/volumes/{app}/{name}/file", s.volumeFile)
@@ -729,6 +746,87 @@ func (s *Server) volumeDownload(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Length", strconv.FormatInt(d.Size, 10))
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(w, io.LimitReader(d.File, d.Size))
+}
+
+// dbtoolID checks the id a request names, so what reaches the sessions is always shaped like one.
+func dbtoolID(r *http.Request) (string, bool) {
+	id := r.PathValue("id")
+	return id, len(id) >= 16 && len(id) <= 64 && dbtoolIDPattern.MatchString(id)
+}
+
+var dbtoolIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
+func (s *Server) dbtoolsOff(w http.ResponseWriter) bool {
+	if s.opts.DBTools == nil {
+		writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "database tools are not enabled"})
+		return true
+	}
+	return false
+}
+
+// dbtoolStart begins opening a database in its tool and answers at once; the
+// download and start go on in the background and are followed with dbtoolStatus.
+func (s *Server) dbtoolStart(w http.ResponseWriter, r *http.Request) {
+	if s.dbtoolsOff(w) {
+		return
+	}
+	var body dbtool.StartRequest
+	if !decode(w, r, &body) {
+		return
+	}
+	view, err := s.opts.DBTools.Start(body)
+	if err != nil {
+		s.respond(w, err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, view)
+}
+
+func (s *Server) dbtoolStatus(w http.ResponseWriter, r *http.Request) {
+	if s.dbtoolsOff(w) {
+		return
+	}
+	id, ok := dbtoolID(r)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "there is no such session"})
+		return
+	}
+	view, found := s.opts.DBTools.Status(id)
+	if !found {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "there is no such session"})
+		return
+	}
+	writeJSON(w, http.StatusOK, view)
+}
+
+func (s *Server) dbtoolTicket(w http.ResponseWriter, r *http.Request) {
+	if s.dbtoolsOff(w) {
+		return
+	}
+	id, ok := dbtoolID(r)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "there is no such session"})
+		return
+	}
+	token, err := s.opts.DBTools.Ticket(id)
+	if err != nil {
+		s.respond(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"ticket": token})
+}
+
+func (s *Server) dbtoolStop(w http.ResponseWriter, r *http.Request) {
+	if s.dbtoolsOff(w) {
+		return
+	}
+	id, ok := dbtoolID(r)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "there is no such session"})
+		return
+	}
+	s.opts.DBTools.Stop(id)
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
 // backupVolume answers with a gzipped tar of one volume. It is made in full in the

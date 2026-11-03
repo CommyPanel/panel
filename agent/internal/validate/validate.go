@@ -54,6 +54,7 @@ func Network(s string) error {
 
 var (
 	dbImageRe    = regexp.MustCompile(`^(mariadb|mysql|postgres):[0-9]+(\.[0-9]+){0,2}$`)
+	toolImageRe  = regexp.MustCompile(`^(phpmyadmin|adminer):[0-9]+(\.[0-9]+){0,2}$`)
 	dbIdentRe    = regexp.MustCompile(`^[a-z][a-z0-9_]{0,30}$`)
 	dbPasswordRe = regexp.MustCompile(`^[A-Za-z0-9]{16,64}$`)
 	aliasRe      = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
@@ -80,6 +81,17 @@ func RunImage(s string) error {
 		return Image(s)
 	}
 	return DatabaseImage(s)
+}
+
+// ToolImage checks the image of a database tool: the official phpmyadmin or
+// adminer with a plain version tag. It is deliberately not accepted by RunImage,
+// so the generic container actions can never start one; only the agent's own
+// database tool sessions do.
+func ToolImage(s string) error {
+	if !toolImageRe.MatchString(s) {
+		return invalid("invalid database tool image %q", s)
+	}
+	return nil
 }
 
 // DatabaseEngine checks the name of a database engine.
