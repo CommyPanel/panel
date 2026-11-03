@@ -22,12 +22,12 @@ A token is checked against its owner's **current** permissions on every call: if
 
 All calls are under `/api/v1`, send `Accept: application/json` and `Authorization: Bearer <token>`.
 
-| Call | Ability | Answer |
-|---|---|---|
-| `GET /apps` | `apps:read` | the apps the token may see |
-| `GET /apps/{slug}` | `apps:read` | one app: status, stack, domains, live and latest deployment |
-| `POST /apps/{slug}/deployments` | `apps:deploy` | `202` and the new deployment |
-| `GET /apps/{slug}/deployments/{number}` | `apps:read` | the deployment; add `?log=1` for the build log |
+| Call                                    | Ability       | Answer                                                      |
+| --------------------------------------- | ------------- | ----------------------------------------------------------- |
+| `GET /apps`                             | `apps:read`   | the apps the token may see                                  |
+| `GET /apps/{slug}`                      | `apps:read`   | one app: status, stack, domains, live and latest deployment |
+| `POST /apps/{slug}/deployments`         | `apps:deploy` | `202` and the new deployment                                |
+| `GET /apps/{slug}/deployments/{number}` | `apps:read`   | the deployment; add `?log=1` for the build log              |
 
 Answers hold no secrets: no environment variables, keys or webhook secrets.
 
@@ -55,18 +55,18 @@ Store the token as a repository secret (`COMMYPANEL_TOKEN`) and the panel addres
 ```yaml
 - name: Deploy
   env:
-    BASE: ${{ vars.COMMYPANEL_URL }}
-    TOKEN: ${{ secrets.COMMYPANEL_TOKEN }}
+      BASE: ${{ vars.COMMYPANEL_URL }}
+      TOKEN: ${{ secrets.COMMYPANEL_TOKEN }}
   run: |
-    n=$(curl -fsS -X POST "$BASE/api/v1/apps/shop/deployments" \
-      -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" | jq -r .data.number)
-    while :; do
-      d=$(curl -fsS "$BASE/api/v1/apps/shop/deployments/$n" \
-        -H "Authorization: Bearer $TOKEN" -H "Accept: application/json")
-      [ "$(echo "$d" | jq -r .data.finished)" = true ] && break
-      sleep 5
-    done
-    [ "$(echo "$d" | jq -r .data.succeeded)" = true ]
+      n=$(curl -fsS -X POST "$BASE/api/v1/apps/shop/deployments" \
+        -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" | jq -r .data.number)
+      while :; do
+        d=$(curl -fsS "$BASE/api/v1/apps/shop/deployments/$n" \
+          -H "Authorization: Bearer $TOKEN" -H "Accept: application/json")
+        [ "$(echo "$d" | jq -r .data.finished)" = true ] && break
+        sleep 5
+      done
+      [ "$(echo "$d" | jq -r .data.succeeded)" = true ]
 ```
 
 Use a token restricted to that one app, with only `apps:deploy` and `apps:read`.

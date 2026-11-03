@@ -33,6 +33,7 @@ use App\Http\Controllers\EnvVarController;
 use App\Http\Controllers\GitTokenController;
 use App\Http\Controllers\HttpsController;
 use App\Http\Controllers\ManagedDatabaseController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\ServerAddressController;
@@ -260,6 +261,13 @@ Route::middleware('auth')->group(function () {
         Route::delete('/settings/backups/remote', [BackupRemoteController::class, 'destroy'])->middleware('password.confirm')->name('settings.backups.remote.destroy');
         Route::get('/settings/backups/{name}', [BackupController::class, 'download'])->where('name', $name)->middleware('password.confirm')->name('settings.backups.download');
         Route::delete('/settings/backups/{name}', [BackupController::class, 'destroy'])->where('name', $name)->middleware('password.confirm')->name('settings.backups.destroy');
+    });
+
+    Route::middleware('can:'.Permissions::NOTIFICATIONS_MANAGE)->group(function () {
+        Route::get('/settings/notifications', [NotificationController::class, 'index'])->name('settings.notifications');
+        Route::put('/settings/notifications', [NotificationController::class, 'update'])->middleware('password.confirm')->name('settings.notifications.update');
+        Route::post('/settings/notifications/test', [NotificationController::class, 'test'])->middleware('throttle:6,1')->name('settings.notifications.test');
+        Route::delete('/settings/notifications', [NotificationController::class, 'destroy'])->middleware('password.confirm')->name('settings.notifications.destroy');
     });
 
     Route::get('/settings/updates', [UpdateController::class, 'show'])

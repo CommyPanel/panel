@@ -18,6 +18,7 @@ use App\Host\Data\TaskSpec;
 use App\Host\Exceptions\DockerUnavailable;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
+use App\Jobs\SendDeployAlert;
 use App\Models\App;
 use App\Models\Deployment;
 use App\Tls\TlsPlanner;
@@ -86,6 +87,7 @@ class DeployApp
 
             $log->line('Deployment finished.');
             $this->audit->record('deploy.succeeded', null, ['app' => $app->slug, 'deployment' => $deployment->number]);
+            SendDeployAlert::dispatchFor($deployment);
         } catch (Throwable $e) {
             $this->fail($deployment, $log, $e, $started);
         } finally {
@@ -368,5 +370,6 @@ class DeployApp
             'deployment' => $deployment->number,
             'reason' => $message,
         ]);
+        SendDeployAlert::dispatchFor($deployment);
     }
 }

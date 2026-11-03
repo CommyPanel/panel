@@ -1,5 +1,6 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
+    Bell,
     Braces,
     Boxes,
     Database,
@@ -124,6 +125,12 @@ const NAV: { heading: string; items: NavItem[] }[] = [
                 label: 'Backups',
                 icon: DatabaseBackup,
                 permission: 'backups.view',
+            },
+            {
+                href: '/settings/notifications',
+                label: 'Notifications',
+                icon: Bell,
+                permission: 'notifications.manage',
             },
             {
                 href: '/settings/updates',
