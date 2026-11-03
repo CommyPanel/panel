@@ -73,11 +73,6 @@ export function RestoreBackupModal({
                         <strong>Links</strong> tab, deploy again, and delete the
                         old database when you are sure.
                     </li>
-                    <li>
-                        Only backups CommyPanel made itself can be restored. One
-                        made before this feature existed, or changed since, is
-                        refused.
-                    </li>
                 </ul>
                 <div className="flex flex-wrap justify-end gap-2">
                     <Button variant="ghost" onClick={onClose}>

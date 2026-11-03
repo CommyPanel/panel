@@ -591,14 +591,7 @@ export default function Show({ server, databases, backups, keep }: Props) {
                     holds the data itself, so downloading one needs your
                     password and is recorded. To load one back, press{' '}
                     <strong>Restore</strong>: it goes into a new database, and
-                    nothing that exists is changed. A backup made by an older
-                    CommyPanel cannot be restored here; load it with{' '}
-                    <code>
-                        {server.engine === 'postgres'
-                            ? `gunzip -c FILE | docker exec -i db-${server.slug} psql -U postgres -d NAME`
-                            : `gunzip -c FILE | docker exec -i db-${server.slug} sh -c '${server.engine === 'mysql' ? 'mysql' : 'mariadb'} -uroot -p"$${server.engine === 'mysql' ? 'MYSQL' : 'MARIADB'}_ROOT_PASSWORD" NAME'`}
-                    </code>{' '}
-                    on the server.
+                    nothing that exists is changed.
                 </p>
             </Card>
 
