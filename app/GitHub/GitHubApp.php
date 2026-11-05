@@ -101,7 +101,7 @@ class GitHubApp
             throw new GitHubFailed('GitHub sent something unexpected.');
         }
 
-        $data = $this->call(fn () => $this->http()->post(self::API."/app-manifests/{$code}/conversions"), 'create the app');
+        $data = $this->call(fn () => $this->http()->send('POST', self::API."/app-manifests/{$code}/conversions"), 'create the app');
 
         $id = $data['id'] ?? null;
         $pem = $data['pem'] ?? null;
@@ -279,7 +279,11 @@ class GitHubApp
         }
 
         if (! $response->successful()) {
-            throw new GitHubFailed("GitHub answered {$status} when asked to {$what}.");
+            // GitHub's own explanation helps ("Validation Failed", a rate limit); it holds no secrets.
+            $message = $response->json('message');
+            $detail = is_string($message) && $message !== '' ? ': '.mb_substr(preg_replace('/\s+/', ' ', $message) ?? '', 0, 160) : '';
+
+            throw new GitHubFailed("GitHub answered {$status} when asked to {$what}{$detail}.");
         }
 
         $json = $response->json();

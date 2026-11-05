@@ -100,7 +100,8 @@ describe('creating the app', function () {
             ->and(json_encode(app(GitHubApp::class)->toArray()))->not->toContain('whsec_shared')->not->toContain('BEGIN')
             ->and(AuditLog::query()->where('action', 'github.connected')->exists())->toBeTrue();
 
-        Http::assertSent(fn (HttpRequest $r) => str_ends_with($r->url(), '/app-manifests/abcdefghij1234/conversions'));
+        // GitHub rejects the conversion with a 422 when it is sent a body (even "[]"), so it carries none
+        Http::assertSent(fn (HttpRequest $r) => str_ends_with($r->url(), '/app-manifests/abcdefghij1234/conversions') && $r->method() === 'POST' && $r->body() === '');
     });
 
     it('accepts the return only with this session\'s state, once', function () {
@@ -127,6 +128,15 @@ describe('creating the app', function () {
         $state = session('github.pending')['state'];
         $this->get('/settings/github/callback?code='.urlencode('../../x').'&state='.$state)->assertSessionHasErrors('github');
         Http::assertNothingSent();
+    });
+
+    it('tells the person what GitHub said when it refuses', function () {
+        ($this->confirmed)()->post('/settings/github/prepare', ['account' => 'personal']);
+        $state = session('github.pending')['state'];
+        Http::fake(['*' => Http::response(['message' => 'Validation Failed'], 422)]);
+
+        $this->get('/settings/github/callback?code=abcdefghij1234&state='.$state)
+            ->assertSessionHasErrors(['github' => 'GitHub answered 422 when asked to create the app: Validation Failed.']);
     });
 
     it('refuses an answer that is not an app', function () {

@@ -53,6 +53,8 @@ final class Permissions
 
     public const BACKUPS_MANAGE = 'backups.manage';
 
+    public const TOKENS_MANAGE = 'tokens.manage';
+
     public const GITHUB_MANAGE = 'github.manage';
 
     public const NOTIFICATIONS_MANAGE = 'notifications.manage';
@@ -105,6 +107,7 @@ final class Permissions
             self::APPS_LINKS => ['group' => 'Apps', 'label' => 'Link apps to databases and other apps', 'description' => 'Let an app reach a database, or another app, over a private network made for that link. A linked app can use the database it is given, and its connection details are added to its environment variables.'],
             self::BACKUPS_VIEW => ['group' => 'Server', 'label' => 'View backups', 'description' => 'See the list of the panel\'s backups, when they were made and how big they are.'],
             self::BACKUPS_MANAGE => ['group' => 'Server', 'label' => 'Manage backups', 'description' => 'Take a backup now, download one and delete one. A backup holds everything in the panel\'s database, including the encrypted secrets of apps and databases, so downloading asks for the password and is recorded in the audit log.'],
+            self::TOKENS_MANAGE => ['group' => 'Access', 'label' => 'Manage own API tokens', 'description' => 'Create and revoke your own API tokens for scripts and CI. A token can only do what you may do yourself (read apps, start deployments), optionally limited to some apps, and stops working if you lose that permission. Creating and revoking ask for your password and are recorded in the audit log.'],
             self::GITHUB_MANAGE => ['group' => 'Server', 'label' => 'Connect GitHub', 'description' => 'Create the panel\'s GitHub App, install it on an account and disconnect it. The app can read the code of the repositories you give it access to on GitHub, and anyone who may create apps can then deploy those repositories.'],
             self::NOTIFICATIONS_MANAGE => ['group' => 'Server', 'label' => 'Manage deployment messages', 'description' => 'Choose where the result of deployments is sent (Slack, Discord or any webhook), send a test message and switch it off. The address is stored encrypted and never shown again; the messages hold the app, commit and error, never logs or secrets.'],
             self::SERVER_VIEW => ['group' => 'Server', 'label' => 'View the server', 'description' => 'See host resources, service states, Docker and nginx status.'],

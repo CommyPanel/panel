@@ -1,11 +1,13 @@
 <?php
 
 use App\Api\TokenAccess;
+use App\Auth\Permissions;
 use App\Auth\SyncRolesAndPermissions;
 use App\Models\App;
 use App\Models\AuditLog;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
+use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
     app(SyncRolesAndPermissions::class)();
@@ -41,13 +43,14 @@ it('shows a person their own tokens and what they may put on one', function () {
 
 it('offers a person only the abilities they hold', function () {
     $viewer = User::factory()->regular()->create();
-    $viewer->givePermissionTo('apps.view');
+    $viewer->givePermissionTo('apps.view', 'tokens.manage');
 
     $this->actingAs($viewer)->get('/settings/tokens')->assertInertia(fn (Assert $page) => $page
         ->has('abilities', 1)
         ->where('abilities.0.key', TokenAccess::READ));
 
     $nobody = User::factory()->regular()->create();
+    $nobody->givePermissionTo('tokens.manage');
     $this->actingAs($nobody)->get('/settings/tokens')->assertInertia(fn (Assert $page) => $page->has('abilities', 0)->where('apps', []));
 });
 
@@ -93,7 +96,7 @@ describe('making one', function () {
 
     it('refuses what the person may not do, an unknown app, a bad lifetime and an empty choice', function () {
         $viewer = User::factory()->regular()->create();
-        $viewer->givePermissionTo('apps.view');
+        $viewer->givePermissionTo('apps.view', 'tokens.manage');
         $this->actingAs($viewer);
 
         ($this->confirmed)()->post('/settings/tokens', validToken())->assertSessionHasErrors('abilities.1');
@@ -151,4 +154,21 @@ it('is for people who are signed in', function () {
 
     $this->get('/settings/tokens')->assertRedirect('/login');
     $this->post('/settings/tokens', validToken())->assertRedirect('/login');
+});
+
+it('needs the tokens permission for the page, creating and revoking', function () {
+    $nobody = User::factory()->regular()->create();
+    $this->actingAs($nobody);
+
+    $this->get('/settings/tokens')->assertForbidden();
+    ($this->confirmed)()->post('/settings/tokens', validToken())->assertForbidden();
+    $this->delete('/settings/tokens/1')->assertForbidden();
+
+    $nobody->givePermissionTo('tokens.manage', 'apps.view');
+    $this->get('/settings/tokens')->assertOk();
+});
+
+it('lists the permission with the others, for roles to grant', function () {
+    expect(Permissions::names())->toContain('tokens.manage')
+        ->and(Role::findByName('admin')->hasPermissionTo('tokens.manage'))->toBeTrue();
 });

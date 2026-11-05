@@ -65,9 +65,11 @@ Route::middleware('auth')->group(function () {
         ->name('settings.security');
 
     // A person's own API tokens: they carry only what that person may do (see App\Api\TokenAccess).
-    Route::get('/settings/tokens', [ApiTokenController::class, 'index'])->name('settings.tokens');
-    Route::post('/settings/tokens', [ApiTokenController::class, 'store'])->middleware('password.confirm')->name('settings.tokens.store');
-    Route::delete('/settings/tokens/{token}', [ApiTokenController::class, 'destroy'])->whereNumber('token')->middleware('password.confirm')->name('settings.tokens.destroy');
+    Route::middleware('can:'.Permissions::TOKENS_MANAGE)->group(function () {
+        Route::get('/settings/tokens', [ApiTokenController::class, 'index'])->name('settings.tokens');
+        Route::post('/settings/tokens', [ApiTokenController::class, 'store'])->middleware('password.confirm')->name('settings.tokens.store');
+        Route::delete('/settings/tokens/{token}', [ApiTokenController::class, 'destroy'])->whereNumber('token')->middleware('password.confirm')->name('settings.tokens.destroy');
+    });
 
     // Everything below is guarded by a permission (see App\Auth\Permissions).
     // `create` must be registered before `show`, or /apps/create would match /apps/{app}.

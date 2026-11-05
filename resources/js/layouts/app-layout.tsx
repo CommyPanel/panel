@@ -114,6 +114,7 @@ const NAV: { heading: string; items: NavItem[] }[] = [
                 href: '/settings/tokens',
                 label: 'API tokens',
                 icon: Braces,
+                permission: 'tokens.manage',
             },
             {
                 href: '/settings/audit-log',

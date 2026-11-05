@@ -5,7 +5,7 @@ bearer tokens, never your password or a browser session.
 
 ## Create a token
 
-Settings > API tokens > New token. Choose:
+Settings > API tokens > New token (needs the `tokens.manage` permission). Choose:
 
 - **What it may do**: read apps and deployments (`apps:read`), start deployments (`apps:deploy`). You can
   only give what you hold yourself.
