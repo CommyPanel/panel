@@ -49,7 +49,7 @@ async function call(
 const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
 
 /**
- * Opens a database in phpMyAdmin or Adminer. This page is in a new tab: it asks the
+ * Opens a database in phpMyAdmin or pgAdmin. This page is in a new tab: it asks the
  * server to start the tool, shows how far that is, and then moves this tab on to the
  * tool, already logged in. It tells what is about to happen, including that the tool
  * closes by itself.

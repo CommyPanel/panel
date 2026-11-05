@@ -1,5 +1,5 @@
 // Package dbtool lets a person open a database in phpMyAdmin (MySQL, MariaDB) or
-// Adminer (PostgreSQL) without installing anything.
+// pgAdmin (PostgreSQL) without installing anything.
 //
 // A session starts a small container of the tool on the database server's own
 // network, logged in as that one database's own user, and removes it again after

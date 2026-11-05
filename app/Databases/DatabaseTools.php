@@ -12,7 +12,7 @@ use App\Models\ManagedDatabase;
 use Illuminate\Http\Request;
 
 /**
- * Opening a database in phpMyAdmin (MySQL, MariaDB) or Adminer (PostgreSQL) without
+ * Opening a database in phpMyAdmin (MySQL, MariaDB) or pgAdmin (PostgreSQL) without
  * installing anything: a short-lived container of the tool, logged in as that one
  * database's own user, which the agent removes after 15 minutes without use.
  *
@@ -34,7 +34,7 @@ class DatabaseTools
     {
         $server = $of instanceof ManagedDatabase ? $of->server : $of;
 
-        return $server->engine->value === 'postgres' ? 'Adminer' : 'phpMyAdmin';
+        return $server->engine->value === 'postgres' ? 'pgAdmin' : 'phpMyAdmin';
     }
 
     /**

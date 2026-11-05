@@ -12,7 +12,7 @@ const toolBase = "https://commy.example.com:2053/s/abcdefghijklmnopqrstuvwx/"
 func toolSpec(engine string) ToolSpec {
 	tool := "phpmyadmin"
 	if engine == "postgres" {
-		tool = "adminer"
+		tool = "pgadmin"
 	}
 	return ToolSpec{Name: "dbtool-0123456789ab", Tool: tool, Engine: engine, Server: "main", User: "shop", Password: userPw, Port: 29001, BaseURL: toolBase}
 }
@@ -51,7 +51,7 @@ func TestAToolRunsOnItsDatabaseServersNetworkAloneAndWithoutPrivileges(t *testin
 	}
 }
 
-func TestAdminerIsTheToolForPostgres(t *testing.T) {
+func TestPgAdminIsTheToolForPostgres(t *testing.T) {
 	m, d, _ := setup(t)
 
 	if err := m.RunTool(context.Background(), toolSpec("postgres")); err != nil {
@@ -59,7 +59,12 @@ func TestAdminerIsTheToolForPostgres(t *testing.T) {
 	}
 	raw, _ := json.Marshal(d.created)
 	body := string(raw)
-	if !strings.Contains(body, `"Image":"adminer:5"`) || !strings.Contains(body, `ADMINER_DEFAULT_SERVER=db-main`) || strings.Contains(body, "PMA_") {
+	for _, want := range []string{`"Image":"dpage/pgadmin4:9"`, `PGADMIN_CONFIG_SERVER_MODE=False`, `PGADMIN_CONFIG_UPGRADE_CHECK_ENABLED=False`, `PGADMIN_CONFIG_ENABLE_PSQL=False`, `PGADMIN_DISABLE_POSTFIX=true`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %s in %s", want, body)
+		}
+	}
+	if strings.Contains(body, "PMA_") || strings.Contains(body, "shop") && strings.Contains(body, "PGADMIN_SERVER_JSON_FILE") {
 		t.Errorf("body = %s", body)
 	}
 	if strings.Contains(body, userPw) {
@@ -71,8 +76,9 @@ func TestAToolIsRefusedForAnythingButItsOwnToolAndNetwork(t *testing.T) {
 	m, d, _ := setup(t)
 	bad := map[string]func(*ToolSpec){
 		"phpMyAdmin for postgres": func(s *ToolSpec) { s.Engine = "postgres" },
-		"adminer for mariadb":     func(s *ToolSpec) { s.Tool = "adminer" },
-		"an unknown tool":         func(s *ToolSpec) { s.Tool = "pgadmin" },
+		"pgadmin for mariadb":     func(s *ToolSpec) { s.Tool = "pgadmin" },
+		"adminer for postgres":    func(s *ToolSpec) { s.Engine = "postgres"; s.Tool = "adminer" },
+		"an unknown tool":         func(s *ToolSpec) { s.Tool = "cockpit" },
 		"not a dbtool name":       func(s *ToolSpec) { s.Name = "shop-1" },
 		"another network":         func(s *ToolSpec) { s.Server = "../bridge" },
 		"a root user":             func(s *ToolSpec) { s.User = "root" },
@@ -97,7 +103,7 @@ func TestAToolIsRefusedForAnythingButItsOwnToolAndNetwork(t *testing.T) {
 
 func TestToolImagesAreNotAcceptedByTheGenericContainerActions(t *testing.T) {
 	m, _, _ := setup(t)
-	for _, image := range []string{"phpmyadmin:5.2", "adminer:5"} {
+	for _, image := range []string{"phpmyadmin:5.2", "dpage/pgadmin4:9"} {
 		spec := ContainerSpec{Name: "x-1", Image: image, Network: "commypanel-db-main"}
 		if err := m.Validate(spec); err == nil {
 			t.Errorf("%s can be started from a request", image)

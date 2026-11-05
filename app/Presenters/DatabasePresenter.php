@@ -22,7 +22,7 @@ class DatabasePresenter
             'name' => $server->name,
             'engine' => $server->engine->value,
             'engine_label' => $server->engine->label(),
-            // The tool a database of this server opens in: phpMyAdmin for MySQL and MariaDB, Adminer for PostgreSQL.
+            // The tool a database of this server opens in: phpMyAdmin for MySQL and MariaDB, pgAdmin for PostgreSQL.
             'tool' => DatabaseTools::toolName($server),
             'version' => $server->version,
             'status' => $server->status->value,

@@ -2,7 +2,9 @@ package dbtool
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -259,13 +261,13 @@ func TestASessionPullsStartsAndWaitsBeforeItIsReady(t *testing.T) {
 	}
 }
 
-func TestPostgresGetsAdminer(t *testing.T) {
+func TestPostgresGetsPgAdmin(t *testing.T) {
 	r := newRig(t, nil)
 	v := r.start(t, "postgres")
-	if v.Tool != "" && v.Tool != "adminer" {
+	if v.Tool != "" && v.Tool != "pgadmin" {
 		t.Errorf("tool = %s", v.Tool)
 	}
-	if got, _ := r.m.Status(v.ID); got.Tool != "adminer" {
+	if got, _ := r.m.Status(v.ID); got.Tool != "pgadmin" {
 		t.Errorf("tool = %s", got.Tool)
 	}
 }
@@ -687,54 +689,77 @@ func TestToolsLeftBehindByACrashAreRemovedAtStartUp(t *testing.T) {
 	}
 }
 
-func TestAdminerIsLoggedInByTheAgentAndItsCookiesAreHandedOver(t *testing.T) {
-	var loginForm url.Values
-	r := newRig(t, func(w http.ResponseWriter, req *http.Request) {
+func pgAdminFake(t *testing.T, connected bool, seen *struct {
+	body   map[string]any
+	csrf   string
+	cookie string
+}) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
 		switch {
-		case req.Method == "GET" && req.URL.RawQuery == "":
-			http.SetCookie(w, &http.Cookie{Name: "adminer_sid", Value: "first", Path: "/", HttpOnly: true})
-			http.SetCookie(w, &http.Cookie{Name: "adminer_key", Value: "key", Path: "/", HttpOnly: true})
-			_, _ = io.WriteString(w, "login form")
-		case req.Method == "POST":
-			_ = req.ParseForm()
-			loginForm = req.PostForm
-			http.SetCookie(w, &http.Cookie{Name: "adminer_sid", Value: "logged-in", Path: "/", HttpOnly: true})
-			w.Header().Set("Location", "?pgsql=db-main&username=shop&db=shop&ns=public")
-			w.WriteHeader(http.StatusFound)
+		case req.Method == "GET" && req.URL.Path == "/browser/":
+			http.SetCookie(w, &http.Cookie{Name: "pga4_session", Value: "sess", Path: "/", HttpOnly: true})
+			http.SetCookie(w, &http.Cookie{Name: "PGADMIN_LANGUAGE", Value: "en", Path: "/"})
+			http.SetCookie(w, &http.Cookie{Name: "laravel_session", Value: "not-the-tools", Path: "/"})
+			_, _ = io.WriteString(w, "pgAdmin")
+		case req.Method == "GET" && req.URL.Path == "/browser/js/utils.js":
+			_, _ = io.WriteString(w, "define(function(){ window.pgAdmin['csrf_token'] = 'tok-123'; });")
+		case req.Method == "POST" && req.URL.Path == "/browser/server/obj/1/":
+			if seen != nil {
+				_ = json.NewDecoder(req.Body).Decode(&seen.body)
+				seen.csrf = req.Header.Get("X-pgA-CSRFToken")
+				if c, err := req.Cookie("pga4_session"); err == nil {
+					seen.cookie = c.Value
+				}
+			}
+			_, _ = io.WriteString(w, fmt.Sprintf(`{"node":{"connected":%v,"is_password_saved":false}}`, connected))
 		default:
 			_, _ = io.WriteString(w, "the database")
 		}
-	})
+	}
+}
+
+func TestPgAdminIsConnectedByTheAgentAndItsCookiesAreHandedOver(t *testing.T) {
+	var seen struct {
+		body   map[string]any
+		csrf   string
+		cookie string
+	}
+	r := newRig(t, pgAdminFake(t, true, &seen))
 	v := r.start(t, "postgres")
 	ticket, _ := r.m.Ticket(v.ID)
 
 	rec := get(r, "/open?t="+ticket, nil)
 
-	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/s/"+v.ID+"/?pgsql=db-main&username=shop&db=shop&ns=public" {
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/s/"+v.ID+"/browser/" {
 		t.Fatalf("%d %s", rec.Code, rec.Header().Get("Location"))
 	}
-	if loginForm.Get("auth[username]") != "shop" || loginForm.Get("auth[password]") != pw || loginForm.Get("auth[server]") != "db-main" || loginForm.Get("auth[db]") != "shop" || loginForm.Get("auth[driver]") != "pgsql" {
-		t.Errorf("login form = %v", loginForm)
+	if seen.csrf != "tok-123" || seen.cookie != "sess" {
+		t.Errorf("csrf %q cookie %q", seen.csrf, seen.cookie)
+	}
+	if seen.body["username"] != "shop" || seen.body["password"] != pw || seen.body["host"] != "db-main" || seen.body["db"] != "shop" ||
+		seen.body["save_password"] != false || seen.body["connect_now"] != true {
+		t.Errorf("connect body = %v", seen.body)
 	}
 	names := map[string]string{}
 	for _, c := range rec.Result().Cookies() {
 		names[c.Name] = c.Value
-		if c.Path != "/s/"+v.ID+"/" || !c.Secure || !c.HttpOnly {
+		if c.Path != "/s/"+v.ID+"/" || !c.Secure || !c.HttpOnly || c.SameSite != http.SameSiteStrictMode {
 			t.Errorf("cookie %+v", c)
 		}
 	}
-	if names["adminer_sid"] != "logged-in" || names["adminer_key"] != "key" || names["cpdbtool_"+v.ID] == "" {
+	if names["pga4_session"] != "sess" || names["PGADMIN_LANGUAGE"] != "en" || names["cpdbtool_"+v.ID] == "" {
 		t.Errorf("cookies = %v", names)
+	}
+	if _, bad := names["laravel_session"]; bad {
+		t.Error("a cookie that is not the tool's was handed to the browser")
 	}
 	if strings.Contains(rec.Body.String(), pw) || strings.Contains(rec.Header().Get("Location"), pw) {
 		t.Error("the password reached the browser")
 	}
 }
 
-func TestAnAdminerThatRefusesTheLoginIsReportedAndTheTicketIsSpent(t *testing.T) {
-	r := newRig(t, func(w http.ResponseWriter, req *http.Request) {
-		_, _ = io.WriteString(w, "no luck")
-	})
+func TestAPgAdminThatDoesNotConnectIsReportedAndTheTicketIsSpent(t *testing.T) {
+	r := newRig(t, pgAdminFake(t, false, nil))
 	v := r.start(t, "postgres")
 	ticket, _ := r.m.Ticket(v.ID)
 
@@ -743,6 +768,30 @@ func TestAnAdminerThatRefusesTheLoginIsReportedAndTheTicketIsSpent(t *testing.T)
 	}
 	if rec := get(r, "/open?t="+ticket, nil); rec.Code != http.StatusNotFound {
 		t.Errorf("the ticket was not spent: %d", rec.Code)
+	}
+}
+
+func TestPgAdminIsToldWhereItLivesAndOnlyItsOwnCookiesAreForwarded(t *testing.T) {
+	var script, cookies string
+	r := newRig(t, func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Path == "/browser/" && req.Method == "GET" && req.Header.Get("X-Script-Name") != "" {
+			script, cookies = req.Header.Get("X-Script-Name"), req.Header.Get("Cookie")
+		}
+		pgAdminFake(t, true, nil)(w, req)
+	})
+	v := r.start(t, "postgres")
+	ticket, _ := r.m.Ticket(v.ID)
+	opened := get(r, "/open?t="+ticket, nil)
+	jar := opened.Result().Cookies()
+	jar = append(jar, &http.Cookie{Name: "laravel_session", Value: "the panel's"})
+
+	get(r, "/s/"+v.ID+"/browser/", jar)
+
+	if script != "/s/"+v.ID {
+		t.Errorf("X-Script-Name = %q", script)
+	}
+	if strings.Contains(cookies, "laravel_session") || strings.Contains(cookies, "cpdbtool_") || !strings.Contains(cookies, "pga4_session=sess") {
+		t.Errorf("forwarded cookies = %q", cookies)
 	}
 }
 

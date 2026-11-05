@@ -28,12 +28,12 @@ beforeEach(function () {
     $this->url = fn ($db, string $suffix = '') => "/databases/{$db->server->slug}/databases/{$db->id}/tool{$suffix}";
 });
 
-it('names the tool after the engine: phpMyAdmin for MySQL and MariaDB, Adminer for PostgreSQL', function () {
+it('names the tool after the engine: phpMyAdmin for MySQL and MariaDB, pgAdmin for PostgreSQL', function () {
     expect(DatabaseTools::toolName($this->shop))->toBe('phpMyAdmin')
-        ->and(DatabaseTools::toolName($this->sales))->toBe('Adminer')
-        ->and(DatabaseTools::toolName($this->pg))->toBe('Adminer');
+        ->and(DatabaseTools::toolName($this->sales))->toBe('pgAdmin')
+        ->and(DatabaseTools::toolName($this->pg))->toBe('pgAdmin');
 
-    $this->get('/databases/'.$this->pg->slug)->assertInertia(fn (Assert $page) => $page->where('server.tool', 'Adminer'));
+    $this->get('/databases/'.$this->pg->slug)->assertInertia(fn (Assert $page) => $page->where('server.tool', 'pgAdmin'));
     $this->get('/databases/'.$this->maria->slug)->assertInertia(fn (Assert $page) => $page->where('server.tool', 'phpMyAdmin'));
 });
 
@@ -48,7 +48,7 @@ describe('the page that opens a tool', function () {
             ->where('database.user', 'shop')
             ->where('idle_minutes', 15));
 
-        ($this->confirmed)()->get(($this->url)($this->sales))->assertInertia(fn (Assert $page) => $page->where('tool', 'Adminer'));
+        ($this->confirmed)()->get(($this->url)($this->sales))->assertInertia(fn (Assert $page) => $page->where('tool', 'pgAdmin'));
     });
 
     it('is only for people allowed to open databases in a tool', function () {
@@ -78,7 +78,7 @@ describe('starting', function () {
             ->and(json_encode($entry->metadata))->not->toContain($this->shop->password);
     });
 
-    it('uses Adminer for PostgreSQL', function () {
+    it('uses pgAdmin for PostgreSQL', function () {
         ($this->confirmed)()->postJson(($this->url)($this->sales))->assertOk();
 
         $call = collect($this->host->actions())->firstWhere('action', 'startDatabaseTool');

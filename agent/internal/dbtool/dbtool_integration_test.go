@@ -26,7 +26,7 @@ const (
 
 // Run with: go test -tags integration ./internal/dbtool -run RealTools -v -timeout 25m
 // Needs a local Docker daemon. Real MariaDB and PostgreSQL servers are started
-// with phpMyAdmin and Adminer in front of them, reached through the real proxy.
+// with phpMyAdmin and pgAdmin in front of them, reached through the real proxy.
 func TestRealTools(t *testing.T) {
 	sock := os.Getenv("DOCKER_SOCK")
 	if sock == "" {
@@ -136,24 +136,52 @@ func TestRealTools(t *testing.T) {
 				t.Errorf("mounts = %+v", tool.Mounts)
 			}
 
-			// Anything on this machine that finds the container's port directly meets the login form,
-			// not a logged-in session: the password is not in the container.
+			// Anything on this machine that finds the container's port directly meets a login form
+			// (phpMyAdmin) or a pgAdmin with no server and no connection (single-user mode), not a
+			// session of the database user: the password is not in the container.
 			for _, p := range tool.Ports {
-				direct, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/", p.Host))
-				if err != nil {
-					t.Fatal(err)
+				base := fmt.Sprintf("http://127.0.0.1:%d", p.Host)
+				if c.engine == "mariadb" {
+					direct, err := http.Get(base + "/")
+					if err != nil {
+						t.Fatal(err)
+					}
+					page, _ := io.ReadAll(io.LimitReader(direct.Body, 2<<20))
+					direct.Body.Close()
+					if !strings.Contains(string(page), "pma_username") {
+						t.Errorf("the container's own port does not show a login form:\n%.400s", page)
+					}
+					continue
 				}
-				page, _ := io.ReadAll(io.LimitReader(direct.Body, 2<<20))
-				direct.Body.Close()
-				want := "pma_username"
-				if c.engine == "postgres" {
-					want = "auth[username]"
+				stranger := &http.Client{Timeout: 30 * time.Second}
+				jarCookies := []*http.Cookie{}
+				get := func(path string, headers map[string]string) string {
+					req, _ := http.NewRequest("GET", base+path, nil)
+					for _, ck := range jarCookies {
+						req.AddCookie(ck)
+					}
+					for k, v := range headers {
+						req.Header.Set(k, v)
+					}
+					resp, err := stranger.Do(req)
+					if err != nil {
+						t.Fatal(err)
+					}
+					defer resp.Body.Close()
+					jarCookies = append(jarCookies, resp.Cookies()...)
+					out, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+					return string(out)
 				}
-				if !strings.Contains(string(page), want) {
-					t.Errorf("the container's own port does not show a login form:\n%.400s", page)
+				get("/browser/", nil)
+				script := get("/browser/js/utils.js", nil)
+				token := ""
+				if i := strings.Index(script, "csrf_token'] = '"); i >= 0 {
+					token = script[i+len("csrf_token'] = '"):]
+					token = token[:strings.Index(token, "'")]
 				}
-				if strings.Contains(string(page), "shop") && !strings.Contains(string(page), want) {
-					t.Error("the container's own port is logged in")
+				nodes := get("/browser/server/nodes/1/", map[string]string{"X-pgA-CSRFToken": token})
+				if strings.Contains(nodes, `"connected":true`) || strings.Contains(nodes, `"user":{`) || strings.Contains(nodes, "shop") {
+					t.Errorf("the container's own port shows a connected server:\n%.400s", nodes)
 				}
 			}
 			inspect, _ := exec.Command("docker", "inspect", "-f", "{{range .Config.Env}}{{println .}}{{end}}", tool.Name).CombinedOutput()
@@ -219,8 +247,35 @@ func TestRealTools(t *testing.T) {
 			if resp.StatusCode != 200 {
 				t.Fatalf("the tool answered %d: %.300s", resp.StatusCode, body)
 			}
-			if !strings.Contains(body, "shop") {
+			if c.engine == "mariadb" && !strings.Contains(body, "shop") {
 				t.Errorf("the page does not mention the database:\n%.600s", body)
+			}
+			if c.engine == "postgres" {
+				if !strings.Contains(body, "pgAdmin") {
+					t.Errorf("not pgAdmin:\n%.400s", body)
+				}
+				// The connection belongs to the browser's session: the server is there and connected.
+				_, script := fetch("/s/" + view.ID + "/browser/js/utils.js")
+				i := strings.Index(script, "csrf_token'] = '")
+				if i < 0 {
+					t.Fatalf("no CSRF token through the proxy:\n%.300s", script)
+				}
+				token := script[i+len("csrf_token'] = '"):]
+				token = token[:strings.Index(token, "'")]
+				req, _ := http.NewRequest("GET", web.URL+"/s/"+view.ID+"/browser/server/nodes/1/", nil)
+				req.Header.Set("X-pgA-CSRFToken", token)
+				for k, v := range jar {
+					req.AddCookie(&http.Cookie{Name: k, Value: v})
+				}
+				answer, err := browser.Do(req)
+				if err != nil {
+					t.Fatal(err)
+				}
+				nodes, _ := io.ReadAll(io.LimitReader(answer.Body, 1<<20))
+				answer.Body.Close()
+				if !strings.Contains(string(nodes), `"connected":true`) || !strings.Contains(string(nodes), `"is_password_saved":false`) || !strings.Contains(string(nodes), `"label":"shop"`) {
+					t.Errorf("the server is not connected for the browser:\n%.500s", nodes)
+				}
 			}
 			if strings.Contains(body, "secretdb") || strings.Contains(body, "secretuser") {
 				t.Error("another database shows on the page")
@@ -251,9 +306,25 @@ func TestRealTools(t *testing.T) {
 					t.Error("phpMyAdmin lists a database the user cannot use")
 				}
 			} else {
-				resp, denied := fetch("/s/" + view.ID + "/?pgsql=db-" + server + "&username=shop&db=secretdb")
-				if resp.StatusCode == 200 && strings.Contains(denied, "Schema:") {
-					t.Error("Adminer opened a database the user may not use")
+				// pgAdmin is asked, as the person could, to open the other database as the same user.
+				_, script := fetch("/s/" + view.ID + "/browser/js/utils.js")
+				token := script[strings.Index(script, "csrf_token'] = '")+len("csrf_token'] = '"):]
+				token = token[:strings.Index(token, "'")]
+				payload := `{"name":"x","host":"db-` + server + `","port":5432,"db":"secretdb","username":"shop","password":"` + userPw + `","gid":1,"sslmode":"prefer","connect_now":true,"save_password":false,"connect_timeout":10}`
+				req, _ := http.NewRequest("POST", web.URL+"/s/"+view.ID+"/browser/server/obj/1/", strings.NewReader(payload))
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("X-pgA-CSRFToken", token)
+				for k, v := range jar {
+					req.AddCookie(&http.Cookie{Name: k, Value: v})
+				}
+				answer, err := browser.Do(req)
+				if err != nil {
+					t.Fatal(err)
+				}
+				denied, _ := io.ReadAll(io.LimitReader(answer.Body, 1<<20))
+				answer.Body.Close()
+				if strings.Contains(string(denied), `"connected":true`) {
+					t.Errorf("pgAdmin opened a database the user may not use:\n%.300s", denied)
 				}
 			}
 

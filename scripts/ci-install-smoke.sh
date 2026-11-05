@@ -86,7 +86,7 @@ check_address_detection() {
     case "$out" in *'"ipv4":['*'"ipv6":['*) ok "the agent lists the public addresses on the interfaces" ;; *) fail "the agent's addresses call answered: ${out:-nothing}" ;; esac
 }
 
-# Database tools (phpMyAdmin, Adminer) are served on a port of their own, which nginx hands to
+# Database tools (phpMyAdmin, pgAdmin) are served on a port of their own, which nginx hands to
 # the agent's tool socket. Without a ticket every answer is the same plain 404.
 check_tools_port() {
     local code

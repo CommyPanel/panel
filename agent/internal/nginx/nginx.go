@@ -224,7 +224,7 @@ server {
     }
 }
 {{if and .CertDir .ToolsSocket}}
-# Database tools (phpMyAdmin, Adminer) on a port of their own: a browser treats it as
+# Database tools (phpMyAdmin, pgAdmin) on a port of their own: a browser treats it as
 # another website than the panel. Everything goes to the agent's tool socket, which accepts
 # only a single-use ticket and the cookie it hands out.
 server {

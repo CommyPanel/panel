@@ -13,7 +13,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Opening a database in phpMyAdmin or Adminer. The page opens in a new tab, starts the
+ * Opening a database in phpMyAdmin or pgAdmin. The page opens in a new tab, starts the
  * tool, follows its progress and then moves itself on to the tool, already logged in.
  */
 class DatabaseToolController extends Controller

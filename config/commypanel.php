@@ -51,7 +51,7 @@ return [
         'critical_percent' => (int) env('DISK_CRITICAL_PERCENT', 95),
     ],
 
-    // The port database tools (phpMyAdmin, Adminer) are served on, next to the panel's address. It is
+    // The port database tools (phpMyAdmin, pgAdmin) are served on, next to the panel's address. It is
     // another port on purpose: a browser keeps ports apart, so a tool cannot act as the panel.
     'tools_port' => (int) env('COMMYPANEL_TOOLS_PORT', 2053),
 

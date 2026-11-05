@@ -515,7 +515,7 @@ class FakeHostDriver implements HostDriver
         $this->record('startDatabaseTool', ['engine' => $engine, 'server' => $server, 'database' => $database, 'user' => $user, 'public_base' => $publicBase]);
 
         $id = Str::random(24);
-        $tool = $engine === 'postgres' ? 'adminer' : 'phpmyadmin';
+        $tool = $engine === 'postgres' ? 'pgadmin' : 'phpmyadmin';
         $this->toolSessions[$id] = ['tool' => $tool, 'server' => $server, 'database' => $database];
 
         return new DatabaseToolSession($id, $this->toolStage[0] === 'ready' ? 'pulling' : $this->toolStage[0], $tool, $server, $database, $this->toolStage[1]);

@@ -24,7 +24,7 @@ DATA_DIR="/var/lib/commypanel"
 CONF_DIR="/etc/commypanel"
 NGINX_DIR="/etc/nginx"
 PANEL_PORT="${COMMYPANEL_PANEL_PORT:-8443}"
-# The port database tools (phpMyAdmin, Adminer) are served on. It is another port than the
+# The port database tools (phpMyAdmin, pgAdmin) are served on. It is another port than the
 # panel on purpose: a browser keeps different ports apart, so a tool can never act as the
 # panel. 2053 is one Cloudflare also proxies (443, 2053, 2083, 2087, 2096 and 8443 are).
 TOOLS_PORT="${COMMYPANEL_TOOLS_PORT:-2053}"
@@ -910,7 +910,7 @@ main() {
     say '\n%s%s CommyPanel %s is installed.%s\n\n' "$C_GREEN" "$MARK_OK" "$VERSION" "$C_RESET"
     say '  Create your admin account (works once, expires in 1 hour):\n\n    %s%s%s\n\n' "$C_BOLD" "${url:-run: sudo commypanel setup-url}" "$C_RESET"
     say '  Your browser will warn about the panel certificate: it is self-signed until you add a panel domain.\n\n'
-    say '  Open these ports in your firewall: 80, 443, %s, and %s (for phpMyAdmin and Adminer).\n' "$PANEL_PORT" "$TOOLS_PORT"
+    say '  Open these ports in your firewall: 80, 443, %s, and %s (for phpMyAdmin and pgAdmin).\n' "$PANEL_PORT" "$TOOLS_PORT"
     if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q 'Status: active'; then
         say '  ufw is active here, so run:  sudo ufw allow 80,443,%s,%s/tcp\n' "$PANEL_PORT" "$TOOLS_PORT"
     fi

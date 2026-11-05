@@ -2,6 +2,8 @@ package docker
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -18,14 +20,14 @@ const ToolLabel = "com.commypanel.dbtool"
 // chosen here, never by a request.
 const (
 	PhpMyAdminImage = "phpmyadmin:5.2"
-	AdminerImage    = "adminer:5"
+	PgAdminImage    = "dpage/pgadmin4:9"
 )
 
-// ToolSpec is a database tool (phpMyAdmin for MySQL and MariaDB, Adminer for
+// ToolSpec is a database tool (phpMyAdmin for MySQL and MariaDB, pgAdmin for
 // PostgreSQL) started for one database, logged in as that database's own user.
 type ToolSpec struct {
 	Name     string // dbtool-<random>
-	Tool     string // "phpmyadmin" or "adminer"
+	Tool     string // "phpmyadmin" or "pgadmin"
 	Engine   string
 	Server   string // the database server's slug: its container is db-<slug>
 	User     string
@@ -42,7 +44,7 @@ func ToolFor(engine string) (tool, image string, containerPort int, err error) {
 		return "", "", 0, err
 	}
 	if engine == "postgres" {
-		return "adminer", AdminerImage, 8080, nil
+		return "pgadmin", PgAdminImage, 8080, nil
 	}
 	return "phpmyadmin", PhpMyAdminImage, 80, nil
 }
@@ -107,8 +109,26 @@ func (m *Manager) RunTool(ctx context.Context, t ToolSpec) error {
 		env["PMA_ABSOLUTE_URI"] = t.BaseURL
 		env["UPLOAD_LIMIT"] = "128M"
 		env["HIDE_PHP_VERSION"] = "true"
-	case "adminer":
-		env["ADMINER_DEFAULT_SERVER"] = "db-" + t.Server
+	case "pgadmin":
+		// Single-user ("desktop") mode: no login of its own, and no connection until the agent
+		// makes one with the database user's password, which pgAdmin keeps only in memory for
+		// that browser session (never saved). Its own account is a throw-away that is never
+		// used. No mail server, no PSQL shell, no calls home to look for updates.
+		env["PGADMIN_DEFAULT_EMAIL"] = "tool@commypanel.example"
+		env["PGADMIN_DEFAULT_PASSWORD"] = randomSecret()
+		env["PGADMIN_CONFIG_SERVER_MODE"] = "False"
+		env["PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED"] = "False"
+		env["PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION"] = "False"
+		env["PGADMIN_CONFIG_ENABLE_PSQL"] = "False"
+		env["PGADMIN_CONFIG_UPGRADE_CHECK_ENABLED"] = "False"
+		env["PGADMIN_CONFIG_CONSOLE_LOG_LEVEL"] = "40"
+		env["PGADMIN_DISABLE_POSTFIX"] = "true"
+		env["PGADMIN_LISTEN_PORT"] = "8080" // without the mail server it runs unprivileged and cannot take 80
+	}
+
+	memory, cpus := 256, 0.5
+	if t.Tool == "pgadmin" {
+		memory, cpus = 768, 1
 	}
 
 	return m.start(ctx, ContainerSpec{
@@ -117,8 +137,8 @@ func (m *Manager) RunTool(ctx context.Context, t ToolSpec) error {
 		HostPort:      t.Port,
 		ContainerPort: containerPort,
 		Env:           env,
-		MemoryMB:      256,
-		CPUs:          0.5,
+		MemoryMB:      memory,
+		CPUs:          cpus,
 		Network:       ToolNetwork(t.Server),
 		extraLabels:   map[string]string{ToolLabel: "true"},
 		noRestart:     true,
@@ -144,4 +164,12 @@ func (m *Manager) ToolContainers(ctx context.Context) ([]string, error) {
 		}
 	}
 	return names, nil
+}
+
+// randomSecret is a value nobody needs to know: pgAdmin insists on an account at start-up, and
+// in single-user mode it is never asked for.
+func randomSecret() string {
+	b := make([]byte, 24)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
 }

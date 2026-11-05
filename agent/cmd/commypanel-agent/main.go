@@ -65,7 +65,7 @@ func run() error {
 		buildMem   = flag.Int("build-memory-mb", 2048, "memory limit for image builds")
 		buildCPUs  = flag.Float64("build-cpus", 2, "CPU limit for image builds")
 		termSocket = flag.String("terminal-socket", "", "Unix socket for browser terminals (WebSocket); empty turns terminals off")
-		toolSocket = flag.String("dbtool-socket", "", "Unix socket for the web side of database tools (phpMyAdmin, Adminer); empty turns them off")
+		toolSocket = flag.String("dbtool-socket", "", "Unix socket for the web side of database tools (phpMyAdmin, pgAdmin); empty turns them off")
 		toolsPort  = flag.Int("tools-port", 2053, "the port database tools are served on, next to the panel's own domain")
 		toolGroup  = flag.String("dbtool-socket-group", "www-data", "group that may connect to the database tool socket (the web server's)")
 		termGroup  = flag.String("terminal-socket-group", "www-data", "group that may connect to the terminal socket (the web server's)")

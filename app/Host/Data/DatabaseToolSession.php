@@ -3,7 +3,7 @@
 namespace App\Host\Data;
 
 /**
- * One opening of a database in its tool (phpMyAdmin, Adminer), as the agent
+ * One opening of a database in its tool (phpMyAdmin, pgAdmin), as the agent
  * reports it. It never holds a secret.
  */
 final readonly class DatabaseToolSession

@@ -269,7 +269,7 @@ interface HostDriver
     public function backupVolume(string $app, string $name, string $toPath): void;
 
     /**
-     * Begin opening a database in its tool (phpMyAdmin for MySQL and MariaDB, Adminer for
+     * Begin opening a database in its tool (phpMyAdmin for MySQL and MariaDB, pgAdmin for
      * PostgreSQL): the agent starts a short-lived container next to the database server,
      * logged in as that database's own user, and removes it after 15 minutes without use.
      * Returns at once; follow it with databaseToolStatus. `$publicBase` is the web address of

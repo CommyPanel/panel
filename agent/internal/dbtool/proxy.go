@@ -1,7 +1,9 @@
 package dbtool
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -19,7 +21,7 @@ import (
 // planting a cookie that the panel would read.
 var cookiePrefixes = map[string][]string{
 	"phpmyadmin": {"phpMyAdmin", "pma", "__Secure-phpMyAdmin", "__Secure-pma"},
-	"adminer":    {"adminer_"},
+	"pgadmin":    {"pga4_session", "PGADMIN_LANGUAGE"},
 }
 
 const authCookie = "cpdbtool_"
@@ -132,6 +134,7 @@ func (b *toolBrowser) do(ctx context.Context, method, path string, form url.Valu
 }
 
 var (
+	pgaCSRFRe    = regexp.MustCompile(`csrf_token'\]\s*=\s*'([^']+)'`)
 	pmaTokenRe   = regexp.MustCompile(`name="token" value="([0-9a-f]+)"`)
 	pmaSessionRe = regexp.MustCompile(`name="set_session" value="([0-9a-f]+)"`)
 )
@@ -170,27 +173,73 @@ func (m *Manager) login(ctx context.Context, s *session) ([]*http.Cookie, string
 		}
 		return b.owned(s), s.prefix + "/index.php?route=/database/structure&db=" + url.QueryEscape(s.Database), nil
 
-	case "adminer":
-		if _, _, err := b.do(ctx, http.MethodGet, "/", nil); err != nil {
+	case "pgadmin":
+		// Single-user mode: the page opens without a login. A browser session of its own (cookie)
+		// and its CSRF token come first, then one call registers the database as a server and
+		// connects it with the database user's password, which is not saved. The connection
+		// belongs to this session's cookie, which is what the browser is given.
+		if _, _, err := b.do(ctx, http.MethodGet, "/browser/", nil); err != nil {
 			return nil, "", err
 		}
-		resp, _, err := b.do(ctx, http.MethodPost, "/", url.Values{
-			"auth[driver]":   {"pgsql"},
-			"auth[server]":   {"db-" + s.Server},
-			"auth[username]": {s.user},
-			"auth[password]": {s.password},
-			"auth[db]":       {s.Database},
-		})
+		_, script, err := b.do(ctx, http.MethodGet, "/browser/js/utils.js", nil)
 		if err != nil {
 			return nil, "", err
 		}
-		location := resp.Header.Get("Location")
-		if resp.StatusCode != http.StatusFound || !strings.HasPrefix(location, "?") {
-			return nil, "", fmt.Errorf("Adminer did not accept the login (%d)", resp.StatusCode)
+		csrf := pgaCSRFRe.FindStringSubmatch(script)
+		if csrf == nil {
+			return nil, "", fmt.Errorf("pgAdmin gave no CSRF token")
 		}
-		return b.owned(s), s.prefix + "/" + location, nil
+		payload, _ := json.Marshal(map[string]any{
+			"name": s.Database, "host": "db-" + s.Server, "port": 5432, "db": s.Database,
+			"username": s.user, "password": s.password, "gid": 1, "sslmode": "prefer",
+			"connect_now": true, "save_password": false, "connect_timeout": 10,
+		})
+		resp, answer, err := b.doJSON(ctx, "/browser/server/obj/1/", csrf[1], payload)
+		if err != nil {
+			return nil, "", err
+		}
+		var node struct {
+			Node struct {
+				Connected bool `json:"connected"`
+				Saved     bool `json:"is_password_saved"`
+			} `json:"node"`
+		}
+		// The answer to a refusal can quote the database's own message, so it is never logged.
+		if resp.StatusCode != http.StatusOK || json.Unmarshal([]byte(answer), &node) != nil || !node.Node.Connected {
+			return nil, "", fmt.Errorf("pgAdmin did not connect (%d)", resp.StatusCode)
+		}
+		if node.Node.Saved {
+			return nil, "", fmt.Errorf("pgAdmin saved the password")
+		}
+		return b.owned(s), s.prefix + "/browser/", nil
 	}
 	return nil, "", fmt.Errorf("unknown tool %q", s.Tool)
+}
+
+// doJSON posts a JSON body the way pgAdmin's own pages do, with the CSRF token it handed out.
+func (b *toolBrowser) doJSON(ctx context.Context, path, csrf string, body []byte) (*http.Response, string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, b.base+path, bytes.NewReader(body))
+	if err != nil {
+		return nil, "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-pgA-CSRFToken", csrf)
+	for _, name := range b.order {
+		req.AddCookie(&http.Cookie{Name: name, Value: b.cookies[name]})
+	}
+	resp, err := b.client.Do(req)
+	if err != nil {
+		return nil, "", err
+	}
+	defer resp.Body.Close()
+	text, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	for _, c := range resp.Cookies() {
+		if _, known := b.cookies[c.Name]; !known {
+			b.order = append(b.order, c.Name)
+		}
+		b.cookies[c.Name] = c.Value
+	}
+	return resp, string(text), nil
 }
 
 // owned are the cookies the tool made that belong to it, in the order it made them.
@@ -260,6 +309,10 @@ func (m *Manager) proxy(w http.ResponseWriter, r *http.Request) {
 			pr.Out.Header.Del("Authorization")
 			pr.Out.Header.Del("Proxy-Authorization")
 			pr.Out.Header.Del("Cookie")
+			if s.Tool == "pgadmin" {
+				// pgAdmin builds its links below the path it is told it lives at.
+				pr.Out.Header.Set("X-Script-Name", s.prefix)
+			}
 			for _, c := range r.Cookies() {
 				if hasPrefix(c.Name, cookiePrefixes[s.Tool]) {
 					pr.Out.AddCookie(c)

@@ -23,7 +23,7 @@ func (m *Manager) PullImage(ctx context.Context, image string) error {
 	return m.pull(ctx, image)
 }
 
-// PullToolImage is PullImage for the database tools (phpMyAdmin, Adminer). It is
+// PullToolImage is PullImage for the database tools (phpMyAdmin, pgAdmin). It is
 // not offered to the panel directly; the database tool sessions call it with an
 // image the agent itself chose.
 func (m *Manager) PullToolImage(ctx context.Context, image string) error {

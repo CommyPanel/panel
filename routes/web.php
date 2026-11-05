@@ -201,7 +201,7 @@ Route::middleware('auth')->group(function () {
             Route::post('{server:slug}/databases/{database}/password', [ManagedDatabaseController::class, 'password'])->whereNumber('database')->middleware('password.confirm')->name('databases.password');
         });
 
-        // phpMyAdmin and Adminer: a page that starts the tool and follows it, and the calls it makes.
+        // phpMyAdmin and pgAdmin: a page that starts the tool and follows it, and the calls it makes.
         Route::middleware(['can:'.Permissions::DATABASES_TOOLS, 'password.confirm'])->where(['database' => '[0-9]+', 'session' => '[A-Za-z0-9_-]{16,64}'])->group(function () {
             Route::get('{server:slug}/databases/{database}/tool', [DatabaseToolController::class, 'show'])->name('databases.tool.show');
             Route::post('{server:slug}/databases/{database}/tool', [DatabaseToolController::class, 'start'])->middleware('throttle:10,1')->name('databases.tool.start');
