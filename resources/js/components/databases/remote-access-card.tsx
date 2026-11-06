@@ -1,11 +1,13 @@
 import { router } from '@inertiajs/react';
 import {
+    CircleHelp,
     Clock,
     Download,
     Globe,
     LoaderCircle,
     Lock,
     LockOpen,
+    RotateCw,
     ShieldAlert,
     TriangleAlert,
 } from 'lucide-react';
@@ -18,6 +20,7 @@ import { Card } from '@/components/ui/card';
 import { CommandBox } from '@/components/ui/command-box';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
+import { Tooltip } from '@/components/ui/tooltip';
 import { useConfirmedAction } from '@/hooks/use-confirmed-action';
 import { formatDate } from '@/lib/format';
 import type { DatabaseServer, RemoteAccess } from '@/types';
@@ -82,6 +85,7 @@ function OpenModal({
     server,
     remote,
     durations,
+    ports,
     myIp,
     changing,
     onClose,
@@ -89,6 +93,7 @@ function OpenModal({
     server: DatabaseServer;
     remote: RemoteAccess;
     durations: number[];
+    ports: [number, number];
     myIp: string | null;
     changing: boolean;
     onClose: () => void;
@@ -99,6 +104,9 @@ function OpenModal({
         changing && remote.forever ? NEVER : '60',
     );
     const [acknowledge, setAcknowledge] = useState(false);
+    const [acknowledgeRestart, setAcknowledgeRestart] = useState(false);
+    // The first opening restarts the server once, to switch TLS on.
+    const needsRestart = !changing && !remote.tls;
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [busy, setBusy] = useState(false);
 
@@ -116,6 +124,9 @@ function OpenModal({
 
         const data = {
             allow,
+            ...(needsRestart
+                ? { acknowledge_restart: acknowledgeRestart }
+                : {}),
             ...(never
                 ? { never: true, acknowledge }
                 : { duration: Number(duration) }),
@@ -271,24 +282,19 @@ function OpenModal({
 
                     <ul className="list-disc space-y-1.5 pl-5 text-sm text-base-content/80">
                         <li>
-                            The port is chosen at random (not{' '}
-                            {server.engine === 'postgres' ? '5432' : '3306'}).
-                            If your server has a firewall, open it for the
-                            allowed addresses.
+                            The port is chosen at random from{' '}
+                            <strong>
+                                {ports[0]}&ndash;{ports[1]}
+                            </strong>{' '}
+                            (never{' '}
+                            {server.engine === 'postgres' ? '5432' : '3306'}),
+                            and you see it once it is open. If your server or
+                            hosting provider has a firewall, you can open that
+                            whole range now, for the allowed addresses only.
                         </li>
                         <li>
                             Connections must use TLS. You get a certificate to
                             check the server with.
-                            {!remote.tls && (
-                                <>
-                                    {' '}
-                                    <strong>
-                                        The first time, the server restarts once
-                                        to switch TLS on.
-                                    </strong>{' '}
-                                    Linked apps reconnect by themselves.
-                                </>
-                            )}
                         </li>
                         <li>
                             Cloudflare&apos;s proxy does not carry database
@@ -296,6 +302,60 @@ function OpenModal({
                             proxied (orange cloud) name.
                         </li>
                     </ul>
+
+                    {needsRestart && (
+                        <div className="space-y-2 rounded-box border border-warning bg-warning/10 p-4">
+                            <p className="flex items-center gap-2 text-sm font-semibold">
+                                <RotateCw
+                                    className="size-4 shrink-0"
+                                    aria-hidden
+                                />
+                                The server restarts once
+                                <Tooltip
+                                    align="start"
+                                    side="top"
+                                    label="TLS is a start-up setting of the database, so a running server cannot switch it on. It is needed once per server, and again only if the server's public address changes."
+                                >
+                                    <button
+                                        type="button"
+                                        className="btn btn-circle btn-text btn-xs"
+                                        aria-label="Why does the server restart?"
+                                    >
+                                        <CircleHelp
+                                            className="size-4"
+                                            aria-hidden
+                                        />
+                                    </button>
+                                </Tooltip>
+                            </p>
+                            <p className="text-sm">
+                                To require TLS, the database server is started
+                                again the first time. Your data stays. Apps
+                                linked to it lose their connection for a few
+                                seconds, and longer if the database has to
+                                recover, and reconnect by themselves.
+                            </p>
+                            <label className="flex cursor-pointer items-start gap-3">
+                                <input
+                                    type="checkbox"
+                                    className="checkbox mt-0.5 checkbox-warning"
+                                    checked={acknowledgeRestart}
+                                    onChange={(e) =>
+                                        setAcknowledgeRestart(e.target.checked)
+                                    }
+                                />
+                                <span className="text-sm">
+                                    I understand the server restarts now and
+                                    apps may briefly lose their connection.
+                                </span>
+                            </label>
+                            {errors.acknowledge_restart && (
+                                <p className="text-sm text-error" role="alert">
+                                    {errors.acknowledge_restart}
+                                </p>
+                            )}
+                        </div>
+                    )}
 
                     <div className="flex flex-wrap justify-end gap-2">
                         <Button variant="ghost" onClick={onClose}>
@@ -305,7 +365,10 @@ function OpenModal({
                             type="submit"
                             variant={never ? 'error' : 'primary'}
                             loading={busy}
-                            disabled={never && !acknowledge}
+                            disabled={
+                                (never && !acknowledge) ||
+                                (needsRestart && !acknowledgeRestart)
+                            }
                         >
                             {changing
                                 ? 'Save changes'
@@ -329,12 +392,14 @@ export function RemoteAccessCard({
     server,
     remote,
     durations,
+    ports,
     myIp,
     canChange,
 }: {
     server: DatabaseServer;
     remote: RemoteAccess;
     durations: number[];
+    ports: [number, number];
     myIp: string | null;
     canChange: boolean;
 }) {
@@ -549,6 +614,7 @@ export function RemoteAccessCard({
                     server={server}
                     remote={remote}
                     durations={durations}
+                    ports={ports}
                     myIp={myIp}
                     changing={modal === 'change'}
                     onClose={() => setModal(null)}

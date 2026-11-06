@@ -28,7 +28,7 @@ beforeEach(function () {
 
 function openRemote(array $extra = []): array
 {
-    return ['allow' => '198.51.100.7', 'duration' => 30, ...$extra];
+    return ['allow' => '198.51.100.7', 'duration' => 30, 'acknowledge_restart' => true, ...$extra];
 }
 
 describe('the address list', function () {
@@ -139,6 +139,17 @@ describe('opening', function () {
     });
 });
 
+it('asks before the first restart, but not again once TLS is on', function () {
+    ($this->confirmed)()->post('/databases/main/remote', ['allow' => '198.51.100.7', 'duration' => 30])->assertSessionHasErrors('acknowledge_restart');
+    expect($this->server->fresh()->remoteOpen())->toBeFalse();
+
+    ($this->confirmed)()->post('/databases/main/remote', openRemote());
+    ($this->confirmed)()->delete('/databases/main/remote');
+    ($this->confirmed)()->post('/databases/main/remote', ['allow' => '198.51.100.7', 'duration' => 30])->assertSessionHasNoErrors();
+
+    expect($this->server->fresh()->remote_status)->toBe('open');
+});
+
 describe('changing and closing', function () {
     beforeEach(function () {
         ($this->confirmed)()->post('/databases/main/remote', openRemote());
@@ -190,7 +201,8 @@ describe('what people see', function () {
             ->where('remote.allow', ['198.51.100.7'])
             ->where('remote.host', '203.0.113.9')
             ->where('remote.tls', true)
-            ->where('remote_durations', RemoteAccess::DURATIONS));
+            ->where('remote_durations', RemoteAccess::DURATIONS)
+            ->where('remote_ports', RemoteAccess::range()));
 
         ($this->confirmed)()->get('/databases/main/remote/ca')->assertOk()->assertHeader('Content-Type', 'application/x-pem-file');
     });

@@ -20,6 +20,11 @@ class DatabaseRemoteController extends Controller
     {
         [$allow, $minutes] = $this->input($request);
 
+        // The first opening restarts the server to switch TLS on: say so, and ask for a yes.
+        if (! $server->tls_enabled && ! $request->boolean('acknowledge_restart')) {
+            throw ValidationException::withMessages(['acknowledge_restart' => 'Confirm that the server may restart once.']);
+        }
+
         try {
             $access->open($server, $allow, $minutes, $request->user());
         } catch (DatabaseException $e) {
@@ -75,6 +80,7 @@ class DatabaseRemoteController extends Controller
             'duration' => ['nullable', 'integer'],
             'never' => ['boolean'],
             'acknowledge' => ['boolean'],
+            'acknowledge_restart' => ['boolean'],
         ]);
 
         if ($request->boolean('never')) {

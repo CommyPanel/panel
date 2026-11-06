@@ -37,6 +37,7 @@ class DatabaseServerController extends Controller
             'keep' => (int) config('commypanel.backups.keep_databases'),
             'remote' => RemoteAccess::summary($server, $address->ipv4() ?? $address->ipv6() ?? $panelDomain->name() ?? ''),
             'remote_durations' => RemoteAccess::DURATIONS,
+            'remote_ports' => RemoteAccess::range(),
             'my_ip' => request()->ip(),
         ]);
     }

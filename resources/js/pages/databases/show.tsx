@@ -49,6 +49,7 @@ type Props = {
     keep: number;
     remote: RemoteAccess;
     remote_durations: number[];
+    remote_ports: [number, number];
     my_ip: string | null;
 };
 
@@ -59,6 +60,7 @@ export default function Show({
     keep,
     remote,
     remote_durations,
+    remote_ports,
     my_ip,
 }: Props) {
     const can = useCan();
@@ -543,6 +545,7 @@ export default function Show({
                     server={server}
                     remote={remote}
                     durations={remote_durations}
+                    ports={remote_ports}
                     myIp={my_ip}
                     canChange={can('databases.remote')}
                 />
