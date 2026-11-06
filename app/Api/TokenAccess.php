@@ -56,17 +56,20 @@ class TokenAccess
     /**
      * @param  list<string>  $abilities  of self::abilities()
      * @param  list<string>  $appSlugs  limit the token to these apps; none = all
+     * @param  int|null  $days  how long it lasts, 1 to 365; null for no expiry
      */
-    public function create(User $user, string $name, array $abilities, array $appSlugs, int $days): NewAccessToken
+    public function create(User $user, string $name, array $abilities, array $appSlugs, ?int $days): NewAccessToken
     {
         $allowed = $this->allowedFor($user);
         $abilities = array_values(array_unique(array_intersect($abilities, $allowed)));
-        $days = max(1, min(self::MAX_DAYS, $days));
+        // null: a token that never expires. It still stops when it is revoked, when its owner is
+        // deleted, or when its owner loses the permissions it uses.
+        $expires = $days === null ? null : Carbon::now()->addDays(max(1, min(self::MAX_DAYS, $days)));
 
         return $user->createToken(
             $name,
             [...$abilities, ...array_map(fn (string $slug) => 'app:'.$slug, array_values(array_unique($appSlugs)))],
-            Carbon::now()->addDays($days),
+            $expires,
         );
     }
 

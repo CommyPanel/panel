@@ -37,15 +37,26 @@ class ApiTokenController extends Controller
                 'expires_at' => $t->expires_at?->toIso8601String(),
                 'expired' => $t->expires_at !== null && $t->expires_at->isPast(),
             ])->all(),
+            'can_create' => $access->allowedFor($user) !== [],
+            'new_token' => session('new_token'),
+            'api_url' => rtrim($request->getSchemeAndHttpHost(), '/').'/api/v1',
+        ]);
+    }
+
+    /**
+     * The page for making a token: what it may do, which apps, how long it lasts.
+     */
+    public function create(Request $request, TokenAccess $access): Response
+    {
+        $user = $request->user();
+
+        return Inertia::render('settings/token-create', [
             'abilities' => array_map(
                 fn (string $key) => ['key' => $key, 'label' => TokenAccess::abilities()[$key]['label'], 'description' => TokenAccess::abilities()[$key]['description']],
                 $access->allowedFor($user),
             ),
             'apps' => $user->can('apps.view') ? App::query()->whereNull('setup_step')->orderBy('name')->get(['slug', 'name'])->all() : [],
-            'new_token' => session('new_token'),
             'default_days' => TokenAccess::DEFAULT_DAYS,
-            'max_days' => TokenAccess::MAX_DAYS,
-            'api_url' => rtrim($request->getSchemeAndHttpHost(), '/').'/api/v1',
         ]);
     }
 
@@ -60,19 +71,26 @@ class ApiTokenController extends Controller
             'abilities.*' => ['string', Rule::in($allowed)],
             'apps' => ['array', 'max:50'],
             'apps.*' => ['string', Rule::exists('apps', 'slug')],
-            'days' => ['required', 'integer', 'min:1', 'max:'.TokenAccess::MAX_DAYS],
+            // a number of days, or "never"
+            'days' => ['required', function (string $attribute, mixed $value, \Closure $fail) {
+                if ($value !== 'never' && (! is_numeric($value) || (int) $value < 1 || (int) $value > TokenAccess::MAX_DAYS || (string) (int) $value !== (string) $value)) {
+                    $fail('Choose how long the token lasts.');
+                }
+            }],
         ], ['abilities.required' => 'Choose what the token may do.', 'abilities.*.in' => 'You cannot give a token something you may not do yourself.']);
 
         if ($user->tokens()->count() >= self::MAX_TOKENS) {
             return back()->withErrors(['name' => 'You have '.self::MAX_TOKENS.' tokens. Revoke one you no longer use first.']);
         }
 
-        $token = $access->create($user, $data['name'], $data['abilities'], $data['apps'] ?? [], (int) $data['days']);
+        $never = $data['days'] === 'never';
+        $token = $access->create($user, $data['name'], $data['abilities'], $data['apps'] ?? [], $never ? null : (int) $data['days']);
 
         $audit->record('token.created', $user, [
             'name' => $data['name'],
             'abilities' => $token->accessToken->abilities,
             'expires_at' => $token->accessToken->expires_at?->toIso8601String(),
+            'never_expires' => $never,
         ]);
 
         // Shown once, on the next page, and never again.

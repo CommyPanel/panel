@@ -39,13 +39,14 @@ return [
     | Expiration Minutes
     |--------------------------------------------------------------------------
     |
-    | This value controls the number of minutes until an issued token will be
-    | considered expired. This will override any values set in the token's
-    | "expires_at" attribute, but first-party sessions are not affected.
+    | Null on purpose. A value here expires EVERY token that many minutes after
+    | it was made, whatever its own "expires_at" says, which would cut a token
+    | made for a year (or one that never expires) short. Each token carries its
+    | own expiry (see App\Api\TokenAccess), so that is the only one that counts.
     |
     */
 
-    'expiration' => 60 * 24 * 90,
+    'expiration' => null,
 
     /*
     |--------------------------------------------------------------------------

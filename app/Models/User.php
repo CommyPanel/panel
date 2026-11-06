@@ -35,6 +35,12 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, HasRoles, Notifiable, TwoFactorAuthenticatable;
 
+    protected static function booted(): void
+    {
+        // A deleted account leaves no working or lingering API tokens behind.
+        static::deleting(fn (self $user) => $user->tokens()->delete());
+    }
+
     /**
      * The account created through the setup link: it can do everything and is
      * never changed or deleted from the panel (only `admin:reset` recovers it).

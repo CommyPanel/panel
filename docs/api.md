@@ -10,7 +10,10 @@ Settings > API tokens > New token (needs the `tokens.manage` permission). Choose
 - **What it may do**: read apps and deployments (`apps:read`), start deployments (`apps:deploy`). You can
   only give what you hold yourself.
 - **Which apps**: all, or only the ones you tick. A token restricted to some apps gets a 404 for any other.
-- **Valid for**: 1 to 365 days (90 by default). A token that never expires is not offered.
+- **Valid for**: 30 days, 90 days (the default), 6 months, 1 year, or **Never expires**. A token that never
+  expires works until you revoke it or its owner is deleted (and stops if its owner loses the permissions it
+  uses), so treat it like a password and rotate it regularly: make a new token, switch your pipeline over,
+  then revoke the old one. The form says so when you choose it.
 
 The token (it starts with `cpt_`) is shown once. Only a hash is stored. Creating and revoking ask for your
 password and are written to the audit log, as is every deployment a token starts.
