@@ -35,6 +35,17 @@ type Site struct {
 	// is parsed and checked against an allow-list (see custom.go) and rendered
 	// from the parsed result, never embedded as typed.
 	Custom string `json:"custom,omitempty"`
+	// Rollout sends a share of the visitors to a second container (a new release) while
+	// UpstreamPort stays the one everybody else gets.
+	Rollout *Rollout `json:"rollout,omitempty"`
+}
+
+// Rollout is a gradual rollout: Percent of the visitors (1 to 99) get the container on
+// Port. Each visitor is given a bucket from 00 to 99 once, kept in a cookie, so a visitor
+// stays on one version, and raising the percentage moves only the buckets in between.
+type Rollout struct {
+	Port    int `json:"port"`
+	Percent int `json:"percent"`
 }
 
 // Redirect is a permanent redirect between two of a site's domains.
@@ -79,6 +90,17 @@ func (s Site) Validate() error {
 	if s.Certificate != "" {
 		if err := validate.Name(s.Certificate); err != nil {
 			return err
+		}
+	}
+	if r := s.Rollout; r != nil {
+		if err := validate.Port(r.Port); err != nil {
+			return err
+		}
+		if r.Port == s.UpstreamPort {
+			return &validate.InputError{Msg: "a rollout needs a second container, on another port"}
+		}
+		if r.Percent < 1 || r.Percent > 99 {
+			return &validate.InputError{Msg: "a rollout's share must be between 1 and 99 percent"}
 		}
 	}
 	_, err := CheckCustom(s.Custom)
@@ -146,6 +168,9 @@ type Config struct {
 	// keeps the tools on another origin than the panel.
 	ToolsSocket string
 	ToolsPort   int
+	// MetricsSocket is the Unix datagram socket nginx writes one line per proxied request
+	// to (see package traffic). Empty turns request statistics off.
+	MetricsSocket string
 }
 
 type Manager struct {
@@ -171,6 +196,31 @@ func NewManager(cfg Config, run Runner) *Manager {
 const panelSiteName = "panel"
 
 var siteTmpl = template.Must(template.New("site").Parse(`# Managed by CommyPanel. Do not edit; changes are overwritten.
+{{if .MetricsSocket}}log_format {{.LogFormat}} '{{.Name}}|$status|$request_time|$upstream_addr|$upstream_status|$upstream_response_time';
+{{end}}{{with .Rollout}}
+# Gradual rollout: {{.Percent}}% of visitors get the new release. A visitor is given a bucket
+# from 00 to 99 once and keeps it in a cookie, so they stay on one version.
+split_clients "${request_id}a" ${{.Var}}_tens {
+{{range .Digits}}    10% {{.}};
+{{end}}    * 9;
+}
+split_clients "${request_id}b" ${{.Var}}_ones {
+{{range .Digits}}    10% {{.}};
+{{end}}    * 9;
+}
+map $cookie_cp_rollout ${{.Var}}_bucket {
+    "~^[0-9][0-9]$" $cookie_cp_rollout;
+    default "${{.Var}}_tens${{.Var}}_ones";
+}
+map ${{.Var}}_bucket ${{.Var}}_target {
+    "~^{{.Regex}}$" 127.0.0.1:{{.NewPort}};
+    default 127.0.0.1:{{.OldPort}};
+}
+map $cookie_cp_rollout ${{.Var}}_cookie {
+    "~^[0-9][0-9]$" "";
+    default "cp_rollout=${{.Var}}_bucket; Path=/; Max-Age=86400; HttpOnly; SameSite=Lax{{if .Secure}}; Secure{{end}}";
+}
+{{end}}
 server {
     listen 80;
     listen [::]:80;
@@ -202,8 +252,11 @@ server {
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
-    set $commypanel_upstream http://127.0.0.1:{{.Port}};
-{{if .Custom}}
+{{if .Rollout}}    set $commypanel_upstream http://${{.Rollout.Var}}_target;
+    add_header Set-Cookie ${{.Rollout.Var}}_cookie always;
+{{else}}    set $commypanel_upstream http://127.0.0.1:{{.Port}};
+{{end}}{{if .MetricsSocket}}    access_log syslog:server=unix:{{.MetricsSocket}},nohostname {{.LogFormat}};
+{{end}}{{if .Custom}}
     # Custom directives, edited in CommyPanel. Checked before they are written.
 {{.Custom}}{{end}}{{if .TerminalSocket}}
     # Browser terminals: a WebSocket to the agent's terminal socket, which only
@@ -220,7 +273,7 @@ server {
     }
 {{end}}
     location / {
-        proxy_pass http://127.0.0.1:{{.Port}};
+        proxy_pass {{if .Rollout}}$commypanel_upstream{{else}}http://127.0.0.1:{{.Port}}{{end}};
     }
 }
 {{if and .CertDir .ToolsSocket}}
@@ -336,17 +389,32 @@ func (m *Manager) Render(s Site) (string, error) {
 	}
 	data := struct {
 		ServerNames, Webroot, CertDir, Custom, TerminalSocket, ToolsSocket string
+		Name, LogFormat, MetricsSocket                                     string
 		Port, ToolsPort                                                    int
 		ModernHTTP2                                                        bool
 		Redirects                                                          []Redirect
+		Rollout                                                            *rolloutData
 	}{
-		ServerNames: strings.Join(s.served(), " "),
-		Redirects:   s.Redirects,
-		Webroot:     filepath.Join(m.cfg.StateDir, "acme-webroot"),
-		Port:        s.UpstreamPort,
-		Custom:      custom,
+		ServerNames:   strings.Join(s.served(), " "),
+		Redirects:     s.Redirects,
+		Webroot:       filepath.Join(m.cfg.StateDir, "acme-webroot"),
+		Port:          s.UpstreamPort,
+		Custom:        custom,
+		Name:          s.Name,
+		LogFormat:     "cp_" + strings.ReplaceAll(s.Name, "-", "_"),
+		MetricsSocket: m.cfg.MetricsSocket,
+	}
+	if r := s.Rollout; r != nil {
+		data.Rollout = &rolloutData{
+			Var:     "$cp_" + strings.ReplaceAll(s.Name, "-", "_"),
+			Percent: r.Percent, NewPort: r.Port, OldPort: s.UpstreamPort,
+			Regex: bucketRegex(r.Percent), Secure: s.Certificate != "",
+			Digits: []int{0, 1, 2, 3, 4, 5, 6, 7, 8},
+		}
+		data.Rollout.Var = strings.TrimPrefix(data.Rollout.Var, "$")
 	}
 	if s.Name == panelSiteName {
+		data.MetricsSocket = "" // the panel's own site is not an app: nothing to compare releases on
 		data.TerminalSocket = m.cfg.TerminalSocket
 		data.ToolsSocket, data.ToolsPort = m.cfg.ToolsSocket, m.cfg.ToolsPort
 	}
@@ -361,6 +429,32 @@ func (m *Manager) Render(s Site) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+// rolloutData is what the site template needs for a gradual rollout.
+type rolloutData struct {
+	Var     string // the prefix of the rollout's nginx variables, without the dollar sign
+	Percent int
+	NewPort int
+	OldPort int
+	Regex   string // matches the buckets (00 to 99) that get the new release
+	Secure  bool   // mark the cookie Secure
+	Digits  []int
+}
+
+// bucketRegex matches the two-digit buckets from 00 up to, not including, percent. A
+// visitor's bucket is kept in a cookie, so raising the percentage moves only the buckets
+// in between and never sends a visitor back to the old release.
+func bucketRegex(percent int) string {
+	tens, ones := percent/10, percent%10
+	var parts []string
+	if tens > 0 {
+		parts = append(parts, "[0-"+strconv.Itoa(tens-1)+"][0-9]")
+	}
+	if ones > 0 {
+		parts = append(parts, strconv.Itoa(tens)+"[0-"+strconv.Itoa(ones-1)+"]")
+	}
+	return "(" + strings.Join(parts, "|") + ")"
 }
 
 var nginxVersionRe = regexp.MustCompile(`nginx/(\d+)\.(\d+)\.(\d+)`)

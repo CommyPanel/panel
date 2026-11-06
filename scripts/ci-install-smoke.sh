@@ -98,12 +98,22 @@ check_tools_port() {
     ok "the database tool port reaches the agent"
 }
 
+# nginx writes one line per request to the agent's metrics socket, which is how the panel compares
+# releases. It must exist and be writable by the web server's user.
+check_metrics_socket() {
+    [ -S /run/commypanel-metrics/metrics.sock ] || fail "the request statistics socket is missing"
+    [ "$(stat -c '%G %a' /run/commypanel-metrics/metrics.sock)" = "www-data 660" ] || fail "the request statistics socket is not group www-data, mode 660"
+    runuser -u www-data -- test -w /run/commypanel-metrics/metrics.sock || fail "the web server's user cannot write to the request statistics socket"
+    ok "the request statistics socket accepts the web server"
+}
+
 install_it "install"
 check_running
 check_page
 check_acme_webroot
 check_address_detection
 check_tools_port
+check_metrics_socket
 
 install_it "upgrade over the same version"
 check_running

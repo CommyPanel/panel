@@ -13,6 +13,8 @@ ExecStart=@@PREFIX@@/current/bin/commypanel-agent \
     --terminal-socket-group www-data \
     --dbtool-socket /run/commypanel-dbtool/dbtool.sock \
     --dbtool-socket-group www-data \
+    --metrics-socket /run/commypanel-metrics/metrics.sock \
+    --metrics-socket-group www-data \
     --tools-port @@TOOLS_PORT@@ \
     --data-dir @@DATA_DIR@@ \
     --state-dir /var/lib/commypanel-agent \
@@ -20,7 +22,7 @@ ExecStart=@@PREFIX@@/current/bin/commypanel-agent \
     --allow-uid @@PANEL_UID@@
 Restart=always
 RestartSec=2
-RuntimeDirectory=commypanel commypanel-terminal commypanel-dbtool
+RuntimeDirectory=commypanel commypanel-terminal commypanel-dbtool commypanel-metrics
 RuntimeDirectoryMode=0755
 # The agent's own folder: scratch files, the record of its dumps, TLS private keys,
 # the ACME account key and the ACME challenge files. Owned by root and outside the

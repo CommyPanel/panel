@@ -26,6 +26,7 @@ import (
 	"commypanel/agent/internal/nginx"
 	"commypanel/agent/internal/system"
 	"commypanel/agent/internal/terminal"
+	"commypanel/agent/internal/traffic"
 	"commypanel/agent/internal/usage"
 	"commypanel/agent/internal/validate"
 	"commypanel/agent/internal/volumefs"
@@ -1147,5 +1148,61 @@ func TestDatabaseToolsCanBeOff(t *testing.T) {
 	s := New(Options{Nginx: &fakeNginx{}, Authorize: AllowAll()})
 	if rec := do(t, s, "POST", "/v1/dbtools/start", `{}`); rec.Code != 501 {
 		t.Errorf("start with tools off: %d", rec.Code)
+	}
+}
+
+type fakeTraffic struct{ got traffic.Query }
+
+func (f *fakeTraffic) Range(site string, q traffic.Query) map[int]*traffic.Stats {
+	f.got = q
+	if site != "shop" {
+		return map[int]*traffic.Stats{}
+	}
+	return map[int]*traffic.Stats{20001: {Requests: 10, Errors: 1, P95: 100}}
+}
+
+func TestTrafficRange(t *testing.T) {
+	f := &fakeTraffic{}
+	s := New(Options{Nginx: &fakeNginx{}, Docker: &fakeDocker{}, Traffic: f, Authorize: AllowAll()})
+
+	rec := do(t, s, "GET", "/v1/traffic/shop?from=1800000000&to=1800000300&step=30", "")
+	var got struct {
+		Site  string                   `json:"site"`
+		Ports map[string]traffic.Stats `json:"ports"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil || rec.Code != 200 {
+		t.Fatalf("%d %s %v", rec.Code, rec.Body, err)
+	}
+	if got.Site != "shop" || got.Ports["20001"].Requests != 10 || got.Ports["20001"].Errors != 1 {
+		t.Errorf("answer = %+v", got)
+	}
+	if f.got.From != 1800000000 || f.got.To != 1800000300 || f.got.Step != 30 {
+		t.Errorf("query = %+v", f.got)
+	}
+
+	// The default is the last ten minutes.
+	do(t, s, "GET", "/v1/traffic/shop", "")
+	if span := f.got.To - f.got.From; span < 590 || span > 620 {
+		t.Errorf("default span = %d", span)
+	}
+}
+
+func TestTrafficRangeRefusesBadInput(t *testing.T) {
+	s := New(Options{Nginx: &fakeNginx{}, Docker: &fakeDocker{}, Traffic: &fakeTraffic{}, Authorize: AllowAll()})
+	for name, path := range map[string]string{
+		"a bad site":        "/v1/traffic/Not_A_Site",
+		"a text time":       "/v1/traffic/shop?from=yesterday",
+		"an inverted range": "/v1/traffic/shop?from=1800000300&to=1800000000",
+		"over an hour":      "/v1/traffic/shop?from=1800000000&to=1800009000",
+		"a tiny step":       "/v1/traffic/shop?step=1",
+		"an odd step":       "/v1/traffic/shop?step=15",
+		"a huge step":       "/v1/traffic/shop?step=7200",
+	} {
+		if rec := do(t, s, "GET", path, ""); rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: %d %s", name, rec.Code, rec.Body)
+		}
+	}
+	if rec := do(t, New(Options{Nginx: &fakeNginx{}, Docker: &fakeDocker{}, Authorize: AllowAll()}), "GET", "/v1/traffic/shop", ""); rec.Code != http.StatusNotImplemented {
+		t.Errorf("without statistics: %d", rec.Code)
 	}
 }

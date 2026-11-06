@@ -15,6 +15,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"time"
 
 	"commypanel/agent/internal/certs"
 	"commypanel/agent/internal/dbtool"
@@ -23,6 +24,7 @@ import (
 	"commypanel/agent/internal/peercred"
 	"commypanel/agent/internal/system"
 	"commypanel/agent/internal/terminal"
+	"commypanel/agent/internal/traffic"
 	"commypanel/agent/internal/usage"
 	"commypanel/agent/internal/validate"
 	"commypanel/agent/internal/volumefs"
@@ -118,6 +120,11 @@ type Usage interface {
 	Snapshot(history bool) usage.Snapshot
 }
 
+// Traffic is the per-container request counts nginx reports.
+type Traffic interface {
+	Range(site string, q traffic.Query) map[int]*traffic.Stats
+}
+
 // Authorizer decides whether the caller of a request may use the agent.
 type Authorizer func(r *http.Request) bool
 
@@ -130,6 +137,7 @@ type Options struct {
 	Certs     Certificates
 	Unit      DockerUnit
 	Usage     Usage
+	Traffic   Traffic
 	Authorize Authorizer
 	Version   string
 	DryRun    bool
@@ -174,6 +182,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/system/info", s.systemInfo)
 	mux.HandleFunc("GET /v1/system/addresses", s.systemAddresses)
 	mux.HandleFunc("GET /v1/system/usage", s.systemUsage)
+	mux.HandleFunc("GET /v1/traffic/{site}", s.trafficRange)
 	mux.HandleFunc("GET /v1/nginx/status", s.nginxStatus)
 	mux.HandleFunc("POST /v1/nginx/test", s.nginxTest)
 	mux.HandleFunc("POST /v1/nginx/reload", s.nginxReload)
@@ -323,6 +332,54 @@ func (s *Server) systemUsage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, s.opts.Usage.Snapshot(r.URL.Query().Get("history") == "1"))
+}
+
+// trafficRange answers how a site's containers did over a time range: requests, failures
+// and latency per container port, and optionally a series. Read-only.
+func (s *Server) trafficRange(w http.ResponseWriter, r *http.Request) {
+	if s.opts.Traffic == nil {
+		writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "request statistics are not available"})
+		return
+	}
+	site := r.PathValue("site")
+	if err := validate.Name(site); err != nil {
+		s.respond(w, err)
+		return
+	}
+	q := r.URL.Query()
+	now := time.Now().Unix()
+	from, to, step := now-600, now+1, int64(0)
+	var err error
+	if v := q.Get("from"); v != "" {
+		if from, err = strconv.ParseInt(v, 10, 64); err != nil {
+			s.respond(w, &validate.InputError{Msg: "from must be a unix time"})
+			return
+		}
+	}
+	if v := q.Get("to"); v != "" {
+		if to, err = strconv.ParseInt(v, 10, 64); err != nil {
+			s.respond(w, &validate.InputError{Msg: "to must be a unix time"})
+			return
+		}
+	}
+	if v := q.Get("step"); v != "" {
+		if step, err = strconv.ParseInt(v, 10, 64); err != nil || step < traffic.BucketSeconds || step > 3600 || step%traffic.BucketSeconds != 0 {
+			s.respond(w, &validate.InputError{Msg: "step must be a multiple of 10 seconds up to an hour"})
+			return
+		}
+	}
+	if to <= from || to-from > int64(traffic.History/time.Second)+traffic.BucketSeconds {
+		s.respond(w, &validate.InputError{Msg: "the range must be positive and at most an hour"})
+		return
+	}
+	// A range that does not line up with the buckets would give a ragged series.
+	from -= from % traffic.BucketSeconds
+	writeJSON(w, http.StatusOK, map[string]any{
+		"site":  site,
+		"from":  from,
+		"to":    to,
+		"ports": s.opts.Traffic.Range(site, traffic.Query{From: from, To: to, Step: step}),
+	})
 }
 
 func (s *Server) nginxStatus(w http.ResponseWriter, r *http.Request) {

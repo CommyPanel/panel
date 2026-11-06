@@ -27,6 +27,7 @@ import (
 	"commypanel/agent/internal/statedir"
 	"commypanel/agent/internal/system"
 	"commypanel/agent/internal/terminal"
+	"commypanel/agent/internal/traffic"
 	"commypanel/agent/internal/usage"
 	"commypanel/agent/internal/volumefs"
 )
@@ -54,23 +55,25 @@ func main() {
 
 func run() error {
 	var (
-		socket     = flag.String("socket", "/run/commypanel/agent.sock", "Unix socket path")
-		group      = flag.String("socket-group", "commypanel", "group that may connect to the socket")
-		dataDir    = flag.String("data-dir", "/var/lib/commypanel", "panel data directory")
-		stateDir   = flag.String("state-dir", "/var/lib/commypanel-agent", "the agent's own scratch space and records; root only, outside the data directory")
-		sitesDir   = flag.String("nginx-sites-dir", "/etc/nginx/commypanel", "directory nginx includes site configs from")
-		dockerSock = flag.String("docker-socket", "/var/run/docker.sock", "Docker Engine socket")
-		defMemory  = flag.Int("default-memory-mb", 512, "memory limit for containers that do not set one")
-		defCPUs    = flag.Float64("default-cpus", 1, "CPU limit for containers that do not set one")
-		buildMem   = flag.Int("build-memory-mb", 2048, "memory limit for image builds")
-		buildCPUs  = flag.Float64("build-cpus", 2, "CPU limit for image builds")
-		termSocket = flag.String("terminal-socket", "", "Unix socket for browser terminals (WebSocket); empty turns terminals off")
-		toolSocket = flag.String("dbtool-socket", "", "Unix socket for the web side of database tools (phpMyAdmin, pgAdmin); empty turns them off")
-		toolsPort  = flag.Int("tools-port", 2053, "the port database tools are served on, next to the panel's own domain")
-		toolGroup  = flag.String("dbtool-socket-group", "www-data", "group that may connect to the database tool socket (the web server's)")
-		termGroup  = flag.String("terminal-socket-group", "www-data", "group that may connect to the terminal socket (the web server's)")
-		dryRun     = flag.Bool("dry-run", false, "write configs but never run nginx or Docker (development)")
-		allowed    uidList
+		socket       = flag.String("socket", "/run/commypanel/agent.sock", "Unix socket path")
+		group        = flag.String("socket-group", "commypanel", "group that may connect to the socket")
+		dataDir      = flag.String("data-dir", "/var/lib/commypanel", "panel data directory")
+		stateDir     = flag.String("state-dir", "/var/lib/commypanel-agent", "the agent's own scratch space and records; root only, outside the data directory")
+		sitesDir     = flag.String("nginx-sites-dir", "/etc/nginx/commypanel", "directory nginx includes site configs from")
+		dockerSock   = flag.String("docker-socket", "/var/run/docker.sock", "Docker Engine socket")
+		defMemory    = flag.Int("default-memory-mb", 512, "memory limit for containers that do not set one")
+		defCPUs      = flag.Float64("default-cpus", 1, "CPU limit for containers that do not set one")
+		buildMem     = flag.Int("build-memory-mb", 2048, "memory limit for image builds")
+		buildCPUs    = flag.Float64("build-cpus", 2, "CPU limit for image builds")
+		termSocket   = flag.String("terminal-socket", "", "Unix socket for browser terminals (WebSocket); empty turns terminals off")
+		toolSocket   = flag.String("dbtool-socket", "", "Unix socket for the web side of database tools (phpMyAdmin, pgAdmin); empty turns them off")
+		toolsPort    = flag.Int("tools-port", 2053, "the port database tools are served on, next to the panel's own domain")
+		toolGroup    = flag.String("dbtool-socket-group", "www-data", "group that may connect to the database tool socket (the web server's)")
+		metricsSock  = flag.String("metrics-socket", "", "Unix datagram socket nginx writes one line per proxied request to; empty turns request statistics off")
+		metricsGroup = flag.String("metrics-socket-group", "www-data", "group that may write to the metrics socket (the web server's)")
+		termGroup    = flag.String("terminal-socket-group", "www-data", "group that may connect to the terminal socket (the web server's)")
+		dryRun       = flag.Bool("dry-run", false, "write configs but never run nginx or Docker (development)")
+		allowed      uidList
 	)
 	flag.Var(&allowed, "allow-uid", "UID allowed to call the agent (repeatable; the panel's user)")
 	showVersion := flag.Bool("version", false, "print version and exit")
@@ -101,7 +104,7 @@ func run() error {
 		return fmt.Errorf("state directory: %w", err)
 	}
 
-	mgr := nginx.NewManager(nginx.Config{SitesDir: *sitesDir, DataDir: *dataDir, StateDir: *stateDir, DryRun: *dryRun, TerminalSocket: *termSocket, ToolsSocket: *toolSocket, ToolsPort: *toolsPort}, nil)
+	mgr := nginx.NewManager(nginx.Config{SitesDir: *sitesDir, DataDir: *dataDir, StateDir: *stateDir, DryRun: *dryRun, TerminalSocket: *termSocket, ToolsSocket: *toolSocket, ToolsPort: *toolsPort, MetricsSocket: *metricsSock}, nil)
 	dockerMgr := docker.NewManager(docker.Config{
 		DataDir: *dataDir, StateDir: *stateDir, DryRun: *dryRun,
 		DefaultMemoryMB: *defMemory, DefaultCPUs: *defCPUs,
@@ -110,6 +113,10 @@ func run() error {
 	dockerMgr.CleanScratch()
 	certMgr := certs.NewManager(certs.Config{DataDir: *dataDir, StateDir: *stateDir, DryRun: *dryRun, UserAgent: "commypanel-agent/" + version})
 	sampler := usage.New(usage.Config{DataDir: *dataDir, Containers: dockerMgr})
+	var requests *traffic.Store
+	if *metricsSock != "" {
+		requests = traffic.New(nil)
+	}
 	var tickets *terminal.Tickets
 	if *termSocket != "" {
 		tickets = terminal.NewTickets(terminal.TicketTTL, 32)
@@ -122,7 +129,7 @@ func run() error {
 		// A tool must not outlive the agent that watches it and closes it after 15 minutes.
 		defer tools.Shutdown()
 	}
-	srv := server.New(server.Options{Nginx: mgr, DBTools: toolsFor(tools), Docker: dockerMgr, Volumes: volumefs.New(*dataDir), Terminal: ticketIssuer(tickets), Certs: certMgr, Unit: system.NewDockerUnit(*dryRun), Usage: sampler,
+	srv := server.New(server.Options{Nginx: mgr, DBTools: toolsFor(tools), Docker: dockerMgr, Volumes: volumefs.New(*dataDir), Terminal: ticketIssuer(tickets), Certs: certMgr, Unit: system.NewDockerUnit(*dryRun), Usage: sampler, Traffic: trafficFor(requests),
 		Authorize: authorize, Version: version, DryRun: *dryRun,
 		System:    func() system.Status { return system.Collect(*dataDir) },
 		Info:      system.NewReader(*dataDir).Info,
@@ -151,6 +158,13 @@ func run() error {
 	}()
 
 	go sampler.Run(ctx)
+
+	if requests != nil {
+		if err := requests.Listen(ctx, *metricsSock, *metricsGroup, *dryRun); err != nil {
+			return fmt.Errorf("metrics socket: %w", err)
+		}
+		slog.Info("request statistics enabled", "socket", *metricsSock)
+	}
 
 	if err := mgr.EnsureDefaultSite(ctx); err != nil {
 		slog.Warn("could not install the default port-80 site; certificates for domains without a live app will fail", "err", err)
@@ -228,6 +242,15 @@ func run() error {
 		return err
 	}
 	return nil
+}
+
+// trafficFor avoids handing the server a typed nil: with statistics off it must see a nil
+// interface so it can answer "not available".
+func trafficFor(t *traffic.Store) server.Traffic {
+	if t == nil {
+		return nil
+	}
+	return t
 }
 
 // toolsFor avoids handing the server a typed nil: with database tools off it
