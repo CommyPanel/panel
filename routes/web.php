@@ -15,6 +15,7 @@ use App\Http\Controllers\AppSetupController;
 use App\Http\Controllers\AppSourceController;
 use App\Http\Controllers\AppStateController;
 use App\Http\Controllers\AppTerminalController;
+use App\Http\Controllers\AppTrafficController;
 use App\Http\Controllers\AppUsageController;
 use App\Http\Controllers\AppVolumeBackupController;
 use App\Http\Controllers\AppVolumeController;
@@ -102,6 +103,9 @@ Route::middleware('auth')->group(function () {
 
         Route::get('usage', [AppUsageController::class, 'show'])
             ->middleware('can:'.Permissions::APPS_VIEW)->name('usage');
+
+        Route::get('traffic', [AppTrafficController::class, 'show'])
+            ->middleware('can:'.Permissions::APPS_VIEW)->name('traffic');
 
         Route::get('deployments/{deployment:number}', [DeploymentController::class, 'show'])
             ->middleware('can:'.Permissions::APPS_VIEW)->name('deployments.show');

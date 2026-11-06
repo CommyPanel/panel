@@ -3,6 +3,8 @@ import {
     CircleDashed,
     Loader2,
     PauseCircle,
+    Split,
+    Undo2,
     XCircle,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -45,6 +47,16 @@ const STATES: Record<
     stopped: {
         icon: <PauseCircle className="size-5" aria-hidden />,
         label: 'Stopped',
+        tone: 'text-warning',
+    },
+    rollout: {
+        icon: <Split className="size-5" aria-hidden />,
+        label: 'Rolling out',
+        tone: 'text-info',
+    },
+    rolled_back: {
+        icon: <Undo2 className="size-5" aria-hidden />,
+        label: 'Rolled back',
         tone: 'text-warning',
     },
 };

@@ -10,6 +10,7 @@ use App\Enums\DeploymentStatus;
 use App\Models\App;
 use App\Models\Deployment;
 use App\Presenters\AppPresenter;
+use App\Presenters\SafeDeployPresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -28,11 +29,12 @@ class DeploymentController extends Controller
         return redirect()->route('apps.deployments.show', [$app, $deployment]);
     }
 
-    public function show(App $app, Deployment $deployment): Response
+    public function show(App $app, Deployment $deployment, SafeDeployPresenter $safe): Response
     {
         return Inertia::render('apps/deployment', [
             'app' => ['slug' => $app->slug, 'name' => $app->name],
             'deployment' => AppPresenter::deployment($deployment, withLog: true),
+            'safe' => $safe->for($deployment),
         ]);
     }
 

@@ -1,7 +1,9 @@
 import { Link, router } from '@inertiajs/react';
-import { GitCommit, RotateCcw } from 'lucide-react';
+import { GitCommit, Play, RotateCcw, ShieldCheck } from 'lucide-react';
+import { useState } from 'react';
 import DeploymentController from '@/actions/App/Http/Controllers/DeploymentController';
 import { DeploymentStatusMark } from '@/components/apps/deployment-status';
+import { RetryModal } from '@/components/apps/safe-deploy-panels';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { formatDate, formatDuration, timeAgo } from '@/lib/format';
@@ -33,6 +35,7 @@ function Overview({ app }: { app: AppSettings }) {
 }
 
 export function DeploymentsTab({ app, deployments }: Props) {
+    const [retrying, setRetrying] = useState<number | null>(null);
     const rollBack = (number: number) =>
         router.post(
             DeploymentController.rollback({
@@ -72,6 +75,18 @@ export function DeploymentsTab({ app, deployments }: Props) {
                                             <DeploymentStatusMark
                                                 status={d.status}
                                             />
+                                            {d.watch?.state === 'watching' && (
+                                                <span
+                                                    className="mt-1 flex items-center gap-1 text-xs text-info"
+                                                    title="The previous version is kept running while this release is watched"
+                                                >
+                                                    <ShieldCheck
+                                                        className="size-3.5"
+                                                        aria-hidden
+                                                    />
+                                                    watching
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="whitespace-nowrap">
                                             <Link
@@ -131,6 +146,20 @@ export function DeploymentsTab({ app, deployments }: Props) {
                                             {formatDuration(d.duration_seconds)}
                                         </td>
                                         <td className="text-right whitespace-nowrap">
+                                            {d.can_retry && (
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        setRetrying(d.number)
+                                                    }
+                                                >
+                                                    <Play
+                                                        className="size-4"
+                                                        aria-hidden
+                                                    />
+                                                    Go live again
+                                                </Button>
+                                            )}
                                             {d.status === 'superseded' &&
                                                 d.can_roll_back && (
                                                     <Button
@@ -155,6 +184,14 @@ export function DeploymentsTab({ app, deployments }: Props) {
                     </div>
                 )}
             </Card>
+            {retrying !== null && (
+                <RetryModal
+                    open
+                    onClose={() => setRetrying(null)}
+                    slug={app.slug}
+                    number={retrying}
+                />
+            )}
         </div>
     );
 }

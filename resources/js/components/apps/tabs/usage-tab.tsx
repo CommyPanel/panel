@@ -1,5 +1,6 @@
 import { AppContainersCard } from '@/components/containers/app-containers-card';
 import { Card } from '@/components/ui/card';
+import { AppTrafficCard } from '@/components/usage/app-traffic-card';
 import { AppUsageCard } from '@/components/usage/app-usage-card';
 import type { AppSettings } from '@/types';
 
@@ -28,6 +29,7 @@ export function UsageTab({ app }: { app: AppSettings }) {
                     </p>
                 </Card>
             )}
+            {app.active_release !== null && <AppTrafficCard slug={app.slug} />}
             <AppContainersCard slug={app.slug} />
         </div>
     );

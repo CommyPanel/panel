@@ -76,7 +76,7 @@ function GitHubAutoDeploy({
                 <input
                     type="checkbox"
                     role="switch"
-                    className="toggle toggle-primary"
+                    className="switch switch-primary"
                     checked={webhook.enabled}
                     onChange={() => setAsking(true)}
                 />

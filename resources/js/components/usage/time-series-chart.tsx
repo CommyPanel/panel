@@ -23,10 +23,12 @@ type Props = {
     height?: number;
     /** Shown instead of the plot until there is data. */
     emptyText?: string;
+    /** How much time the plot covers, in milliseconds (five minutes by default). */
+    windowMs?: number;
 };
 
 const MARGIN = { top: 8, right: 10, bottom: 20, left: 46 };
-const WINDOW_MS = 5 * 60 * 1000;
+const DEFAULT_WINDOW_MS = 5 * 60 * 1000;
 const TABLE_ROWS = 12;
 
 /** 1, 2, 2.5, 5 or 10 times a power of ten, at least `value`. */
@@ -91,6 +93,7 @@ export function TimeSeriesChart({
     yFloor = 0,
     height = 150,
     emptyText = 'Waiting for the first readings.',
+    windowMs = DEFAULT_WINDOW_MS,
 }: Props) {
     const [wrap, width] = useWidth<HTMLElement>();
     const [hover, setHover] = useState<number | null>(null);
@@ -105,7 +108,7 @@ export function TimeSeriesChart({
     const plotW = Math.max(0, width - MARGIN.left - MARGIN.right);
     const plotH = height - MARGIN.top - MARGIN.bottom;
     const end = times[last] ?? 0;
-    const start = Math.max(times[0] ?? 0, end - WINDOW_MS);
+    const start = Math.max(times[0] ?? 0, end - windowMs);
     const x = (t: number) =>
         MARGIN.left +
         (end === start ? plotW : ((t - start) / (end - start)) * plotW);

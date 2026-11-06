@@ -13,6 +13,8 @@ const styles: Record<AppStatus | DeploymentStatus | DomainStatus, string> = {
     active: 'badge-success',
     superseded: 'badge-neutral',
     stopped: 'badge-warning',
+    rollout: 'badge-info',
+    rolled_back: 'badge-warning',
     deactivated: 'badge-neutral',
     pending: 'badge-neutral',
     verified: 'badge-success',
@@ -25,6 +27,8 @@ const labels: Partial<
 > = {
     setup: 'setting up',
     active: 'live',
+    rollout: 'rolling out',
+    rolled_back: 'rolled back',
     verified: 'connected',
     misconfigured: 'needs attention',
 };

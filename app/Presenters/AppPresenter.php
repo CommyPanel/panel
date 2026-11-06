@@ -2,6 +2,7 @@
 
 namespace App\Presenters;
 
+use App\Deploy\Safe\RolloutService;
 use App\Deploy\Source\GitProvider;
 use App\Enums\AppStatus;
 use App\Enums\CertificateStatus;
@@ -54,6 +55,14 @@ class AppPresenter
             'token_help' => self::tokenHelp($app),
             'release_command' => $app->release_command,
             'pending_changes' => $app->hasPendingChanges(),
+            'safe_deploys' => [
+                'watch_enabled' => $app->watch_enabled,
+                'watch_minutes' => $app->watch_minutes,
+                'rollout_enabled' => $app->rollout_enabled,
+                'rollout_steps' => RolloutService::stepsFor($app),
+                'rollout_hold_minutes' => $app->rollout_hold_minutes,
+                'rollout_auto' => $app->rollout_auto,
+            ],
             'volumes' => $app->volumes()->orderBy('id')->get()->map(fn ($v) => ['id' => $v->id, 'name' => $v->name, 'path' => $v->path, 'locked' => $v->isLocked()])->all(),
             'deactivated_release' => $app->status() === AppStatus::Deactivated
                 ? $app->deployments()->where('status', DeploymentStatus::Stopped)->max('number')

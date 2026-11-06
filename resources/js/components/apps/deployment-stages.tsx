@@ -47,7 +47,9 @@ function stateOf(
     if (
         status === 'active' ||
         status === 'superseded' ||
-        status === 'stopped'
+        status === 'stopped' ||
+        status === 'rollout' ||
+        status === 'rolled_back'
     ) {
         return 'done';
     }

@@ -178,7 +178,7 @@ export default function Create({ github }: { github: GitHubRepos | null }) {
                                 <input
                                     type="checkbox"
                                     role="switch"
-                                    className="toggle toggle-primary mt-0.5"
+                                    className="switch mt-0.5 switch-primary"
                                     checked={form.data.github_auto_deploy}
                                     onChange={(e) =>
                                         form.setData(

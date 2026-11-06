@@ -5,19 +5,27 @@ import AppController from '@/actions/App/Http/Controllers/AppController';
 import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
 import { DeploymentStages } from '@/components/apps/deployment-stages';
+import {
+    RolledBackNotice,
+    RolloutPanel,
+    WatchPanel,
+} from '@/components/apps/safe-deploy-panels';
 import { Card } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/format';
-import type { DeploymentDetail } from '@/types';
+import type { DeploymentDetail, SafeDeployInfo } from '@/types';
 
 type Props = {
     app: { slug: string; name: string };
     deployment: DeploymentDetail;
+    safe: SafeDeployInfo;
 };
 
 // Fast enough that the log feels live; polling stops as soon as the deployment has finished.
 const POLL_MS = 1000;
+// A rollout or a watch changes every few seconds, not every second.
+const SLOW_POLL_MS = 5000;
 
 function waitingText(status: DeploymentDetail['status']): string {
     return status === 'queued'
@@ -25,19 +33,29 @@ function waitingText(status: DeploymentDetail['status']): string {
         : 'Working. Output appears here as soon as there is some...';
 }
 
-export default function Deployment({ app, deployment }: Props) {
+export default function Deployment({ app, deployment, safe }: Props) {
     const logRef = useRef<HTMLPreElement>(null);
 
+    // Still being made, or live and being watched: keep the page up to date.
+    const watching = deployment.watch?.state === 'watching';
+    const interval = !deployment.finished
+        ? deployment.status === 'rollout'
+            ? SLOW_POLL_MS
+            : POLL_MS
+        : watching
+          ? SLOW_POLL_MS
+          : null;
+
     useEffect(() => {
-        if (deployment.finished) return;
+        if (interval === null) return;
 
         const timer = setInterval(
-            () => router.reload({ only: ['deployment'] }),
-            POLL_MS,
+            () => router.reload({ only: ['deployment', 'safe'] }),
+            interval,
         );
 
         return () => clearInterval(timer);
-    }, [deployment.finished]);
+    }, [interval]);
 
     useEffect(() => {
         const log = logRef.current;
@@ -82,6 +100,9 @@ export default function Deployment({ app, deployment }: Props) {
             {deployment.status === 'failed' && deployment.error && (
                 <Alert variant="error">{deployment.error}</Alert>
             )}
+            {deployment.status === 'rolled_back' && (
+                <RolledBackNotice slug={app.slug} deployment={deployment} />
+            )}
 
             <div className="grid items-start gap-6 xl:grid-cols-3">
                 <div className="min-w-0 xl:col-span-2">
@@ -96,6 +117,21 @@ export default function Deployment({ app, deployment }: Props) {
                     </Card>
                 </div>
                 <div className="min-w-0 space-y-6">
+                    {safe.rollout && (
+                        <RolloutPanel
+                            slug={app.slug}
+                            rollout={safe.rollout}
+                            traffic={safe.traffic}
+                        />
+                    )}
+                    {deployment.watch && !safe.rollout && (
+                        <WatchPanel
+                            slug={app.slug}
+                            deployment={deployment}
+                            traffic={safe.traffic}
+                            previous={safe.traffic?.previous_number ?? null}
+                        />
+                    )}
                     <Card title="Progress">
                         <DeploymentStages
                             stage={deployment.stage}

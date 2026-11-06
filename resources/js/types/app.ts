@@ -61,6 +61,7 @@ export type AppSettings = AppSummary & {
     release_command: string | null;
     /** Variables, volumes or links changed after the running container was made. */
     pending_changes: boolean;
+    safe_deploys: SafeDeploys;
     volumes: AppVolume[];
     memory_limit_mb: number | null;
     cpu_limit: number | null;
@@ -89,7 +90,11 @@ export type DeploymentStatus =
     | 'active'
     | 'superseded'
     | 'failed'
-    | 'stopped';
+    | 'stopped'
+    /** A share of the visitors is on this release while it is being proven. */
+    | 'rollout'
+    /** It went live, did clearly worse, and traffic was moved back. */
+    | 'rolled_back';
 
 export type DeploymentStage =
     | 'fetch'
@@ -111,6 +116,10 @@ export type DeploymentSummary = {
     is_rollback: boolean;
     /** Recreates the container from the live image to apply variables, volumes and links. */
     is_apply: boolean;
+    /** Going live again, on purpose, after an automatic rollback. */
+    is_retry: boolean;
+    can_retry: boolean;
+    watch: { state: string; until: string | null; note: string | null } | null;
     has_release_command: boolean;
     can_roll_back: boolean;
     error: string | null;
@@ -143,4 +152,44 @@ export type AppWebhook = {
     /** Only for people who may change the app. */
     secret?: string | null;
     on_panel_domain?: boolean;
+};
+
+/** The settings of watching new releases and of gradual rollouts. */
+export type SafeDeploys = {
+    watch_enabled: boolean;
+    watch_minutes: number;
+    rollout_enabled: boolean;
+    rollout_steps: number[];
+    rollout_hold_minutes: number;
+    rollout_auto: boolean;
+};
+
+export type SafeStat = {
+    requests: number;
+    errors: number;
+    error_percent: number;
+    p95_ms: number;
+};
+
+/** What the deployment page shows about a gradual rollout or a watch. */
+export type SafeDeployInfo = {
+    rollout: {
+        state: 'running' | 'waiting' | 'promoted' | 'aborted' | 'rolled_back';
+        percent: number;
+        step: number;
+        steps: number[];
+        hold_minutes: number;
+        auto: boolean;
+        step_started_at: string;
+        step_ends_at: string;
+        note: string | null;
+        previous_number: number | null;
+    } | null;
+    traffic: {
+        new: SafeStat | null;
+        reference: SafeStat | null;
+        verdict: { state: 'ok' | 'bad' | 'unknown'; reason: string };
+        /** The release being compared with, for a watch. */
+        previous_number?: number | null;
+    } | null;
 };

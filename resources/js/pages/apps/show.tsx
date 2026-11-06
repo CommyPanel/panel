@@ -9,9 +9,11 @@ import {
     FileCode,
     Rocket,
     ScrollText,
+    ShieldCheck,
     SquareTerminal,
     Settings,
     SlidersHorizontal,
+    Split,
     Variable,
 } from 'lucide-react';
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
@@ -26,6 +28,7 @@ import { LinksTab } from '@/components/apps/tabs/links-tab';
 import { LogsTab } from '@/components/apps/tabs/logs-tab';
 import { EnvironmentTab } from '@/components/apps/tabs/environment-tab';
 import { NginxTab } from '@/components/apps/tabs/nginx-tab';
+import { SafeDeploysTab } from '@/components/apps/tabs/safe-deploys-tab';
 import { SettingsTab } from '@/components/apps/tabs/settings-tab';
 import { UsageTab } from '@/components/apps/tabs/usage-tab';
 import { PendingChanges } from '@/components/apps/pending-changes';
@@ -64,6 +67,7 @@ type Props = {
 type TabId =
     | 'deployments'
     | 'usage'
+    | 'safe'
     | 'logs'
     | 'volumes'
     | 'links'
@@ -77,6 +81,7 @@ type TabId =
 const TAB_IDS: TabId[] = [
     'deployments',
     'usage',
+    'safe',
     'logs',
     'volumes',
     'links',
@@ -185,6 +190,11 @@ export default function Show({
             id: 'usage',
             label: 'Usage',
             icon: <Activity className="size-4" aria-hidden />,
+        },
+        {
+            id: 'safe',
+            label: 'Safe deploys',
+            icon: <ShieldCheck className="size-4" aria-hidden />,
         },
         ...(canLogs
             ? [
@@ -307,6 +317,26 @@ export default function Show({
 
             {errors.deploy && <Alert variant="error">{errors.deploy}</Alert>}
             {errors.state && <Alert variant="error">{errors.state}</Alert>}
+            {deployments[0]?.status === 'rollout' && (
+                <Alert variant="info">
+                    <div className="flex w-full flex-wrap items-center justify-between gap-3">
+                        <span className="flex items-center gap-2">
+                            <Split className="size-5 shrink-0" aria-hidden />
+                            A gradual rollout of release #
+                            {deployments[0].number} is under way.
+                        </span>
+                        <Link
+                            href={DeploymentController.show({
+                                app: app.slug,
+                                deployment: deployments[0].number,
+                            })}
+                            className="btn btn-sm btn-primary"
+                        >
+                            Open the rollout
+                        </Link>
+                    </div>
+                </Alert>
+            )}
             {app.pending_changes &&
                 app.status !== 'deploying' &&
                 app.status !== 'stopped' && <PendingChanges slug={app.slug} />}
@@ -329,6 +359,7 @@ export default function Show({
                     <DeploymentsTab app={app} deployments={deployments} />
                 )}
                 {active === 'usage' && <UsageTab app={app} />}
+                {active === 'safe' && <SafeDeploysTab app={app} />}
                 {active === 'logs' && <LogsTab app={app} />}
                 {active === 'volumes' && <VolumesTab app={app} />}
                 {active === 'links' && <LinksTab app={app} />}
