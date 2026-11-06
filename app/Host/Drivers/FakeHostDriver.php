@@ -8,6 +8,7 @@ use App\Host\Data\ContainerInfo;
 use App\Host\Data\ContainerSpec;
 use App\Host\Data\ContainerUsage;
 use App\Host\Data\DatabaseTarget;
+use App\Host\Data\DatabaseTls;
 use App\Host\Data\DatabaseToolSession;
 use App\Host\Data\DockerDiagnosis;
 use App\Host\Data\DockerInfo;
@@ -19,6 +20,7 @@ use App\Host\Data\NginxSite;
 use App\Host\Data\NginxStatus;
 use App\Host\Data\NginxTestResult;
 use App\Host\Data\PublicAddresses;
+use App\Host\Data\RemoteListener;
 use App\Host\Data\ResourceName;
 use App\Host\Data\ResourceUsage;
 use App\Host\Data\SystemStatus;
@@ -31,6 +33,7 @@ use App\Host\Data\VolumeListing;
 use App\Host\Data\VolumeUsage;
 use App\Host\Exceptions\DockerUnavailable;
 use App\Host\Exceptions\HostOperationFailed;
+use App\Host\Exceptions\RemotePortInUse;
 use App\Host\HostDriver;
 use Closure;
 use DateTimeImmutable;
@@ -86,6 +89,15 @@ class FakeHostDriver implements HostDriver
 
     /** @var array<string, array<string, list<string>>> network => container => aliases (links made while running) */
     private array $connections = [];
+
+    /** @var array<string, string> server => the hosts its certificate was made for */
+    private array $tlsHosts = [];
+
+    /** @var array<string, RemoteListener> */
+    private array $remote = [];
+
+    /** @var list<int> public ports something else holds (tests) */
+    private array $busyRemotePorts = [];
 
     /** @var list<string> database server containers that do not answer yet */
     private array $notReady = [];
@@ -589,6 +601,61 @@ class FakeHostDriver implements HostDriver
     public function failRestoresWith(?string $message): void
     {
         $this->restoreFails = $message;
+    }
+
+    public function ensureDatabaseTls(string $server, string $engine, array $hosts): DatabaseTls
+    {
+        ResourceName::assertValid($server);
+        $this->record('ensureDatabaseTls', ['server' => $server, 'engine' => $engine, 'hosts' => $hosts]);
+
+        sort($hosts);
+        $key = implode(',', $hosts);
+        $changed = ($this->tlsHosts[$server] ?? null) !== $key;
+        $this->tlsHosts[$server] = $key;
+
+        return new DatabaseTls("-----BEGIN CERTIFICATE-----\nZmFrZS1jYS0{$server}\n-----END CERTIFICATE-----\n", $changed);
+    }
+
+    public function openDatabaseRemote(string $server, string $engine, int $port, array $allow, int $expiresAt): void
+    {
+        ResourceName::assertValid($server);
+        $this->record('openDatabaseRemote', ['server' => $server, 'engine' => $engine, 'port' => $port, 'allow' => $allow, 'expires_at' => $expiresAt]);
+
+        if (in_array($port, $this->busyRemotePorts, true)) {
+            throw new RemotePortInUse('Agent error: port in use');
+        }
+
+        $this->remote[$server] = new RemoteListener($server, $port, $allow, $expiresAt, 0, 0);
+    }
+
+    public function closeDatabaseRemote(string $server): void
+    {
+        ResourceName::assertValid($server);
+        $this->record('closeDatabaseRemote', ['server' => $server]);
+        unset($this->remote[$server]);
+    }
+
+    public function databaseRemoteListeners(): array
+    {
+        $this->record('databaseRemoteListeners', []);
+
+        return array_values($this->remote);
+    }
+
+    /**
+     * Ports something else holds, so opening on them fails (tests).
+     *
+     * @param  list<int>  $ports
+     */
+    public function setBusyRemotePorts(array $ports): void
+    {
+        $this->busyRemotePorts = $ports;
+    }
+
+    /** The agent restarted: every public port is gone (tests). */
+    public function loseRemoteListeners(): void
+    {
+        $this->remote = [];
     }
 
     public function removeDatabaseData(string $server): void

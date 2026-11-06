@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"commypanel/agent/internal/certs"
+	"commypanel/agent/internal/dbremote"
+	"commypanel/agent/internal/dbtls"
 	"commypanel/agent/internal/dbtool"
 	"commypanel/agent/internal/docker"
 	"commypanel/agent/internal/nginx"
@@ -102,6 +104,18 @@ type DBTools interface {
 	Stop(id string)
 }
 
+// DBTLS makes the TLS certificates of database servers.
+type DBTLS interface {
+	Ensure(server, engine string, hosts []string) (dbtls.Result, error)
+}
+
+// DBRemote is the public access to database servers (a TCP proxy in the agent).
+type DBRemote interface {
+	Open(ctx context.Context, req dbremote.OpenRequest) (int, error)
+	Close(server string) error
+	List() []dbremote.Info
+}
+
 // Certificates is the part of the certificate manager the server needs.
 type Certificates interface {
 	Issue(ctx context.Context, r certs.Request) (certs.Info, error)
@@ -134,6 +148,8 @@ type Options struct {
 	Volumes   Volumes
 	Terminal  Terminal
 	DBTools   DBTools
+	DBTLS     DBTLS
+	DBRemote  DBRemote
 	Certs     Certificates
 	Unit      DockerUnit
 	Usage     Usage
@@ -221,6 +237,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/databases/remove-data", s.databaseRemoveData)
 	mux.HandleFunc("POST /v1/databases/dump", s.databaseDump)
 	mux.HandleFunc("POST /v1/databases/restore", s.databaseRestore)
+	mux.HandleFunc("POST /v1/databases/tls", s.databaseTLS)
+	mux.HandleFunc("POST /v1/databases/remote/open", s.remoteOpen)
+	mux.HandleFunc("POST /v1/databases/remote/close", s.remoteClose)
+	mux.HandleFunc("GET /v1/databases/remote", s.remoteList)
 	mux.HandleFunc("POST /v1/terminal/tickets", s.terminalTicket)
 	mux.HandleFunc("POST /v1/volumes/remove", s.removeVolumes)
 	mux.HandleFunc("POST /v1/volumes/backup", s.backupVolume)
@@ -546,6 +566,79 @@ func (s *Server) terminalTicket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ticket": ticket, "expires_in": int(terminal.TicketTTL.Seconds())})
+}
+
+func (s *Server) databaseTLS(w http.ResponseWriter, r *http.Request) {
+	if s.opts.DBTLS == nil {
+		writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "database certificates are not available"})
+		return
+	}
+	var body struct {
+		Server string   `json:"server"`
+		Engine string   `json:"engine"`
+		Hosts  []string `json:"hosts"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	res, err := s.opts.DBTLS.Ensure(body.Server, body.Engine, body.Hosts)
+	if err != nil {
+		s.respond(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+func (s *Server) remoteOff(w http.ResponseWriter) bool {
+	if s.opts.DBRemote == nil {
+		writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "remote access is not available"})
+		return true
+	}
+	return false
+}
+
+func (s *Server) remoteOpen(w http.ResponseWriter, r *http.Request) {
+	if s.remoteOff(w) {
+		return
+	}
+	var body dbremote.OpenRequest
+	if !decode(w, r, &body) {
+		return
+	}
+	port, err := s.opts.DBRemote.Open(r.Context(), body)
+	if errors.Is(err, dbremote.ErrPortInUse) {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "port in use"})
+		return
+	}
+	if err != nil {
+		s.respond(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]int{"port": port})
+}
+
+func (s *Server) remoteClose(w http.ResponseWriter, r *http.Request) {
+	if s.remoteOff(w) {
+		return
+	}
+	var body struct {
+		Server string `json:"server"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	if err := s.opts.DBRemote.Close(body.Server); err != nil {
+		s.respond(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{})
+}
+
+func (s *Server) remoteList(w http.ResponseWriter, r *http.Request) {
+	if s.remoteOff(w) {
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"listeners": s.opts.DBRemote.List()})
 }
 
 func (s *Server) connectNetwork(w http.ResponseWriter, r *http.Request) {

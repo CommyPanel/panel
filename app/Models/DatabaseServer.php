@@ -7,6 +7,7 @@ use App\Enums\DatabaseServerStatus;
 use App\Host\Data\DatabaseTarget;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * A database server CommyPanel runs as a container: MariaDB, MySQL or PostgreSQL.
@@ -20,6 +21,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $error
  * @property string $root_password
  * @property int|null $memory_limit_mb
+ * @property bool $tls_enabled
+ * @property string|null $tls_ca
+ * @property int|null $remote_port
+ * @property string|null $remote_status
+ * @property string|null $remote_error
+ * @property list<string>|null $remote_allow
+ * @property Carbon|null $remote_expires_at
+ * @property bool $remote_forever
+ * @property Carbon|null $remote_opened_at
+ * @property string|null $remote_opened_by
  */
 class DatabaseServer extends Model
 {
@@ -33,6 +44,11 @@ class DatabaseServer extends Model
             'engine' => DatabaseEngine::class,
             'status' => DatabaseServerStatus::class,
             'root_password' => 'encrypted',
+            'tls_enabled' => 'boolean',
+            'remote_allow' => 'array',
+            'remote_expires_at' => 'datetime',
+            'remote_forever' => 'boolean',
+            'remote_opened_at' => 'datetime',
         ];
     }
 
@@ -42,6 +58,12 @@ class DatabaseServer extends Model
     public function databases(): HasMany
     {
         return $this->hasMany(ManagedDatabase::class);
+    }
+
+    /** Whether the public port is open (or meant to be: it is re-opened if the agent lost it). */
+    public function remoteOpen(): bool
+    {
+        return $this->remote_port !== null;
     }
 
     public function containerName(): string

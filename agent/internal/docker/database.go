@@ -38,23 +38,29 @@ func (t DatabaseTarget) validate() error {
 // app called db-shop) would have the database client, and the administrator
 // password, run inside the app's own container.
 func (m *Manager) checkTarget(ctx context.Context, t DatabaseTarget) error {
+	_, err := m.inspectDatabase(ctx, t.Container)
+	return err
+}
+
+// inspectDatabase is checkTarget's check, and answers the image too.
+func (m *Manager) inspectDatabase(ctx context.Context, container string) (string, error) {
 	var inspect struct {
 		Config struct {
 			Image  string            `json:"Image"`
 			Labels map[string]string `json:"Labels"`
 		} `json:"Config"`
 	}
-	err := m.engine.doJSON(ctx, "GET", "/containers/"+t.Container+"/json", nil, nil, &inspect)
+	err := m.engine.doJSON(ctx, "GET", "/containers/"+container+"/json", nil, nil, &inspect)
 	if isStatus(err, 404) {
-		return &validate.InputError{Msg: fmt.Sprintf("container %q does not exist", t.Container)}
+		return "", &validate.InputError{Msg: fmt.Sprintf("container %q does not exist", container)}
 	}
 	if err != nil {
-		return err
+		return "", err
 	}
 	if inspect.Config.Labels[ManagedLabel] != "true" || validate.DatabaseImage(inspect.Config.Image) != nil {
-		return &validate.InputError{Msg: fmt.Sprintf("%q is not a database server", t.Container)}
+		return "", &validate.InputError{Msg: fmt.Sprintf("%q is not a database server", container)}
 	}
-	return nil
+	return inspect.Config.Image, nil
 }
 
 // Names the engines keep for themselves; a database or user cannot be called
@@ -290,6 +296,9 @@ func (m *Manager) RemoveDatabaseData(ctx context.Context, server string) error {
 	if err := os.RemoveAll(resolved); err != nil {
 		return fmt.Errorf("remove database data: %w", err)
 	}
+	// Its certificates and CA key go with it (the certificate folder is the agent's own).
+	_ = os.RemoveAll(dbtlsDir(m.cfg.StateDir, "db-"+server))
+	_ = os.Remove(filepath.Join(m.cfg.StateDir, "dbtls", ".ca", server+".key"))
 	return nil
 }
 

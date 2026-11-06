@@ -22,6 +22,7 @@ import { AddDatabaseModal } from '@/components/databases/add-database-modal';
 import { CredentialsModal } from '@/components/databases/credentials-modal';
 import { DatabaseStatusBadge } from '@/components/databases/database-status';
 import { RestoreBackupModal } from '@/components/databases/restore-backup-modal';
+import { RemoteAccessCard } from '@/components/databases/remote-access-card';
 import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,7 @@ import type {
     DatabaseCredentials,
     DatabaseServer,
     ManagedDatabase,
+    RemoteAccess,
 } from '@/types';
 
 type Props = {
@@ -45,9 +47,20 @@ type Props = {
     databases: ManagedDatabase[];
     backups: DatabaseBackupFile[];
     keep: number;
+    remote: RemoteAccess;
+    remote_durations: number[];
+    my_ip: string | null;
 };
 
-export default function Show({ server, databases, backups, keep }: Props) {
+export default function Show({
+    server,
+    databases,
+    backups,
+    keep,
+    remote,
+    remote_durations,
+    my_ip,
+}: Props) {
     const can = useCan();
     const { errors } = usePage().props;
     const confirmed = useConfirmedAction();
@@ -75,15 +88,20 @@ export default function Show({ server, databases, backups, keep }: Props) {
     const restoring = databases.some((d) => d.restore?.status === 'restoring');
 
     useEffect(() => {
-        if (server.status !== 'provisioning' && !restoring) return;
+        if (
+            server.status !== 'provisioning' &&
+            !restoring &&
+            remote.status !== 'opening'
+        )
+            return;
 
         const timer = setInterval(
-            () => router.reload({ only: ['server', 'databases'] }),
+            () => router.reload({ only: ['server', 'databases', 'remote'] }),
             3000,
         );
 
         return () => clearInterval(timer);
-    }, [server.status, restoring]);
+    }, [server.status, restoring, remote.status]);
 
     const post = (url: ReturnType<typeof DatabaseServerController.start>) =>
         router.post(
@@ -519,6 +537,16 @@ export default function Show({ server, databases, backups, keep }: Props) {
                     </div>
                 )}
             </Card>
+
+            {server.status !== 'provisioning' && server.status !== 'failed' && (
+                <RemoteAccessCard
+                    server={server}
+                    remote={remote}
+                    durations={remote_durations}
+                    myIp={my_ip}
+                    canChange={can('databases.remote')}
+                />
+            )}
 
             <Card
                 title="Backups"

@@ -11,7 +11,7 @@ func TestPrepareMakesTheFoldersWithTheRightModes(t *testing.T) {
 	if err := Prepare(root); err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]os.FileMode{"": 0o711, "tmp": 0o700, "dumps": 0o700, "certs": 0o700, "acme": 0o700, "acme-webroot": 0o755}
+	want := map[string]os.FileMode{"": 0o711, "tmp": 0o700, "dumps": 0o700, "certs": 0o700, "acme": 0o700, "dbtls": 0o700, "acme-webroot": 0o755}
 	for name, mode := range want {
 		info, err := os.Stat(filepath.Join(root, name))
 		if err != nil {

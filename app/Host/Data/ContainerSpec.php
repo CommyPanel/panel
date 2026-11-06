@@ -24,6 +24,7 @@ final readonly class ContainerSpec
         public ?string $network = null,
         public array $aliases = [],
         public array $networks = [],
+        public bool $databaseTls = false,
     ) {
         ResourceName::assertValid($name);
 

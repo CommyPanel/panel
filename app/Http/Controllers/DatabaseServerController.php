@@ -6,6 +6,9 @@ use App\Audit\AuditLogger;
 use App\Databases\DatabaseBackups;
 use App\Databases\DatabaseException;
 use App\Databases\DatabaseServers;
+use App\Databases\RemoteAccess;
+use App\Dns\PanelDomain;
+use App\Dns\ServerAddress;
 use App\Enums\DatabaseEngine;
 use App\Models\DatabaseServer;
 use App\Presenters\DatabasePresenter;
@@ -25,13 +28,16 @@ class DatabaseServerController extends Controller
         ]);
     }
 
-    public function show(DatabaseServer $server, DatabaseBackups $backups): Response
+    public function show(DatabaseServer $server, DatabaseBackups $backups, ServerAddress $address, PanelDomain $panelDomain): Response
     {
         return Inertia::render('databases/show', [
             'server' => DatabasePresenter::server($server),
             'databases' => $server->databases()->with('links.app')->orderBy('name')->get()->map(fn ($d) => DatabasePresenter::database($d))->all(),
             'backups' => array_map(fn (array $b) => [...$b, 'created_at' => date('c', $b['created'])], $backups->all($server)),
             'keep' => (int) config('commypanel.backups.keep_databases'),
+            'remote' => RemoteAccess::summary($server, $address->ipv4() ?? $address->ipv6() ?? $panelDomain->name() ?? ''),
+            'remote_durations' => RemoteAccess::DURATIONS,
+            'my_ip' => request()->ip(),
         ]);
     }
 

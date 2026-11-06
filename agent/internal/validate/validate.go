@@ -122,6 +122,15 @@ func DatabasePassword(s string) error {
 	return nil
 }
 
+// DatabaseServer checks the short name ("slug") of a database server: the
+// container is db-<slug>. It is also a folder name, so it can never hold a dot or slash.
+func DatabaseServer(s string) error {
+	if len(s) > 58 || !nameRe.MatchString(s) {
+		return invalid("invalid database server %q", s)
+	}
+	return nil
+}
+
 // Alias checks a name a container is reachable by on a network.
 func Alias(s string) error {
 	if !aliasRe.MatchString(s) {

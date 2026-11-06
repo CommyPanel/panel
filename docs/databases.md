@@ -6,7 +6,7 @@ CommyPanel runs **MariaDB, MySQL and PostgreSQL** servers for your apps, as cont
 
 **Add server** takes a name, the database (MariaDB, MySQL or PostgreSQL) and a version. The server runs from the official image, downloaded from Docker Hub, so the first start can take a few minutes; the page updates by itself. If it fails, the page says why and offers **Try again**.
 
-- **It is never reachable from the internet.** No port is published. Only an app that is linked to one of its databases can reach it.
+- **It is not reachable from the internet unless you open it.** No port is published. Only an app that is linked to one of its databases can reach it, until you use [Remote access](#remote-access).
 - Its data is kept on this server, in `/var/lib/commypanel/databases/<server>`, and survives restarts and upgrades. The server has a memory limit of 1 GB by default (`DATABASE_MEMORY_MB`).
 - You can **stop**, **start** and **restart** a server. **Delete server** removes it together with the data of every database on it; it asks you to type its name and your password, and is refused while an app uses one of its databases.
 - Versions offered: MariaDB 11.4 and 10.11, MySQL 8.4 and 8.0, PostgreSQL 17, 16 and 15.
@@ -31,6 +31,18 @@ Apps are separate from each other by default: every app has its own Docker netwo
 - Two apps with domains can also call each other over their public addresses (HTTPS through nginx). A link is for traffic that should stay inside the server.
 
 Linking needs the `apps.links` permission. Linking a database lets that app use it, and only that one.
+
+## Remote access
+
+**Remote access** (the `databases.remote` permission, a recent password, audited in red) opens a database server to the internet **for a limited time**, so you can connect from your own network with a desktop client, a backup job or a script. It is off unless you open it.
+
+- You list the **real public IP addresses** (or ranges, nothing wider than /16 or /48) that may connect; there is no "everybody". You choose how long: 15 minutes to 7 days, or **never**, which shows a red warning and needs a confirmation. At the end time the port closes completely and open connections are cut.
+- The port is **random** (20000 to 29999 by default, `COMMYPANEL_DB_REMOTE_PORTS`), not the database's usual one. The agent opens it itself and refuses every other source address without a reply.
+- **TLS is required.** The server gets its own certificate authority and a certificate for its public addresses; the first time, it restarts once to use it. Download **ca.pem** from the card and point your client at it (`sslmode=verify-full` for PostgreSQL, `--ssl-mode=VERIFY_IDENTITY` for MySQL). Clients that do not ask for TLS are refused.
+- Cloudflare's proxy does not carry database traffic: connect to the server's own address. Open the port in your firewall for the allowed addresses.
+- Change the addresses or the time while it is open, or **Close now**. After an agent restart the panel opens the port again within a minute; deleting a server closes it first.
+
+Prefer a VPN or an SSH tunnel for anything permanent: the address list is the only protection in front of the login.
 
 ## A database on another server
 

@@ -7,6 +7,7 @@ use App\Host\Data\CertificateRequest;
 use App\Host\Data\ContainerInfo;
 use App\Host\Data\ContainerSpec;
 use App\Host\Data\DatabaseTarget;
+use App\Host\Data\DatabaseTls;
 use App\Host\Data\DatabaseToolSession;
 use App\Host\Data\DockerDiagnosis;
 use App\Host\Data\DockerInfo;
@@ -18,6 +19,7 @@ use App\Host\Data\NginxSite;
 use App\Host\Data\NginxStatus;
 use App\Host\Data\NginxTestResult;
 use App\Host\Data\PublicAddresses;
+use App\Host\Data\RemoteListener;
 use App\Host\Data\ResourceUsage;
 use App\Host\Data\SystemStatus;
 use App\Host\Data\TaskSpec;
@@ -27,6 +29,7 @@ use App\Host\Data\VolumeListing;
 use App\Host\Data\VolumeUsage;
 use App\Host\Exceptions\DockerUnavailable;
 use App\Host\Exceptions\HostOperationFailed;
+use App\Host\Exceptions\RemotePortInUse;
 
 /**
  * Every privileged operation on the server goes through this interface.
@@ -318,6 +321,36 @@ interface HostDriver
      * @throws HostOperationFailed
      */
     public function removeDatabaseData(string $server): void;
+
+    /**
+     * Make sure a database server has a certificate that covers `$hosts` (addresses and names its
+     * clients use), made by its own certificate authority. `changed` says the certificate was
+     * written anew, so the server has to be restarted to use it.
+     *
+     * @param  list<string>  $hosts
+     */
+    public function ensureDatabaseTls(string $server, string $engine, array $hosts): DatabaseTls;
+
+    /**
+     * Open (or change) the public port of a database server: only the given addresses or ranges
+     * may connect, only with TLS, and the agent closes it itself at `$expiresAt` (a unix time,
+     * 0 for never). Doing it again with the same port changes the list and the time.
+     *
+     * @param  list<string>  $allow
+     *
+     * @throws RemotePortInUse when something else holds the port
+     */
+    public function openDatabaseRemote(string $server, string $engine, int $port, array $allow, int $expiresAt): void;
+
+    /** Close the public port of a database server and every connection on it. Closed already is fine. */
+    public function closeDatabaseRemote(string $server): void;
+
+    /**
+     * What the agent has open now.
+     *
+     * @return list<RemoteListener>
+     */
+    public function databaseRemoteListeners(): array;
 
     /**
      * Attach a running container to a link network, with the names it answers to there.

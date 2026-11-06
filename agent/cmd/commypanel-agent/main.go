@@ -20,6 +20,8 @@ import (
 	"time"
 
 	"commypanel/agent/internal/certs"
+	"commypanel/agent/internal/dbremote"
+	"commypanel/agent/internal/dbtls"
 	"commypanel/agent/internal/dbtool"
 	"commypanel/agent/internal/docker"
 	"commypanel/agent/internal/nginx"
@@ -73,6 +75,7 @@ func run() error {
 		metricsGroup = flag.String("metrics-socket-group", "www-data", "group that may write to the metrics socket (the web server's)")
 		termGroup    = flag.String("terminal-socket-group", "www-data", "group that may connect to the terminal socket (the web server's)")
 		dryRun       = flag.Bool("dry-run", false, "write configs but never run nginx or Docker (development)")
+		remotePorts  = flag.String("db-remote-ports", "20000-29999", "range of public ports a database server may be opened on (MIN-MAX)")
 		allowed      uidList
 	)
 	flag.Var(&allowed, "allow-uid", "UID allowed to call the agent (repeatable; the panel's user)")
@@ -129,7 +132,14 @@ func run() error {
 		// A tool must not outlive the agent that watches it and closes it after 15 minutes.
 		defer tools.Shutdown()
 	}
-	srv := server.New(server.Options{Nginx: mgr, DBTools: toolsFor(tools), Docker: dockerMgr, Volumes: volumefs.New(*dataDir), Terminal: ticketIssuer(tickets), Certs: certMgr, Unit: system.NewDockerUnit(*dryRun), Usage: sampler, Traffic: trafficFor(requests),
+	portRange, err := dbremote.ParsePortRange(*remotePorts)
+	if err != nil {
+		return err
+	}
+	remote := dbremote.New(dbremote.Config{Ports: portRange, Reserved: []int{*toolsPort}}, dockerMgr)
+	defer remote.Shutdown()
+	srv := server.New(server.Options{Nginx: mgr, DBTools: toolsFor(tools),
+		DBTLS: dbtls.New(dbtls.Config{StateDir: *stateDir, DryRun: *dryRun}), DBRemote: remote, Docker: dockerMgr, Volumes: volumefs.New(*dataDir), Terminal: ticketIssuer(tickets), Certs: certMgr, Unit: system.NewDockerUnit(*dryRun), Usage: sampler, Traffic: trafficFor(requests),
 		Authorize: authorize, Version: version, DryRun: *dryRun,
 		System:    func() system.Status { return system.Collect(*dataDir) },
 		Info:      system.NewReader(*dataDir).Info,
@@ -206,6 +216,7 @@ func run() error {
 	go func() {
 		<-ctx.Done()
 		endTools()
+		remote.Shutdown() // fail closed: nothing stays open once the agent stops
 	}()
 	if tools != nil {
 		toolLn, err := listen(*toolSocket, *toolGroup, *dryRun)

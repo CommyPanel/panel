@@ -161,6 +161,8 @@ return [
         'memory_mb' => (int) env('DATABASE_MEMORY_MB', 1024),
         // How long a new server may take to answer its first query.
         'ready_timeout' => (int) env('DATABASE_READY_TIMEOUT', 240),
+        // The public ports remote access picks from, "first-last". The agent enforces the same range.
+        'remote_ports' => (string) env('COMMYPANEL_DB_REMOTE_PORTS', '20000-29999'),
     ],
 
     'backups' => [

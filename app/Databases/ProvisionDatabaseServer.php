@@ -19,7 +19,7 @@ use Throwable;
  */
 class ProvisionDatabaseServer
 {
-    public function __construct(private readonly HostDriver $host) {}
+    public function __construct(private readonly HostDriver $host, private readonly DatabaseCertificate $certificate) {}
 
     public function __invoke(DatabaseServer $server): void
     {
@@ -27,6 +27,11 @@ class ProvisionDatabaseServer
 
         try {
             $this->host->pullImage($server->image());
+
+            // A server that was opened to the internet once keeps its certificate: it starts with TLS.
+            if ((bool) $server->tls_enabled) {
+                $this->certificate->ensure($server);
+            }
 
             // A retry starts from nothing: whatever is left of an earlier attempt goes, the data stays.
             $this->host->removeContainer($server->containerName());
@@ -40,6 +45,7 @@ class ProvisionDatabaseServer
                 memoryLimitMb: $server->memory_limit_mb ?? (int) config('commypanel.databases.memory_mb'),
                 volumes: [new Volume($this->dataPath($server), $server->engine->dataPath())],
                 network: $server->networkName(),
+                databaseTls: (bool) $server->tls_enabled,
             ));
 
             $this->waitUntilReady($server);

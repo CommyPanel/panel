@@ -68,3 +68,20 @@ export type DatabaseBackupFile = {
     size: number;
     created_at: string;
 };
+
+/** A database server reached from the internet, as the page shows it. */
+export type RemoteAccess = {
+    /** null when closed. */
+    status: 'opening' | 'open' | 'failed' | null;
+    error: string | null;
+    port: number | null;
+    /** The address clients connect to. */
+    host: string;
+    allow: string[];
+    forever: boolean;
+    expires_at: string | null;
+    opened_at: string | null;
+    opened_by: string | null;
+    /** Whether the server runs with TLS (it does once it was opened). */
+    tls: boolean;
+};

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Audit\Severity;
 use App\Models\AuditLog;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -17,6 +18,7 @@ class AuditLogController extends Controller
                 ->through(fn (AuditLog $log): array => [
                     'id' => $log->id,
                     'action' => $log->action,
+                    'severity' => Severity::of($log->action),
                     'user' => $log->user_email,
                     'ip' => $log->ip_address,
                     'metadata' => $log->metadata,

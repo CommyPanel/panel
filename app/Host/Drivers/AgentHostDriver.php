@@ -8,6 +8,7 @@ use App\Host\Data\ContainerInfo;
 use App\Host\Data\ContainerSpec;
 use App\Host\Data\ContainerUsage;
 use App\Host\Data\DatabaseTarget;
+use App\Host\Data\DatabaseTls;
 use App\Host\Data\DatabaseToolSession;
 use App\Host\Data\DockerDiagnosis;
 use App\Host\Data\DockerInfo;
@@ -20,6 +21,7 @@ use App\Host\Data\NginxSite;
 use App\Host\Data\NginxStatus;
 use App\Host\Data\NginxTestResult;
 use App\Host\Data\PublicAddresses;
+use App\Host\Data\RemoteListener;
 use App\Host\Data\ResourceName;
 use App\Host\Data\ResourceUsage;
 use App\Host\Data\SystemStatus;
@@ -31,6 +33,7 @@ use App\Host\Data\VolumeListing;
 use App\Host\Data\VolumeUsage;
 use App\Host\Exceptions\DockerUnavailable;
 use App\Host\Exceptions\HostOperationFailed;
+use App\Host\Exceptions\RemotePortInUse;
 use App\Host\HostDriver;
 use DateTimeImmutable;
 use GuzzleHttp\Psr7\FnStream;
@@ -385,6 +388,7 @@ class AgentHostDriver implements HostDriver
             'cpus' => $spec->cpuLimit,
             'network' => $spec->network,
             'aliases' => $spec->aliases,
+            'database_tls' => $spec->databaseTls ?: null,
             'networks' => array_map(fn (NetworkAttachment $n) => array_filter(['name' => $n->name, 'aliases' => $n->aliases], fn ($v) => $v !== []), $spec->networks),
         ], fn ($value) => $value !== null && $value !== []));
     }
@@ -506,6 +510,52 @@ class AgentHostDriver implements HostDriver
     {
         // A first download can take minutes.
         $this->handle($this->request(fn () => $this->client(timeout: 900)->post('/v1/images/pull', ['image' => $image])));
+    }
+
+    public function ensureDatabaseTls(string $server, string $engine, array $hosts): DatabaseTls
+    {
+        ResourceName::assertValid($server);
+        $data = $this->send('post', '/v1/databases/tls', ['server' => $server, 'engine' => $engine, 'hosts' => $hosts]);
+        $pem = $data['ca_pem'] ?? null;
+
+        if (! is_string($pem) || ! str_contains($pem, 'BEGIN CERTIFICATE')) {
+            throw new HostOperationFailed('The agent did not return a certificate.');
+        }
+
+        return new DatabaseTls($pem, (bool) ($data['changed'] ?? false));
+    }
+
+    public function openDatabaseRemote(string $server, string $engine, int $port, array $allow, int $expiresAt): void
+    {
+        ResourceName::assertValid($server);
+        $response = $this->request(fn () => $this->client()->post('/v1/databases/remote/open', [
+            'server' => $server, 'engine' => $engine, 'port' => $port, 'allow' => $allow, 'expires_at' => $expiresAt,
+        ]));
+
+        if ($response->status() === 409) {
+            throw new RemotePortInUse('Agent error: '.($response->json('error') ?? 'port in use'));
+        }
+
+        $this->handle($response);
+    }
+
+    public function closeDatabaseRemote(string $server): void
+    {
+        ResourceName::assertValid($server);
+        $this->send('post', '/v1/databases/remote/close', ['server' => $server]);
+    }
+
+    public function databaseRemoteListeners(): array
+    {
+        $out = [];
+
+        foreach ((array) ($this->send('get', '/v1/databases/remote')['listeners'] ?? []) as $row) {
+            if (is_array($row) && is_string($row['server'] ?? null)) {
+                $out[] = new RemoteListener($row['server'], (int) ($row['port'] ?? 0), array_values(array_map('strval', (array) ($row['allow'] ?? []))), (int) ($row['expires_at'] ?? 0), (int) ($row['connections'] ?? 0), (int) ($row['total'] ?? 0));
+            }
+        }
+
+        return $out;
     }
 
     public function databaseReady(DatabaseTarget $server): bool

@@ -25,6 +25,7 @@ var folders = map[string]os.FileMode{
 	"dumps":        0o700,
 	"certs":        0o700,
 	"acme":         0o700,
+	"dbtls":        0o700, // per-server database certificates and their CA keys
 	"acme-webroot": 0o755, // nginx reads the challenge files from here
 }
 

@@ -92,6 +92,11 @@ type ContainerSpec struct {
 	// has there. They are how a link between an app and a database, or between
 	// two apps, is made: the pair meets on a network of their own.
 	Networks []NetworkAttach `json:"networks,omitempty"`
+	// DatabaseTLS makes a database server (db-<slug>, official image) speak TLS
+	// with the certificate the agent made for it (dbtls): the certificate folder is
+	// mounted read-only and the server is started with the engine's TLS options.
+	// It is the only way that folder can be mounted; volumes can never name it.
+	DatabaseTLS bool `json:"database_tls,omitempty"`
 
 	// Set only by the agent's own code (database tool sessions), never from a request.
 	extraLabels map[string]string
@@ -222,6 +227,11 @@ func (m *Manager) Validate(s ContainerSpec) error {
 			return &validate.InputError{Msg: "a link network cannot be a container's own network"}
 		}
 	}
+	if s.DatabaseTLS {
+		if err := m.checkDatabaseTLS(s); err != nil {
+			return err
+		}
+	}
 	return validateAttachments(s)
 }
 
@@ -325,11 +335,19 @@ func (m *Manager) createBody(s ContainerSpec) map[string]any {
 	for k, v := range s.extraLabels {
 		labels[k] = v
 	}
+	if s.DatabaseTLS {
+		// Validate has checked the image, the name and that the certificate exists.
+		binds = append(binds, dbtlsDir(m.cfg.StateDir, s.Name)+":"+dbtlsMount+":ro")
+		host["Binds"] = binds
+	}
 	body := map[string]any{
 		"Image":      s.Image,
 		"Env":        env,
 		"Labels":     labels,
 		"HostConfig": host,
+	}
+	if s.DatabaseTLS {
+		body["Cmd"] = databaseTLSCommand(s.Image)
 	}
 	if len(s.Aliases) > 0 {
 		body["NetworkingConfig"] = map[string]any{"EndpointsConfig": map[string]any{

@@ -27,6 +27,7 @@ use App\Http\Controllers\BackupRemoteController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DatabaseBackupController;
+use App\Http\Controllers\DatabaseRemoteController;
 use App\Http\Controllers\DatabaseServerController;
 use App\Http\Controllers\DatabaseToolController;
 use App\Http\Controllers\DeployKeyController;
@@ -213,6 +214,14 @@ Route::middleware('auth')->group(function () {
             Route::post('{server:slug}/backups/{name}/restore', [DatabaseBackupController::class, 'restore'])->where('name', '[a-z0-9_.-]+')->middleware('password.confirm')->name('backups.restore');
             Route::delete('{server:slug}/backups/{name}', [DatabaseBackupController::class, 'destroy'])->where('name', '[a-z0-9_.-]+')->middleware('password.confirm')->name('backups.destroy');
             Route::post('{server:slug}/databases/{database}/password', [ManagedDatabaseController::class, 'password'])->whereNumber('database')->middleware('password.confirm')->name('databases.password');
+        });
+
+        // Reachable from the internet: its own permission, and a recent password for every change.
+        Route::middleware(['can:'.Permissions::DATABASES_REMOTE, 'password.confirm'])->group(function () {
+            Route::post('{server:slug}/remote', [DatabaseRemoteController::class, 'store'])->name('remote.store');
+            Route::put('{server:slug}/remote', [DatabaseRemoteController::class, 'update'])->name('remote.update');
+            Route::delete('{server:slug}/remote', [DatabaseRemoteController::class, 'destroy'])->name('remote.destroy');
+            Route::get('{server:slug}/remote/ca', [DatabaseRemoteController::class, 'ca'])->name('remote.ca');
         });
 
         // phpMyAdmin and pgAdmin: a page that starts the tool and follows it, and the calls it makes.

@@ -105,6 +105,8 @@ class DatabaseServers
             throw new DatabaseException("Apps still use this server's databases ({$apps}). Remove their links first.");
         }
 
+        // The public port goes first: nothing may stay open on a server that is being deleted.
+        $this->attempt(fn () => $this->host->closeDatabaseRemote($server->slug), 'close the public port of');
         $this->attempt(fn () => $this->host->removeContainer($server->containerName()), 'remove');
 
         try {

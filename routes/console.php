@@ -12,6 +12,8 @@ Schedule::command('commypanel:check-domains')->everyFiveMinutes()->withoutOverla
 
 Schedule::command('commypanel:tick-safe-deployments')->everyMinute()->withoutOverlapping();
 
+Schedule::command('commypanel:tick-remote-access')->everyMinute()->withoutOverlapping();
+
 Schedule::command('commypanel:renew-certificates')->dailyAt('03:17')->withoutOverlapping();
 
 Schedule::command('commypanel:backup')->dailyAt('03:30')->withoutOverlapping();
