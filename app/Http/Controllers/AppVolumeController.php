@@ -28,7 +28,7 @@ class AppVolumeController extends Controller
 
         $audit->record('app.volume_added', $request->user(), ['app' => $app->slug, 'path' => $volume->path, 'name' => $volume->name], $app);
 
-        return back()->with('status', "{$volume->path} will be kept between deployments, starting with the next one.");
+        return back()->with('status', "{$volume->path} will be kept between deployments once you apply the changes.");
     }
 
     public function destroy(Request $request, App $app, AppVolume $volume, AuditLogger $audit): RedirectResponse
@@ -41,6 +41,6 @@ class AppVolumeController extends Controller
 
         $audit->record('app.volume_removed', $request->user(), ['app' => $app->slug, 'path' => $volume->path, 'name' => $volume->name], $app);
 
-        return back()->with('status', "{$volume->path} is no longer mounted from the next deployment. Its files stay on the server.");
+        return back()->with('status', "{$volume->path} will no longer be mounted once you apply the changes. Its files stay on the server.");
     }
 }

@@ -33,6 +33,7 @@ use Illuminate\Support\Str;
  * @property string|null $git_token_username
  * @property string|null $github_repo
  * @property bool $github_auto_deploy
+ * @property Carbon|null $config_changed_at
  * @property string|null $webhook_id
  * @property string|null $webhook_secret
  * @property string|null $nginx_custom
@@ -67,6 +68,7 @@ class App extends Model
             'stack_hint' => Stack::class,
             'source_verified_at' => 'datetime',
             'stopped_at' => 'datetime',
+            'config_changed_at' => 'datetime',
             'locked_at' => 'datetime',
             'source_type' => SourceType::class,
             'deploy_key_private' => 'encrypted',
@@ -266,5 +268,17 @@ class App extends Model
     public function nextDeploymentNumber(): int
     {
         return ((int) $this->deployments()->max('number')) + 1;
+    }
+
+    /**
+     * Whether variables, volumes or links changed after the live container was made, so it
+     * runs without them until the changes are applied (or the next deployment). A false alarm
+     * is possible (a change made while the deployment was being prepared); a miss is not.
+     */
+    public function hasPendingChanges(): bool
+    {
+        $live = $this->activeDeployment;
+
+        return $live !== null && $this->config_changed_at !== null && $this->config_changed_at->greaterThan($live->created_at);
     }
 }

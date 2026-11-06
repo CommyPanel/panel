@@ -265,9 +265,9 @@ describe('links from an app', function () {
         expect($this->getJson('/apps/shop/links')->json('available_databases'))->toBe([]);
     });
 
-    it('links a database, tells the user it applies from the next deployment, and records it', function () {
+    it('links a database, tells the user to apply the changes, and records it', function () {
         $this->post('/apps/shop/links/database', ['database_id' => $this->database->id, 'env_prefix' => 'database'])
-            ->assertSessionHas('status', fn ($m) => str_contains($m, 'next deployment') && str_contains($m, 'DATABASE_URL'));
+            ->assertSessionHas('status', fn ($m) => str_contains($m, 'apply the changes') && str_contains($m, 'DATABASE_URL'));
 
         $json = $this->getJson('/apps/shop/links')->json();
 

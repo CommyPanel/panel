@@ -61,6 +61,36 @@ class Deployer
     }
 
     /**
+     * Recreate the live container from the image that is already running, so that changed
+     * variables, volumes and links take effect. Nothing is fetched or built; the new container
+     * is started next to the old one, health-checked and given the traffic before the old one
+     * stops, like any deployment, so there is no downtime and a failure keeps the old one.
+     *
+     * @throws DeploymentFailed
+     */
+    public function apply(App $app, ?User $by = null): Deployment
+    {
+        $live = $app->activeDeployment;
+
+        if ($live === null || $live->image_tag === null || ! $live->image_available) {
+            throw new DeploymentFailed('There is no running version to apply the changes to. Deploy the app instead.');
+        }
+
+        $deployment = $this->create($app, [
+            'image_tag' => $live->image_tag,
+            'commit_sha' => $live->commit_sha,
+            'commit_message' => $live->commit_message,
+            'rolled_back_from_id' => $live->id,
+            'settings_only' => true,
+        ]);
+
+        $this->audit->record('deploy.apply_queued', $by, ['app' => $app->slug, 'deployment' => $deployment->number], $app);
+        RunDeployment::dispatch($deployment->id);
+
+        return $deployment;
+    }
+
+    /**
      * @param  array<string, mixed>  $attributes
      */
     private function create(App $app, array $attributes): Deployment

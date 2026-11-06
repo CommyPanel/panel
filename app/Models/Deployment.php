@@ -22,6 +22,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $image_tag
  * @property bool $image_available
  * @property int|null $rolled_back_from_id
+ * @property bool $settings_only
  * @property string|null $container_name
  * @property int|null $host_port
  * @property string|null $log
@@ -42,6 +43,7 @@ class Deployment extends Model
             'status' => DeploymentStatus::class,
             'stage' => DeploymentStage::class,
             'image_available' => 'boolean',
+            'settings_only' => 'boolean',
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
         ];

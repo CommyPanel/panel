@@ -66,7 +66,9 @@ class DeployApp
                     $this->release($app, $deployment, $log);
                 }
             } else {
-                $log->step("Rolling back to release {$deployment->image_tag}.");
+                $log->step($deployment->settings_only
+                    ? "Recreating the container from release {$deployment->image_tag} with the current variables, volumes and links."
+                    : "Rolling back to release {$deployment->image_tag}.");
             }
 
             $deployment->forceFill(['status' => DeploymentStatus::Starting])->save();

@@ -53,6 +53,7 @@ class AppPresenter
             'git_token' => $app->git_token === null ? null : ['username' => $app->git_token_username],
             'token_help' => self::tokenHelp($app),
             'release_command' => $app->release_command,
+            'pending_changes' => $app->hasPendingChanges(),
             'volumes' => $app->volumes()->orderBy('id')->get()->map(fn ($v) => ['id' => $v->id, 'name' => $v->name, 'path' => $v->path, 'locked' => $v->isLocked()])->all(),
             'deactivated_release' => $app->status() === AppStatus::Deactivated
                 ? $app->deployments()->where('status', DeploymentStatus::Stopped)->max('number')
@@ -96,7 +97,8 @@ class AppPresenter
             'commit' => $deployment->commit_sha === null ? null : substr($deployment->commit_sha, 0, 8),
             'commit_message' => $deployment->commit_message,
             'duration_seconds' => $deployment->finished_at !== null && $deployment->started_at !== null ? (int) $deployment->started_at->diffInSeconds($deployment->finished_at, true) : null,
-            'is_rollback' => $deployment->rolled_back_from_id !== null,
+            'is_rollback' => $deployment->rolled_back_from_id !== null && ! $deployment->settings_only,
+            'is_apply' => (bool) $deployment->settings_only,
             'has_release_command' => $deployment->release_command !== null,
             'can_roll_back' => $deployment->image_tag !== null && $deployment->image_available,
             'error' => $deployment->error,

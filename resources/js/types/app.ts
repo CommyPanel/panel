@@ -59,6 +59,8 @@ export type AppSettings = AppSummary & {
     container_port: number;
     health_path: string;
     release_command: string | null;
+    /** Variables, volumes or links changed after the running container was made. */
+    pending_changes: boolean;
     volumes: AppVolume[];
     memory_limit_mb: number | null;
     cpu_limit: number | null;
@@ -107,6 +109,8 @@ export type DeploymentSummary = {
     commit_message: string | null;
     duration_seconds: number | null;
     is_rollback: boolean;
+    /** Recreates the container from the live image to apply variables, volumes and links. */
+    is_apply: boolean;
     has_release_command: boolean;
     can_roll_back: boolean;
     error: string | null;

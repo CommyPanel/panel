@@ -47,7 +47,7 @@ Two names are involved, and only one has to match your app:
 
 Also worth knowing:
 
-- A change applies from the **next deployment**, to the app and to its release command.
+- A change reaches the app when you **apply the changes** (or deploy), to the app and to its release command.
 - The old and the new container **share** a volume while a deployment switches over, so both can read and write it. Make sure two versions can run against the same files for a moment.
 - A **rollback does not roll back volume data.** The files stay as the running version left them.
 - Whatever the image has at that path is **hidden** by the volume, which starts empty.
@@ -145,3 +145,7 @@ location = /old-page {
 ## When Docker is down
 
 The panel runs outside Docker, so it keeps working when Docker does not. Every page then shows a warning, and Server > Docker shows the state of the Docker service and its latest log lines. People with the "Manage Docker and nginx" permission can restart Docker from there after confirming their password. Restarting Docker stops every container for a moment; they come back on their own.
+
+## Applying changes without a deployment
+
+Environment variables, volumes and links are given to a container when it is **made**; a running container cannot gain them, and a plain restart would not either. After you change any of them, the app page shows **Variables, volumes or links changed** with an **Apply changes** button (for people who may deploy). It makes a new container from the version that is **already running**, with the new settings, and swaps traffic exactly like a deployment: the new container starts next to the old one, must pass its health check, takes the traffic, and only then the old one stops. There is **no downtime**, nothing is fetched or built (your code is not updated), and if the new container is not healthy nothing changes. For a short while both containers run at once, so the app must be fine with that. It shows in the Deployments tab as "applied changes". Make as many changes as you like first and apply once.

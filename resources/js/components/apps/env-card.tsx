@@ -27,7 +27,7 @@ export function EnvCard({ slug, keys }: Props) {
     return (
         <Card
             title="Environment variables"
-            description="Values are stored encrypted and never shown again. Changes apply from the next deployment. PORT is set for you."
+            description="Values are stored encrypted and never shown again. Changes reach the running app when you apply them (a button appears on the app) or deploy. PORT is set for you."
         >
             {keys.length > 0 && (
                 <ul className="divide-y divide-base-300 rounded-field border border-base-300">

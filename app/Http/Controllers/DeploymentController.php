@@ -49,6 +49,24 @@ class DeploymentController extends Controller
         return redirect()->route('apps.deployments.show', [$app, $new]);
     }
 
+    /**
+     * Make changed variables, volumes and links take effect without a build and without downtime.
+     */
+    public function apply(Request $request, App $app, Deployer $deployer): RedirectResponse
+    {
+        if ($this->inProgress($app)) {
+            return back()->withErrors(['deploy' => 'A deployment is already in progress.']);
+        }
+
+        try {
+            $new = $deployer->apply($app->load('activeDeployment'), $request->user());
+        } catch (DeploymentFailed $e) {
+            return back()->withErrors(['deploy' => $e->getMessage()]);
+        }
+
+        return redirect()->route('apps.deployments.show', [$app, $new]);
+    }
+
     private function inProgress(App $app): bool
     {
         return $app->deployments()

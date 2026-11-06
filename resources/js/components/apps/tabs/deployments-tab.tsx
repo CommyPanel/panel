@@ -85,6 +85,11 @@ export function DeploymentsTab({ app, deployments }: Props) {
                                             >
                                                 #{d.number}
                                             </Link>
+                                            {d.is_apply && (
+                                                <span className="badge-soft badge-neutral ml-2 badge badge-sm">
+                                                    applied changes
+                                                </span>
+                                            )}
                                             {d.is_rollback && (
                                                 <span className="badge-soft badge-neutral ml-2 badge badge-sm">
                                                     rollback

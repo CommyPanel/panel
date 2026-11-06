@@ -43,7 +43,7 @@ class ApiPresenter
             'succeeded' => $deployment->status->value === 'active' || $deployment->status->value === 'superseded',
             'commit' => $deployment->commit_sha === null ? null : substr($deployment->commit_sha, 0, 12),
             'commit_message' => $deployment->commit_message,
-            'is_rollback' => $deployment->rolled_back_from_id !== null,
+            'is_rollback' => $deployment->rolled_back_from_id !== null && ! $deployment->settings_only,
             'error' => $deployment->error,
             'created_at' => $deployment->created_at?->toIso8601String(),
             'finished_at' => $deployment->finished_at?->toIso8601String(),

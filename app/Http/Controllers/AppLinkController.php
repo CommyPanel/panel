@@ -67,7 +67,7 @@ class AppLinkController extends Controller
 
         $audit->record('app.database_linked', $request->user(), ['app' => $app->slug, 'database' => $database->name, 'server' => $database->server->slug, 'prefix' => $link->env_prefix], $app);
 
-        return back()->with('status', "{$app->name} can reach {$database->name} from its next deployment. The connection is added as {$link->env_prefix}_URL and related variables.");
+        return back()->with('status', "{$app->name} can reach {$database->name} once you apply the changes. The connection is added as {$link->env_prefix}_URL and related variables.");
     }
 
     public function storeApp(Request $request, App $app, AppLinks $links, AuditLogger $audit): RedirectResponse
@@ -87,7 +87,7 @@ class AppLinkController extends Controller
 
         $audit->record('app.app_linked', $request->user(), ['app' => $app->slug, 'target' => $target->slug, 'prefix' => $link->env_prefix], $app);
 
-        return back()->with('status', "{$app->name} can reach {$target->name} from its next deployment, at http://{$target->slug}:{$target->container_port}. {$target->name} needs a new deployment to be reachable by that name.");
+        return back()->with('status', "{$app->name} can reach {$target->name} once you apply the changes, at http://{$target->slug}:{$target->container_port}. {$target->name} needs a new deployment to be reachable by that name.");
     }
 
     public function destroyDatabase(Request $request, App $app, AppDatabaseLink $databaseLink, AppLinks $links, AuditLogger $audit): RedirectResponse
@@ -97,7 +97,7 @@ class AppLinkController extends Controller
 
         $audit->record('app.database_unlinked', $request->user(), ['app' => $app->slug, 'database' => $name], $app);
 
-        return back()->with('status', "{$app->name} no longer reaches {$name} from its next deployment.");
+        return back()->with('status', "{$app->name} no longer reaches {$name} once you apply the changes.");
     }
 
     public function destroyApp(Request $request, App $app, AppLink $appLink, AppLinks $links, AuditLogger $audit): RedirectResponse
@@ -107,6 +107,6 @@ class AppLinkController extends Controller
 
         $audit->record('app.app_unlinked', $request->user(), ['app' => $app->slug, 'target' => $target], $app);
 
-        return back()->with('status', "{$app->name} no longer reaches {$target} from its next deployment.");
+        return back()->with('status', "{$app->name} no longer reaches {$target} once you apply the changes.");
     }
 }

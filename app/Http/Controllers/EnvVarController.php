@@ -25,7 +25,7 @@ class EnvVarController extends Controller
 
         $audit->record('app.env_set', null, ['app' => $app->slug, 'key' => $data['key']], $app);
 
-        return back()->with('status', "{$data['key']} saved. It applies from the next deployment.");
+        return back()->with('status', "{$data['key']} saved. Apply changes to use it.");
     }
 
     public function import(Request $request, App $app, EnvParser $parser, AuditLogger $audit): RedirectResponse
@@ -44,7 +44,7 @@ class EnvVarController extends Controller
         $audit->record('app.env_imported', null, ['app' => $app->slug, 'keys' => array_keys($parsed['vars'])], $app);
 
         $skipped = count($parsed['skipped']);
-        $message = count($parsed['vars']).' variable(s) saved. They apply from the next deployment.'
+        $message = count($parsed['vars']).' variable(s) saved. Apply changes to use them.'
             .($skipped > 0 ? " {$skipped} line(s) were skipped." : '');
 
         return back()->with('status', $message);
@@ -55,6 +55,6 @@ class EnvVarController extends Controller
         $app->envVars()->where('key', $key)->delete();
         $audit->record('app.env_removed', null, ['app' => $app->slug, 'key' => $key], $app);
 
-        return back()->with('status', "{$key} removed. It applies from the next deployment.");
+        return back()->with('status', "{$key} removed. Apply the changes to stop using it.");
     }
 }

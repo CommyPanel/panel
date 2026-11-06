@@ -53,7 +53,14 @@ export default function Deployment({ app, deployment }: Props) {
         ['Started', formatDate(deployment.created_at)],
         ['Finished', formatDate(deployment.finished_at)],
         ['Commit', deployment.commit ?? '-'],
-        ['Type', deployment.is_rollback ? 'Rollback' : 'Deploy'],
+        [
+            'Type',
+            deployment.is_rollback
+                ? 'Rollback'
+                : deployment.is_apply
+                  ? 'Apply changes'
+                  : 'Deploy',
+        ],
     ];
 
     return (
@@ -93,7 +100,9 @@ export default function Deployment({ app, deployment }: Props) {
                         <DeploymentStages
                             stage={deployment.stage}
                             status={deployment.status}
-                            isRollback={deployment.is_rollback}
+                            isRollback={
+                                deployment.is_rollback || deployment.is_apply
+                            }
                             hasReleaseCommand={deployment.has_release_command}
                         />
                     </Card>

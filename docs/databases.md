@@ -25,9 +25,9 @@ Apps are separate from each other by default: every app has its own Docker netwo
 
 - **Link a database:** choose a database and the names of the environment variables (`DATABASE` by default). The app gets `DATABASE_URL`, `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME`, `DATABASE_USER` and `DATABASE_PASSWORD` (or your prefix instead of `DATABASE`). The host is the server's short name, which only linked apps can resolve. For example `postgresql://shop:...@main:5432/shop` or `mysql://...`.
 - **Link an app:** the app can reach the other one at `http://<its name>:<its port>` inside the server, and gets `<PREFIX>_URL`, `_HOST` and `_PORT`. Both apps need a new deployment: this one to get the address, the other to answer to its name.
-- **A link applies from the next deployment**, like an environment variable. The release command (for example a migration) joins the same networks, so it can reach the database too.
+- **A link reaches the running app when you apply the changes** (see below), like an environment variable. The release command (for example a migration) joins the same networks, so it can reach the database too.
 - A variable you add yourself with the same name wins over the one a link adds.
-- **Remove** a link on the same tab; it applies from the next deployment. Deleting an app removes its links.
+- **Remove** a link on the same tab; it applies the same way. Deleting an app removes its links.
 - Two apps with domains can also call each other over their public addresses (HTTPS through nginx). A link is for traffic that should stay inside the server.
 
 Linking needs the `apps.links` permission. Linking a database lets that app use it, and only that one.

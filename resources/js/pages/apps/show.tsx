@@ -28,6 +28,7 @@ import { EnvironmentTab } from '@/components/apps/tabs/environment-tab';
 import { NginxTab } from '@/components/apps/tabs/nginx-tab';
 import { SettingsTab } from '@/components/apps/tabs/settings-tab';
 import { UsageTab } from '@/components/apps/tabs/usage-tab';
+import { PendingChanges } from '@/components/apps/pending-changes';
 import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -306,6 +307,9 @@ export default function Show({
 
             {errors.deploy && <Alert variant="error">{errors.deploy}</Alert>}
             {errors.state && <Alert variant="error">{errors.state}</Alert>}
+            {app.pending_changes &&
+                app.status !== 'deploying' &&
+                app.status !== 'stopped' && <PendingChanges slug={app.slug} />}
             {app.status === 'stopped' && (
                 <Alert variant="warning">
                     This app is stopped. Its domains show an error until you

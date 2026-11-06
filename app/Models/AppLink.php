@@ -16,6 +16,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class AppLink extends Model
 {
+    protected static function booted(): void
+    {
+        // The running container was made without this change: the app has changes to apply.
+        $touch = fn (self $m) => App::query()->whereKey($m->app_id)->update(['config_changed_at' => now()]);
+        static::saved($touch);
+        static::deleted($touch);
+    }
+
     protected $guarded = [];
 
     /**

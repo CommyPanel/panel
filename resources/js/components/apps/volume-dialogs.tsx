@@ -95,9 +95,10 @@ export function AddVolumeModal({
                     </p>
                     <p>
                         <strong>When it starts.</strong> The volume is mounted
-                        from the <em>next deployment</em>. It starts empty, and
-                        it hides whatever the image has at that path, so do not
-                        mount over folders your app ships files in.
+                        once you <em>apply the changes</em> (a button appears on
+                        the app). It starts empty, and it hides whatever the
+                        image has at that path, so do not mount over folders
+                        your app ships files in.
                     </p>
                 </div>
                 <div className="flex flex-wrap justify-end gap-2">
@@ -158,8 +159,8 @@ export function RemoveVolumeModal({
                     </p>
                     <ul className="list-disc space-y-1.5 pl-5 text-sm">
                         <li>
-                            The running version keeps using it until the{' '}
-                            <strong>next deployment</strong>. From then on the
+                            The running version keeps using it until you{' '}
+                            <strong>apply the changes</strong>. From then on the
                             path is just an ordinary folder inside the
                             container, and anything the app writes there is{' '}
                             <strong>lost at every deployment</strong>.
@@ -227,8 +228,8 @@ export function AboutVolumesModal({
                     </li>
                     <li>
                         <strong>New deployments.</strong> Adding or removing a
-                        volume takes effect from the next deployment, for the
-                        app and for its release command.
+                        volume takes effect when you apply the changes or
+                        deploy, for the app and for its release command.
                     </li>
                     <li>
                         <strong>While switching.</strong> The old and the new

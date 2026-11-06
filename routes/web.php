@@ -105,6 +105,7 @@ Route::middleware('auth')->group(function () {
 
         Route::middleware('can:'.Permissions::APPS_DEPLOY)->group(function () {
             Route::post('deployments', [DeploymentController::class, 'store'])->name('deployments.store');
+            Route::post('apply', [DeploymentController::class, 'apply'])->name('apply');
             Route::post('deployments/{deployment:number}/rollback', [DeploymentController::class, 'rollback'])->name('deployments.rollback');
         });
 
