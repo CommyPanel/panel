@@ -1,0 +1,53 @@
+name: Good first issue (for maintainers and proposers)
+description: A small, well-described task that suits someone new to the project.
+labels: ["good first issue", "help wanted"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A good first issue is **small** (a few hours), **clear** about where to start and when it is done, and **safe** to do without deep knowledge of the whole project. Please do not use this for security-sensitive changes (the agent, the installer, authentication).
+  - type: textarea
+    id: summary
+    attributes:
+      label: What should change?
+      description: One or two sentences, written for someone who has never seen the code.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why does it matter?
+      description: Who benefits and what is better afterwards.
+    validations:
+      required: true
+  - type: textarea
+    id: where
+    attributes:
+      label: Where to look
+      description: Files, classes or pages to start from, and a similar existing example to copy the pattern from.
+      placeholder: |
+        - `app/...`
+        - `resources/js/pages/...`
+        - `tests/Feature/...`
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: How we will know it is done
+      description: A short checklist.
+      placeholder: |
+        - [ ] The behaviour described above works
+        - [ ] A test covers it
+        - [ ] The docs mention it, if people will notice
+    validations:
+      required: true
+  - type: textarea
+    id: test
+    attributes:
+      label: How to try it
+      description: How to run it on a laptop (the fake host driver is enough for most tasks) and which tests to run.
+  - type: markdown
+    attributes:
+      value: |
+        New here? Read [CONTRIBUTING.md](https://github.com/emrecanful/commypanel/blob/main/CONTRIBUTING.md). Comment on the issue before you start so two people do not do the same task.

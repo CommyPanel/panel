@@ -1,0 +1,37 @@
+name: Feature request
+description: Suggest an idea or an improvement.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        CommyPanel is deliberately focused: one server, stateless apps first, and a small privileged part. We will tell you honestly whether an idea fits. The best requests describe the **problem** you are trying to solve.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: What are you doing, and what gets in your way?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to happen?
+      description: Your idea, as concrete as you can, with a sketch if it is about the interface.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: Other ways to solve it, including doing it by hand today.
+  - type: dropdown
+    id: help
+    attributes:
+      label: Would you like to build it?
+      options:
+        - "Yes, I would like to try (a maintainer will help)"
+        - "Maybe, if someone can point me in the right direction"
+        - "No, I am only suggesting it"
+    validations:
+      required: true

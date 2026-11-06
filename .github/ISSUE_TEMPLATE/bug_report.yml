@@ -1,0 +1,76 @@
+name: Bug report
+description: Something does not work the way it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. CommyPanel is under heavy development, and bug reports from real servers are the most useful thing you can give us.
+
+        **Security problem?** Do not report it here. See the [security policy](https://github.com/emrecanful/commypanel/security/policy).
+  - type: input
+    id: version
+    attributes:
+      label: CommyPanel version
+      description: Run `sudo commypanel status` on the server.
+      placeholder: "0.6.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: distro
+    attributes:
+      label: Operating system
+      options:
+        - Ubuntu 24.04
+        - Ubuntu 26.04
+        - Debian 13
+        - Other (please say which)
+    validations:
+      required: true
+  - type: dropdown
+    id: arch
+    attributes:
+      label: Architecture
+      options:
+        - amd64
+        - arm64
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, and what did you see?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to ...
+        2. Click ...
+        3. See ...
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and screenshots
+      description: |
+        Paste relevant output (`sudo commypanel logs`, the deployment log, the install log in `/var/log/commypanel-install.log`) or drag in a screenshot.
+        **Remove anything private first**: tokens, passwords, keys, domains you do not want public.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the existing issues and this has not been reported.
+          required: true
+        - label: I removed secrets and private information from what I pasted.
+          required: true
