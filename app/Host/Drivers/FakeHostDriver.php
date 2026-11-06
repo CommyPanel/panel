@@ -23,6 +23,7 @@ use App\Host\Data\ResourceName;
 use App\Host\Data\ResourceUsage;
 use App\Host\Data\SystemStatus;
 use App\Host\Data\TaskSpec;
+use App\Host\Data\TrafficStat;
 use App\Host\Data\Volume;
 use App\Host\Data\VolumeEntry;
 use App\Host\Data\VolumeFilePreview;
@@ -31,6 +32,7 @@ use App\Host\Data\VolumeUsage;
 use App\Host\Exceptions\DockerUnavailable;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
+use Closure;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -286,6 +288,27 @@ class FakeHostDriver implements HostDriver
         ResourceName::assertValid($name);
         $this->record('removeNginxSite', ['name' => $name]);
         unset($this->sites[$name]);
+    }
+
+    /** @var (Closure(string, int, int, int): array<int, TrafficStat>)|null */
+    private ?Closure $traffic = null;
+
+    /**
+     * Tests decide what the requests looked like: the closure gets the site and the range and
+     * returns the stats per container port. Without one there is no traffic.
+     *
+     * @param  (Closure(string, int, int, int): array<int, TrafficStat>)|null  $traffic
+     */
+    public function useTraffic(?Closure $traffic): void
+    {
+        $this->traffic = $traffic;
+    }
+
+    public function trafficStats(string $site, int $from, int $to, int $step = 0): array
+    {
+        $this->record('trafficStats', ['site' => $site, 'from' => $from, 'to' => $to]);
+
+        return $this->traffic === null ? [] : ($this->traffic)($site, $from, $to, $step);
     }
 
     public function buildImage(ImageBuildSpec $spec, ?callable $onOutput = null): void

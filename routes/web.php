@@ -10,6 +10,7 @@ use App\Http\Controllers\AppLinkController;
 use App\Http\Controllers\AppLockController;
 use App\Http\Controllers\AppLogController;
 use App\Http\Controllers\AppNginxController;
+use App\Http\Controllers\AppSafeDeployController;
 use App\Http\Controllers\AppSetupController;
 use App\Http\Controllers\AppSourceController;
 use App\Http\Controllers\AppStateController;
@@ -38,6 +39,7 @@ use App\Http\Controllers\ManagedDatabaseController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\RolloutController;
 use App\Http\Controllers\ServerAddressController;
 use App\Http\Controllers\ServerController;
 use App\Http\Controllers\ServerDockerController;
@@ -107,6 +109,11 @@ Route::middleware('auth')->group(function () {
         Route::middleware('can:'.Permissions::APPS_DEPLOY)->group(function () {
             Route::post('deployments', [DeploymentController::class, 'store'])->name('deployments.store');
             Route::post('apply', [DeploymentController::class, 'apply'])->name('apply');
+            Route::post('deployments/{deployment:number}/retry', [DeploymentController::class, 'retry'])->name('deployments.retry');
+            Route::post('deployments/{deployment:number}/end-watch', [DeploymentController::class, 'endWatch'])->name('deployments.end-watch');
+            Route::post('rollout/advance', [RolloutController::class, 'advance'])->name('rollout.advance');
+            Route::post('rollout/promote', [RolloutController::class, 'promote'])->name('rollout.promote');
+            Route::post('rollout/abort', [RolloutController::class, 'abort'])->name('rollout.abort');
             Route::post('deployments/{deployment:number}/rollback', [DeploymentController::class, 'rollback'])->name('deployments.rollback');
         });
 
@@ -121,6 +128,7 @@ Route::middleware('auth')->group(function () {
             Route::post('git-token', [GitTokenController::class, 'store'])->name('git-token.store');
             Route::delete('git-token', [GitTokenController::class, 'destroy'])->name('git-token.destroy');
             Route::put('auto-deploy', [AppAutoDeployController::class, 'update'])->name('auto-deploy.update');
+            Route::put('safe-deploys', [AppSafeDeployController::class, 'update'])->name('safe-deploys.update');
             Route::post('webhook', [AppWebhookController::class, 'store'])->name('webhook.store');
             Route::delete('webhook', [AppWebhookController::class, 'destroy'])->name('webhook.destroy');
             Route::post('source', [AppSourceController::class, 'upload'])->name('source.upload');

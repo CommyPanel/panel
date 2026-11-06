@@ -23,6 +23,14 @@ use Illuminate\Support\Carbon;
  * @property bool $image_available
  * @property int|null $rolled_back_from_id
  * @property bool $settings_only
+ * @property Carbon|null $live_at
+ * @property string|null $watch_state
+ * @property Carbon|null $watch_until
+ * @property int|null $watch_previous_id
+ * @property int $watch_strikes
+ * @property string|null $watch_note
+ * @property bool $retry
+ * @property bool $skip_watch
  * @property string|null $container_name
  * @property int|null $host_port
  * @property string|null $log
@@ -44,6 +52,10 @@ class Deployment extends Model
             'stage' => DeploymentStage::class,
             'image_available' => 'boolean',
             'settings_only' => 'boolean',
+            'retry' => 'boolean',
+            'skip_watch' => 'boolean',
+            'live_at' => 'datetime',
+            'watch_until' => 'datetime',
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
         ];

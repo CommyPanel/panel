@@ -3,10 +3,12 @@
 namespace App\Deploy\Traffic;
 
 use App\Enums\CertificateStatus;
+use App\Host\Data\NginxRollout;
 use App\Host\Data\NginxSite;
 use App\Host\HostDriver;
 use App\Models\App;
 use App\Models\Deployment;
+use App\Models\Rollout;
 
 /**
  * Makes nginx match the database: an app with domains and a live deployment
@@ -64,6 +66,26 @@ class AppRouting
         $certificate = $app->certificate()->first();
         $https = $certificate !== null && $certificate->status === CertificateStatus::Active && $certificate->isUsable();
 
-        return new NginxSite($app->slug, $domains, $live->host_port, $https ? $app->slug : null, $redirects, $app->nginx_custom);
+        return new NginxSite($app->slug, $domains, $live->host_port, $https ? $app->slug : null, $redirects, $app->nginx_custom, $this->rolloutFor($app, $target));
+    }
+
+    /**
+     * The share of visitors a gradual rollout sends to the new release, while one is under way.
+     * Not when a release is being made live right now (`$target`): that is the end of a rollout.
+     */
+    private function rolloutFor(App $app, ?Deployment $target): ?NginxRollout
+    {
+        if ($target !== null) {
+            return null;
+        }
+
+        $rollout = Rollout::activeFor($app);
+        $new = $rollout?->deployment;
+
+        if ($rollout === null || $new === null || $new->host_port === null) {
+            return null;
+        }
+
+        return new NginxRollout($new->host_port, $rollout->percent);
     }
 }

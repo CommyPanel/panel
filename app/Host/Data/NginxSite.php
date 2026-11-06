@@ -10,6 +10,7 @@ final readonly class NginxSite
      * @param  list<string>  $domains
      * @param  array<string, string>  $redirects  domain => the domain it permanently redirects to
      * @param  string|null  $custom  the user's extra directives; the agent checks them against an allow-list
+     * @param  NginxRollout|null  $rollout  send a share of the visitors to a second container
      */
     public function __construct(
         public string $name,
@@ -18,6 +19,7 @@ final readonly class NginxSite
         public ?string $certificate = null,
         public array $redirects = [],
         public ?string $custom = null,
+        public ?NginxRollout $rollout = null,
     ) {
         ResourceName::assertValid($name);
 
@@ -47,6 +49,10 @@ final readonly class NginxSite
 
         if ($upstreamPort < 1024 || $upstreamPort > 65535) {
             throw new InvalidArgumentException("Invalid upstream port [{$upstreamPort}].");
+        }
+
+        if ($rollout !== null && $rollout->port === $upstreamPort) {
+            throw new InvalidArgumentException('A rollout needs a second container, on another port.');
         }
     }
 }

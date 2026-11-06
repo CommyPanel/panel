@@ -40,6 +40,7 @@ it('routes the domains of an app to its new container when a deployment goes liv
 
 it('moves traffic to the new container on every deploy, before stopping the old one', function () {
     Domain::query()->create(['name' => 'shop.example.com', 'app_id' => $this->shop->id]);
+    $this->shop->update(['watch_enabled' => false]); // a watched release keeps the old container instead of stopping it
 
     $first = app(Deployer::class)->deploy($this->shop)->fresh();
     $second = app(Deployer::class)->deploy($this->shop->fresh())->fresh();

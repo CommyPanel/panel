@@ -2,6 +2,7 @@
 
 namespace App\Alerts;
 
+use App\Enums\DeploymentStatus;
 use App\Models\Deployment;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -29,9 +30,12 @@ class DeployAlerts
         $app = $deployment->app;
         $ok = in_array($deployment->status->value, ['active', 'superseded'], true);
 
-        $title = $ok
-            ? "Deployed {$app->name} (#{$deployment->number})"
-            : "Deployment of {$app->name} (#{$deployment->number}) failed";
+        $rolledBack = $deployment->status === DeploymentStatus::RolledBack;
+        $title = match (true) {
+            $ok => "Deployed {$app->name} (#{$deployment->number})",
+            $rolledBack => "{$app->name} (#{$deployment->number}) was rolled back automatically",
+            default => "Deployment of {$app->name} (#{$deployment->number}) failed",
+        };
 
         $lines = [];
 
@@ -46,7 +50,11 @@ class DeployAlerts
         $link = route('apps.show', ['app' => $app->slug]);
 
         $this->post($title, $lines, $link, [
-            'event' => $ok ? 'deployment.succeeded' : 'deployment.failed',
+            'event' => match (true) {
+                $ok => 'deployment.succeeded',
+                $rolledBack => 'deployment.rolled_back',
+                default => 'deployment.failed',
+            },
             'app' => $app->slug,
             'deployment' => $deployment->number,
             'succeeded' => $ok,

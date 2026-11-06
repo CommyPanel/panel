@@ -5,10 +5,11 @@ namespace App\Deploy;
 use App\Audit\AuditLogger;
 use App\Databases\AppLinks;
 use App\Deploy\Health\HealthChecker;
+use App\Deploy\Safe\RolloutService;
+use App\Deploy\Safe\WatchService;
 use App\Deploy\Source\SourceFetcher;
 use App\Deploy\Stacks\DetectionFailed;
 use App\Deploy\Stacks\StackDetector;
-use App\Deploy\Traffic\TrafficSwitcher;
 use App\Enums\DeploymentStage;
 use App\Enums\DeploymentStatus;
 use App\Enums\Stack;
@@ -21,10 +22,8 @@ use App\Host\HostDriver;
 use App\Jobs\SendDeployAlert;
 use App\Models\App;
 use App\Models\Deployment;
-use App\Tls\TlsPlanner;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Sleep;
 use InvalidArgumentException;
 use Throwable;
 
@@ -40,12 +39,13 @@ class DeployApp
         private readonly SourceFetcher $source,
         private readonly StackDetector $detector,
         private readonly HealthChecker $health,
-        private readonly TrafficSwitcher $traffic,
         private readonly PortAllocator $ports,
         private readonly AuditLogger $audit,
-        private readonly TlsPlanner $tls,
         private readonly AppVolumes $volumes,
         private readonly AppLinks $links,
+        private readonly ReleaseSwitcher $switcher,
+        private readonly WatchService $watch,
+        private readonly RolloutService $rollouts,
     ) {}
 
     public function __invoke(Deployment $deployment): void
@@ -58,6 +58,9 @@ class DeployApp
         try {
             $deployment->forceFill(['status' => DeploymentStatus::Building, 'started_at' => now()])->save();
 
+            // A release still being watched is accepted now: the one it replaced is stopped before another starts.
+            $this->watch->finish($app, 'A new deployment started.');
+
             if ($deployment->rolled_back_from_id === null) {
                 $workDir = $this->workDir($app, $deployment);
                 $this->build($app, $deployment, $workDir, $log);
@@ -66,9 +69,11 @@ class DeployApp
                     $this->release($app, $deployment, $log);
                 }
             } else {
-                $log->step($deployment->settings_only
-                    ? "Recreating the container from release {$deployment->image_tag} with the current variables, volumes and links."
-                    : "Rolling back to release {$deployment->image_tag}.");
+                $log->step(match (true) {
+                    $deployment->settings_only => "Recreating the container from release {$deployment->image_tag} with the current variables, volumes and links.",
+                    $deployment->retry => "Going live again with release {$deployment->image_tag}.",
+                    default => "Rolling back to release {$deployment->image_tag}.",
+                });
             }
 
             $deployment->forceFill(['status' => DeploymentStatus::Starting])->save();
@@ -76,16 +81,15 @@ class DeployApp
             $this->checkHealth($app, $deployment, $log);
 
             $previous = $app->activeDeployment;
-            $this->stage($deployment, DeploymentStage::Switch);
-            $log->step('Switching traffic to the new version.');
-            $this->traffic->switchTo($deployment);
-            $this->moveLinkNames($app, $deployment, $previous, $log);
-            $app->forceFill(['active_deployment_id' => $deployment->id, 'stopped_at' => null])->save();
-            $deployment->forceFill(['status' => DeploymentStatus::Active, 'stage' => DeploymentStage::Done, 'finished_at' => now()])->save();
 
-            $this->tls->ensure($app);
-            $this->retire($previous, $log);
-            $this->pruneImages($app, $log);
+            if ($this->rollouts->shouldRoll($app, $deployment, $previous) && $previous !== null) {
+                // The release is running and healthy but not live: the rollout carries on in the queue.
+                $this->rollouts->start($app, $deployment, $previous, $log);
+
+                return;
+            }
+
+            $this->switcher->goLive($app, $deployment, $previous, $log);
 
             $log->line('Deployment finished.');
             $this->audit->record('deploy.succeeded', null, ['app' => $app->slug, 'deployment' => $deployment->number]);
@@ -252,89 +256,6 @@ class DeployApp
         }
 
         throw new DeploymentFailed("The app did not answer on port {$app->container_port} within {$timeout} seconds. Check that it listens on the PORT environment variable.");
-    }
-
-    /**
-     * Hand the name other apps call this app by from the old release to the new one.
-     * The new release joins first, so the name never points at nothing; the old one
-     * leaves right after, so it does not keep answering while it drains.
-     */
-    private function moveLinkNames(App $app, Deployment $deployment, ?Deployment $previous, DeployLogger $log): void
-    {
-        $networks = $this->links->providedNetworks($app);
-
-        if ($networks === []) {
-            return;
-        }
-
-        $log->step('Moving the name other apps use for this app to the new version.');
-
-        foreach ($networks as $network) {
-            $this->host->connectNetwork((string) $deployment->container_name, $network->name, $network->aliases);
-        }
-
-        if ($previous === null || $previous->container_name === null) {
-            return;
-        }
-
-        foreach ($networks as $network) {
-            try {
-                $this->host->disconnectNetwork($previous->container_name, $network->name);
-            } catch (HostOperationFailed $e) {
-                // It keeps the name until it stops a few seconds from now; not worth failing over.
-                $log->line("Warning: could not take the old version off {$network->name}: ".$e->getMessage());
-            }
-        }
-    }
-
-    private function retire(?Deployment $previous, DeployLogger $log): void
-    {
-        if ($previous === null || $previous->container_name === null) {
-            return;
-        }
-
-        $drain = (int) config('commypanel.deploy.drain_seconds');
-        $log->step("Stopping the previous version ({$previous->container_name}) in {$drain}s.");
-        Sleep::for($drain)->seconds();
-
-        try {
-            $this->host->stopContainer($previous->container_name);
-            $this->host->removeContainer($previous->container_name);
-        } catch (HostOperationFailed $e) {
-            // The new version is already live; do not fail the deploy over cleanup.
-            Log::warning('Could not retire the previous container.', ['container' => $previous->container_name, 'error' => $e->getMessage()]);
-            $log->line('Warning: could not stop the previous container: '.$e->getMessage());
-        }
-
-        $previous->forceFill(['status' => DeploymentStatus::Superseded])->save();
-    }
-
-    /**
-     * Keep the newest releases' images for rollback and remove the rest.
-     */
-    private function pruneImages(App $app, DeployLogger $log): void
-    {
-        $keep = max(1, (int) config('commypanel.deploy.keep_images'));
-
-        /** @var list<string> $tags newest release first */
-        $tags = $app->deployments()
-            ->where('image_available', true)
-            ->whereNotNull('image_tag')
-            ->selectRaw('image_tag, max(number) as newest')
-            ->groupBy('image_tag')
-            ->orderByDesc('newest')
-            ->pluck('image_tag')
-            ->all();
-
-        foreach (array_slice($tags, $keep) as $tag) {
-            try {
-                $this->host->removeImage($tag);
-                $app->deployments()->where('image_tag', $tag)->update(['image_available' => false]);
-                $log->line("Removed old image {$tag}.");
-            } catch (HostOperationFailed $e) {
-                Log::warning('Could not remove an old image.', ['tag' => $tag, 'error' => $e->getMessage()]);
-            }
-        }
     }
 
     private function fail(Deployment $deployment, DeployLogger $log, Throwable $e, bool $containerStarted): void

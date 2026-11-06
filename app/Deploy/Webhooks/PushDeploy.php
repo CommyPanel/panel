@@ -26,6 +26,7 @@ class PushDeploy
             $branch !== $app->git_branch => "Not a push to {$app->git_branch}.",
             in_array($app->load('latestDeployment')->status(), [AppStatus::Stopped, AppStatus::Deactivated], true) => 'The app is stopped; start it in CommyPanel first.',
             $app->deployments()->where('status', DeploymentStatus::Queued)->exists() => 'A deployment is already waiting to run.',
+            $app->deployments()->where('status', DeploymentStatus::Rollout)->exists() => 'A gradual rollout is in progress.',
             default => null,
         };
 

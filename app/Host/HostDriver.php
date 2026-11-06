@@ -21,6 +21,7 @@ use App\Host\Data\PublicAddresses;
 use App\Host\Data\ResourceUsage;
 use App\Host\Data\SystemStatus;
 use App\Host\Data\TaskSpec;
+use App\Host\Data\TrafficStat;
 use App\Host\Data\VolumeFilePreview;
 use App\Host\Data\VolumeListing;
 use App\Host\Data\VolumeUsage;
@@ -139,6 +140,17 @@ interface HostDriver
      * @throws HostOperationFailed
      */
     public function removeNginxSite(string $name): void;
+
+    /**
+     * How a site's containers did over a time range (unix seconds), per container port, from
+     * the requests nginx proxied. A port that served nothing in the range is missing. With a
+     * step (a multiple of 10 seconds) each stat also carries a series.
+     *
+     * @return array<int, TrafficStat>
+     *
+     * @throws HostOperationFailed when the agent has no statistics
+     */
+    public function trafficStats(string $site, int $from, int $to, int $step = 0): array;
 
     /**
      * @param  callable(string): void|null  $onOutput  receives build log lines

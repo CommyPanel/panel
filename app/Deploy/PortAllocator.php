@@ -18,7 +18,11 @@ class PortAllocator
     {
         return Cache::lock('deploy-port-allocation', 10)->block(10, function () use ($deployment): int {
             $used = Deployment::query()
-                ->whereIn('status', [DeploymentStatus::Building, DeploymentStatus::Starting, DeploymentStatus::Active])
+                ->where(function ($query) {
+                    $query->whereIn('status', [DeploymentStatus::Building, DeploymentStatus::Starting, DeploymentStatus::Active, DeploymentStatus::Rollout])
+                        // The release a new one replaced stays running while the new one is watched.
+                        ->orWhereIn('id', Deployment::query()->where('watch_state', 'watching')->whereNotNull('watch_previous_id')->select('watch_previous_id'));
+                })
                 ->whereNotNull('host_port')
                 ->pluck('host_port')
                 ->all();

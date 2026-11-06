@@ -32,7 +32,7 @@ class DeploymentsController extends Controller
         }
 
         $running = $app->deployments()
-            ->whereIn('status', [DeploymentStatus::Queued, DeploymentStatus::Building, DeploymentStatus::Starting])
+            ->whereIn('status', DeploymentStatus::working())
             ->orderByDesc('number')
             ->first();
 

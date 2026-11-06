@@ -33,6 +33,12 @@ use Illuminate\Support\Str;
  * @property string|null $git_token_username
  * @property string|null $github_repo
  * @property bool $github_auto_deploy
+ * @property bool $watch_enabled
+ * @property int $watch_minutes
+ * @property bool $rollout_enabled
+ * @property list<int>|null $rollout_steps
+ * @property int $rollout_hold_minutes
+ * @property bool $rollout_auto
  * @property Carbon|null $config_changed_at
  * @property string|null $webhook_id
  * @property string|null $webhook_secret
@@ -69,6 +75,10 @@ class App extends Model
             'source_verified_at' => 'datetime',
             'stopped_at' => 'datetime',
             'config_changed_at' => 'datetime',
+            'watch_enabled' => 'boolean',
+            'rollout_enabled' => 'boolean',
+            'rollout_steps' => 'array',
+            'rollout_auto' => 'boolean',
             'locked_at' => 'datetime',
             'source_type' => SourceType::class,
             'deploy_key_private' => 'encrypted',
@@ -119,7 +129,7 @@ class App extends Model
     public function isDeploying(): bool
     {
         return $this->deployments()
-            ->whereIn('status', [DeploymentStatus::Queued, DeploymentStatus::Building, DeploymentStatus::Starting])
+            ->whereIn('status', DeploymentStatus::working())
             ->exists();
     }
 

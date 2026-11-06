@@ -24,6 +24,7 @@ use App\Host\Data\ResourceName;
 use App\Host\Data\ResourceUsage;
 use App\Host\Data\SystemStatus;
 use App\Host\Data\TaskSpec;
+use App\Host\Data\TrafficStat;
 use App\Host\Data\VolumeEntry;
 use App\Host\Data\VolumeFilePreview;
 use App\Host\Data\VolumeListing;
@@ -258,6 +259,7 @@ class AgentHostDriver implements HostDriver
                 array_values($site->redirects),
             ),
             'custom' => $site->custom === '' ? null : $site->custom,
+            'rollout' => $site->rollout === null ? null : ['port' => $site->rollout->port, 'percent' => $site->rollout->percent],
         ], fn ($value) => $value !== null);
     }
 
@@ -266,6 +268,27 @@ class AgentHostDriver implements HostDriver
         ResourceName::assertValid($name);
 
         $this->send('delete', '/v1/nginx/sites/'.$name);
+    }
+
+    public function trafficStats(string $site, int $from, int $to, int $step = 0): array
+    {
+        ResourceName::assertValid($site);
+
+        $answer = $this->send('get', '/v1/traffic/'.$site.'?'.http_build_query(array_filter(['from' => $from, 'to' => $to, 'step' => $step ?: null])));
+        $out = [];
+
+        foreach ((array) ($answer['ports'] ?? []) as $port => $stat) {
+            $out[(int) $port] = new TrafficStat(
+                requests: (int) ($stat['requests'] ?? 0),
+                errors: (int) ($stat['errors'] ?? 0),
+                p50: (float) ($stat['p50_ms'] ?? 0),
+                p95: (float) ($stat['p95_ms'] ?? 0),
+                p99: (float) ($stat['p99_ms'] ?? 0),
+                series: array_values(array_map(fn (array $p) => ['t' => (int) $p['t'], 'requests' => (int) ($p['requests'] ?? 0), 'errors' => (int) ($p['errors'] ?? 0)], (array) ($stat['series'] ?? []))),
+            );
+        }
+
+        return $out;
     }
 
     public function buildImage(ImageBuildSpec $spec, ?callable $onOutput = null): void
