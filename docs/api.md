@@ -38,6 +38,8 @@ A deployment has `status`, `stage`, `finished` and `succeeded`. Poll it until `f
 check `succeeded`. Starting a deployment while one runs answers `409` with the running one; a stopped app
 answers `409` too.
 
+A deployment can also have the status `rollout` (a gradual rollout is proving it; `finished` is `false`) or `rolled_back` (it went live and was rolled back by itself; `succeeded` is `false`). The watch runs after the release went live, so a job that stops at the first `succeeded: true` can miss a rollback minutes later.
+
 ```bash
 BASE=https://panel.example.com
 TOKEN=cpt_...
