@@ -6,10 +6,10 @@
 
 Deploy .NET, Go and Node apps from Git with zero downtime, connect domains with automatic HTTPS, and run PostgreSQL, MySQL and MariaDB, all from one web UI on a server you own.
 
-[![Latest release](https://img.shields.io/github/v/release/emrecanful/commypanel?include_prereleases&label=release)](https://github.com/emrecanful/commypanel/releases)
-[![Tests](https://github.com/emrecanful/commypanel/actions/workflows/tests.yml/badge.svg)](https://github.com/emrecanful/commypanel/actions/workflows/tests.yml)
+[![Latest release](https://img.shields.io/github/v/release/commypanel/panel?include_prereleases&label=release)](https://github.com/commypanel/panel/releases)
+[![Tests](https://github.com/commypanel/panel/actions/workflows/tests.yml/badge.svg)](https://github.com/commypanel/panel/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Good first issues](https://img.shields.io/github/issues/emrecanful/commypanel/good%20first%20issue?label=good%20first%20issues&color=7057ff)](https://github.com/emrecanful/commypanel/labels/good%20first%20issue)
+[![Good first issues](https://img.shields.io/github/issues/commypanel/panel/good%20first%20issue?label=good%20first%20issues&color=7057ff)](https://github.com/commypanel/panel/labels/good%20first%20issue)
 
 <img src="docs/images/dashboard.png" alt="The CommyPanel dashboard" width="860">
 
@@ -83,7 +83,7 @@ Deploy .NET, Go and Node apps from Git with zero downtime, connect domains with 
 Run this as root on a fresh or lightly used server:
 
 ```bash
-curl -fsSL https://github.com/emrecanful/commypanel/releases/latest/download/install.sh | sudo bash
+curl -fsSL https://github.com/commypanel/panel/releases/latest/download/install.sh | sudo bash
 ```
 
 The installer downloads the release, **verifies its SHA-256 checksum**, installs everything, and prints a **one-time setup link**. Open it, create your admin account, and you are done. The link works once and expires after an hour (`sudo commypanel setup-url` makes a new one).
@@ -250,8 +250,8 @@ CommyPanel is pre-1.0. What you should know before you rely on it:
 
 Contributions of every size are welcome: bug reports, documentation, tests, and code. Start with [CONTRIBUTING.md](CONTRIBUTING.md), which covers how to run the project on your machine, what we look for in a pull request, and a list of **good first issues**. Please also read the [Code of Conduct](CODE_OF_CONDUCT.md). By contributing you agree to the terms in CONTRIBUTING.md (your work is released under the MIT license, and you sign off your commits).
 
-- Found a bug? [Open an issue](https://github.com/emrecanful/commypanel/issues/new/choose).
-- Want to start small? Look for [`good first issue`](https://github.com/emrecanful/commypanel/labels/good%20first%20issue).
+- Found a bug? [Open an issue](https://github.com/commypanel/panel/issues/new/choose).
+- Want to start small? Look for [`good first issue`](https://github.com/commypanel/panel/labels/good%20first%20issue).
 - Security problem? See [SECURITY.md](SECURITY.md).
 
 ## License

@@ -46,7 +46,7 @@ describe('asking GitHub', function () {
             ->and($status->error)->toBeNull()
             ->and($status->checkedAt)->not->toBeNull();
 
-        Http::assertSent(fn (Request $request) => $request->url() === 'https://api.github.com/repos/emrecanful/commypanel/releases?per_page=30'
+        Http::assertSent(fn (Request $request) => $request->url() === 'https://api.github.com/repos/commypanel/panel/releases?per_page=30'
             && $request->hasHeader('User-Agent', 'CommyPanel/0.1.2')
             && $request->hasHeader('Accept', 'application/vnd.github+json'));
     });
@@ -56,7 +56,7 @@ describe('asking GitHub', function () {
 
         $newest = ($this->checker)()->check()->newer[0];
 
-        expect($newest['url'])->toBe('https://github.com/emrecanful/commypanel/releases/tag/v0.3.0')
+        expect($newest['url'])->toBe('https://github.com/commypanel/panel/releases/tag/v0.3.0')
             ->and($newest['name'])->toBe('CommyPanel 0.3.0')
             ->and($newest['published_at'])->toStartWith('2026-12-01');
     });
@@ -225,7 +225,7 @@ describe('the page', function () {
             ->where('update.available', true)
             ->where('update.supported', true)
             ->where('update.newer.0.version', '0.3.0')
-            ->where('update.releases_url', 'https://github.com/emrecanful/commypanel/releases'));
+            ->where('update.releases_url', 'https://github.com/commypanel/panel/releases'));
 
         Http::assertSentCount(1);
     });

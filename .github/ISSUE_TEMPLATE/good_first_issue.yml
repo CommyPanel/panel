@@ -50,4 +50,4 @@ body:
   - type: markdown
     attributes:
       value: |
-        New here? Read [CONTRIBUTING.md](https://github.com/emrecanful/commypanel/blob/main/CONTRIBUTING.md). Comment on the issue before you start so two people do not do the same task.
+        New here? Read [CONTRIBUTING.md](https://github.com/commypanel/panel/blob/main/CONTRIBUTING.md). Comment on the issue before you start so two people do not do the same task.

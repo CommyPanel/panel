@@ -1,6 +1,6 @@
 [Unit]
 Description=CommyPanel agent (privileged host operations)
-Documentation=https://github.com/emrecanful/commypanel
+Documentation=https://github.com/commypanel/panel
 After=network-online.target docker.service nginx.service
 Wants=docker.service
 

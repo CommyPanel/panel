@@ -12,7 +12,7 @@ CommyPanel is installed on the server it manages. It controls Docker and nginx o
 ## Install
 
 ```bash
-curl -fsSL https://github.com/emrecanful/commypanel/releases/latest/download/install.sh | sudo bash
+curl -fsSL https://github.com/commypanel/panel/releases/latest/download/install.sh | sudo bash
 ```
 
 The installer downloads the release, checks its SHA-256 checksum and stops if it does not match, then installs everything and prints a **one-time setup link**. Open it, create your admin account, and you are done. The link works once and expires after an hour; run `sudo commypanel setup-url` for a new one.

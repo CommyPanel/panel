@@ -19,7 +19,7 @@ This page explains how to get set up, what we look for in a change, the **terms 
 
 - **Try it and tell us what broke.** Install it on a test server, deploy something, and open an issue for anything confusing or wrong. Real-server feedback is the most valuable thing right now.
 - **Improve the docs.** If something took you longer than it should have, a documentation fix is a great first pull request.
-- **Fix a bug or build a small feature** from an issue labelled [`good first issue`](https://github.com/emrecanful/commypanel/labels/good%20first%20issue) or [`help wanted`](https://github.com/emrecanful/commypanel/labels/help%20wanted).
+- **Fix a bug or build a small feature** from an issue labelled [`good first issue`](https://github.com/commypanel/panel/labels/good%20first%20issue) or [`help wanted`](https://github.com/commypanel/panel/labels/help%20wanted).
 - **Review.** Reading a pull request and asking questions is a real contribution.
 
 For anything bigger than a small fix, please **open an issue first** so we can agree on the approach before you spend your time. CommyPanel is deliberately focused (one server, stateless apps first, a small privileged part), and a quick conversation saves everyone a rejected pull request.
@@ -57,7 +57,7 @@ By submitting a contribution (a pull request, a patch, documentation or anything
 
 ## Your first contribution
 
-Look for issues labelled [`good first issue`](https://github.com/emrecanful/commypanel/labels/good%20first%20issue). Each one is meant to be small, to say which files to look at, and to say how we will know it is done. To take one:
+Look for issues labelled [`good first issue`](https://github.com/commypanel/panel/labels/good%20first%20issue). Each one is meant to be small, to say which files to look at, and to say how we will know it is done. To take one:
 
 1. Comment on the issue to say you would like to work on it, so two people do not do the same thing.
 2. Fork the repository, create a branch, and follow [Run it on your machine](#run-it-on-your-machine).
@@ -164,7 +164,7 @@ If you are unsure whether your change touches one of these, say so in the pull r
 
 ## Reporting bugs and suggesting features
 
-- **Bug?** [Open an issue](https://github.com/emrecanful/commypanel/issues/new/choose) with the version (`sudo commypanel status`), your distribution, what you did, what you expected and what happened. Logs help (`sudo commypanel logs`), but remove anything private first.
+- **Bug?** [Open an issue](https://github.com/commypanel/panel/issues/new/choose) with the version (`sudo commypanel status`), your distribution, what you did, what you expected and what happened. Logs help (`sudo commypanel logs`), but remove anything private first.
 - **Feature idea?** Open a feature request and describe the problem you are trying to solve, not only the solution. We will say honestly whether it fits.
 - **Security vulnerability?** Do not open a public issue. See [SECURITY.md](SECURITY.md).
 - **Question?** Open an issue with the `question` label.

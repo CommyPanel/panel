@@ -73,7 +73,7 @@ return [
         'check' => (bool) env('COMMYPANEL_UPDATE_CHECK', true),
 
         // Where releases are published.
-        'repository' => 'emrecanful/commypanel',
+        'repository' => 'commypanel/panel',
 
         // A successful answer is reused for this long; after a failure the
         // next attempt waits for the retry delay.

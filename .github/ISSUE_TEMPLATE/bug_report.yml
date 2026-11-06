@@ -7,7 +7,7 @@ body:
       value: |
         Thanks for taking the time. CommyPanel is under heavy development, and bug reports from real servers are the most useful thing you can give us.
 
-        **Security problem?** Do not report it here. See the [security policy](https://github.com/emrecanful/commypanel/security/policy).
+        **Security problem?** Do not report it here. See the [security policy](https://github.com/commypanel/panel/security/policy).
   - type: input
     id: version
     attributes:
