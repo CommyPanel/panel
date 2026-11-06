@@ -64,6 +64,7 @@ class AppController extends Controller
             'source_type' => $git ? SourceType::Git : SourceType::Upload,
             'git_url' => $github ? "https://github.com/{$data['github_repo']}.git" : ($git ? $data['git_url'] : null),
             'github_repo' => $github ? $data['github_repo'] : null,
+            'github_auto_deploy' => $github && (bool) ($data['github_auto_deploy'] ?? false),
             'git_branch' => $git ? $data['git_branch'] : 'main',
             'setup_step' => SetupStep::Source,
         ]);

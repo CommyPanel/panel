@@ -49,6 +49,7 @@ class StoreAppRequest extends FormRequest
                     $fail('Use an https:// or ssh Git URL, for example https://github.com/acme/shop.git or git@github.com:acme/shop.git.');
                 }
             }],
+            'github_auto_deploy' => ['exclude_unless:source,github', 'nullable', 'boolean'],
             'git_branch' => ['exclude_unless:source,git,github', 'required', 'string', function (string $attribute, mixed $value, Closure $fail) {
                 if (! GitUrl::isValidBranch((string) $value)) {
                     $fail('That is not a valid branch name.');

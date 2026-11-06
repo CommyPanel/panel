@@ -232,6 +232,16 @@ describe('apps read through GitHub', function () {
             ->and($app->source_type->value)->toBe('git');
     });
 
+    it('turns deploy on push on only when asked at creation, and only for GitHub apps', function () {
+        $this->actingAs($this->user)->post('/apps', ['name' => 'Shop', 'source' => 'github', 'github_repo' => 'acme/shop', 'git_branch' => 'develop', 'github_auto_deploy' => true])->assertSessionHasNoErrors();
+        $this->actingAs($this->user)->post('/apps', ['name' => 'Blog', 'source' => 'github', 'github_repo' => 'acme/blog', 'git_branch' => 'main'])->assertSessionHasNoErrors();
+        $this->actingAs($this->user)->post('/apps', ['name' => 'Plain', 'source' => 'git', 'git_url' => 'https://github.com/acme/plain.git', 'git_branch' => 'main', 'github_auto_deploy' => true])->assertSessionHasNoErrors();
+
+        expect(App::query()->where('name', 'Shop')->value('github_auto_deploy'))->toBeTruthy()
+            ->and(App::query()->where('name', 'Blog')->value('github_auto_deploy'))->toBeFalsy()
+            ->and(App::query()->where('name', 'Plain')->value('github_auto_deploy'))->toBeFalsy();
+    });
+
     it('refuses a repository the installation was not given', function () {
         $this->actingAs($this->user)->post('/apps', ['name' => 'Other', 'source' => 'github', 'github_repo' => 'someone/private', 'git_branch' => 'main'])
             ->assertSessionHasErrors('github_repo');

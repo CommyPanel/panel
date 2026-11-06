@@ -25,6 +25,7 @@ export default function Create({ github }: { github: GitHubRepos | null }) {
         git_url: '',
         git_branch: 'main',
         github_repo: '',
+        github_auto_deploy: false,
     });
 
     const submit = (event: FormEvent) => {
@@ -173,6 +174,30 @@ export default function Create({ github }: { github: GitHubRepos | null }) {
                                 }
                                 error={form.errors.git_branch}
                             />
+                            <label className="flex cursor-pointer items-start gap-3">
+                                <input
+                                    type="checkbox"
+                                    role="switch"
+                                    className="toggle toggle-primary mt-0.5"
+                                    checked={form.data.github_auto_deploy}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'github_auto_deploy',
+                                            e.target.checked,
+                                        )
+                                    }
+                                />
+                                <span className="text-sm">
+                                    Deploy on every push to this branch
+                                    <span className="block text-base-content/70">
+                                        Off by default. When on, each push to{' '}
+                                        {form.data.git_branch || 'the branch'}{' '}
+                                        builds and deploys the app by itself.
+                                        You can change it later in the
+                                        app&apos;s settings.
+                                    </span>
+                                </span>
+                            </label>
                         </>
                     )}
                     {form.data.source === 'git' && (
