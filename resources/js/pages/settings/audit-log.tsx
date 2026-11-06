@@ -1,10 +1,10 @@
 import { Link } from '@inertiajs/react';
 import { OctagonAlert, TriangleAlert } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
+import { AuditFilterBar } from '@/components/audit/audit-filters';
+import type { AuditFilters, Severity } from '@/components/audit/audit-filters';
 import { Card } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
-
-type Severity = 'danger' | 'warning' | 'info';
 
 const ROW: Record<Severity, string> = {
     danger: 'bg-error/10 hover:bg-error/15',
@@ -31,10 +31,11 @@ type Entry = {
 type PageLink = { url: string | null; label: string; active: boolean };
 
 type Props = {
-    logs: { data: Entry[]; links: PageLink[] };
+    logs: { data: Entry[]; links: PageLink[]; total: number };
+    filters: AuditFilters;
 };
 
-export default function AuditLog({ logs }: Props) {
+export default function AuditLog({ logs, filters }: Props) {
     return (
         <AppLayout title="Audit log">
             <PageHeader
@@ -72,6 +73,7 @@ export default function AuditLog({ logs }: Props) {
                     </span>
                 </li>
             </ul>
+            <AuditFilterBar filters={filters} total={logs.total} />
             <Card flush>
                 <div className="overflow-x-auto">
                     <table className="table">
@@ -122,7 +124,14 @@ export default function AuditLog({ logs }: Props) {
                             ))}
                             {logs.data.length === 0 && (
                                 <tr>
-                                    <td colSpan={5}>Nothing recorded yet.</td>
+                                    <td colSpan={5}>
+                                        {logs.total === 0 &&
+                                        (filters.q !== '' ||
+                                            filters.severity.length > 0 ||
+                                            filters.range !== null)
+                                            ? 'No entries match these filters.'
+                                            : 'Nothing recorded yet.'}
+                                    </td>
                                 </tr>
                             )}
                         </tbody>

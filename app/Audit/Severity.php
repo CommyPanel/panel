@@ -16,13 +16,13 @@ final class Severity
 
     public const INFO = 'info';
 
-    private const DANGER_ACTIONS = [
+    public const DANGER_ACTIONS = [
         'database.remote_opened', 'database.remote_changed',
         'database_server.deleted', 'database.dropped', 'app.deleted', 'user.deleted',
         'auth.two_factor_disabled', 'admin.reset', 'app.volume_data_deleted',
     ];
 
-    private const WARNING_ACTIONS = [
+    public const WARNING_ACTIONS = [
         'database.remote_failed', 'database.credentials_viewed', 'database.password_changed', 'database.restore_started',
         'database.tool_started', 'database.tool_opened', 'database.backup_downloaded',
         'backup.downloaded', 'backup.remote_changed', 'backup.remote_removed', 'backup.deleted', 'volume.backup_downloaded',
