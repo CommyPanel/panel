@@ -3,6 +3,7 @@ import { DatabaseBackup, Download, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import BackupController from '@/actions/App/Http/Controllers/BackupController';
 import { RemoteBackupCard } from '@/components/backups/remote-backup-card';
+import { RemoteFilesCard } from '@/components/backups/remote-files-card';
 import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -77,6 +78,7 @@ export default function Backups({ backups, keep, folder, remote }: Props) {
             />
 
             {errors.backup && <Alert variant="error">{errors.backup}</Alert>}
+            {errors.remote && <Alert variant="error">{errors.remote}</Alert>}
 
             <Card
                 title={t('Panel backups')}
@@ -170,6 +172,8 @@ export default function Backups({ backups, keep, folder, remote }: Props) {
             </Card>
 
             <RemoteBackupCard remote={remote} manage={manage} />
+
+            {remote.enabled && <RemoteFilesCard manage={manage} />}
 
             <Card title={t('What a backup holds, and what it does not')}>
                 <ul className="list-disc space-y-2 pl-5 text-sm text-base-content/80">

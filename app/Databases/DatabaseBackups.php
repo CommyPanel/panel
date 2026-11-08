@@ -30,7 +30,7 @@ class DatabaseBackups
      *
      * @throws DatabaseException
      */
-    public function create(ManagedDatabase $database): array
+    public function create(ManagedDatabase $database, bool $prune = true): array
     {
         $server = $database->server;
 
@@ -44,7 +44,14 @@ class DatabaseBackups
             throw new DatabaseException(__('The backup folder :dir could not be created.', ['dir' => $dir]));
         }
 
-        $name = $database->name.'-'.date('Ymd-His').'.sql.gz';
+        $stamp = time();
+
+        // Never overwrite a backup made in the same second (a safety copy right after a dump).
+        while (is_file($dir.'/'.$database->name.'-'.date('Ymd-His', $stamp).'.sql.gz')) {
+            $stamp++;
+        }
+
+        $name = $database->name.'-'.date('Ymd-His', $stamp).'.sql.gz';
 
         try {
             $this->host->dumpDatabase($server->target(), $database->name, $dir.'/'.$name);
@@ -53,7 +60,11 @@ class DatabaseBackups
         }
 
         @chmod($dir.'/'.$name, 0600);
-        $this->prune($server, $database->name, (int) config('commypanel.backups.keep_databases'));
+        // A safety copy taken before a restore must not push out the dump that is about to be loaded.
+        if ($prune) {
+            $this->prune($server, $database->name, (int) config('commypanel.backups.keep_databases'));
+        }
+
         app(RemoteBackups::class)->queue('databases/'.$server->slug, $dir.'/'.$name);
 
         return $this->describe($server, $name);

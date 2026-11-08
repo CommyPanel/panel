@@ -4,10 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Audit\AuditLogger;
 use App\Backups\Remote\RemoteBackupFailed;
+use App\Backups\Remote\RemoteBackups;
 use App\Backups\Remote\RemoteSettings;
 use Closure;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Where backups are copied to off this server (any S3-compatible storage). The
@@ -32,6 +35,50 @@ class BackupRemoteController extends Controller
         return back()->with('status', $data['enabled']
             ? __('Saved. Backups made from now on are copied there as well.')
             : __('Saved. Copying to the storage is off.'));
+    }
+
+    /**
+     * What is on the storage, read when the person presses Refresh (never on a page load).
+     */
+    public function files(RemoteBackups $remote): JsonResponse
+    {
+        try {
+            return response()->json($remote->files());
+        } catch (RemoteBackupFailed $e) {
+            return response()->json(['error' => $e->getMessage()], 502);
+        }
+    }
+
+    /**
+     * Hand one copy to the browser, streamed through the panel so the storage's keys never
+     * leave it. The panel does not restore from it: the explanation on the page says how.
+     */
+    public function download(Request $request, RemoteBackups $remote, AuditLogger $audit): StreamedResponse|RedirectResponse
+    {
+        $path = $request->validate(['path' => ['required', 'string', 'max:200']])['path'];
+
+        try {
+            $object = $remote->open($path);
+        } catch (RemoteBackupFailed $e) {
+            return back()->withErrors(['remote' => $e->getMessage()]);
+        }
+
+        $audit->record('backup.remote_downloaded', $request->user(), ['file' => $path]);
+
+        $headers = ['Content-Type' => 'application/gzip', 'Content-Disposition' => 'attachment; filename="'.basename($path).'"', 'Cache-Control' => 'no-store', 'X-Content-Type-Options' => 'nosniff'];
+
+        if ($object['size'] > 0) {
+            $headers['Content-Length'] = (string) $object['size'];
+        }
+
+        return response()->stream(function () use ($object) {
+            $stream = $object['stream'];
+
+            while (! $stream->eof()) {
+                echo $stream->read(1024 * 256);
+                flush();
+            }
+        }, 200, $headers);
     }
 
     /**

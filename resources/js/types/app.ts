@@ -61,6 +61,7 @@ export type AppSettings = AppSummary & {
     release_command: string | null;
     /** Variables, volumes or links changed after the running container was made. */
     pending_changes: boolean;
+    alerts_enabled: boolean;
     safe_deploys: SafeDeploys;
     volumes: AppVolume[];
     memory_limit_mb: number | null;

@@ -408,3 +408,25 @@ it('reads the public addresses the agent found on the server, and drops anything
         ->and($found->primaryIpv4)->toBe('65.21.10.20')
         ->and($found->primaryIpv6)->toBeNull();
 });
+
+it('asks the agent to replace a database with a dump, sending the mode only then', function () {
+    $target = new DatabaseTarget('db-main', 'postgres', 'abcdefghijklmnop1234');
+    Http::fake(['agent/v1/databases/restore' => Http::response(['ok' => true])]);
+
+    agentDriver()->restoreDatabase($target, 'shop', 'shop', 'main', 'shop-20261103-040000.sql.gz', 'replace');
+
+    Http::assertSent(fn ($request) => ($request->data()['mode'] ?? null) === 'replace' && $request->data()['database'] === 'shop');
+});
+
+it('asks the agent to unpack a volume archive and passes its refusal on', function () {
+    Http::fake(['agent/v1/volumes/restore' => Http::sequence()
+        ->push(['ok' => true, 'files' => 4, 'bytes' => 99])
+        ->push(['error' => 'container shop-1 is running with this volume mounted; stop the app first'], 400)]);
+
+    expect(agentDriver()->restoreVolume('shop', 'uploads', 'uploads-20261103-040000.tar.gz'))->toBe(['files' => 4, 'bytes' => 99]);
+
+    Http::assertSent(fn ($request) => $request->data() === ['app' => 'shop', 'volume' => 'uploads', 'archive' => 'uploads-20261103-040000.tar.gz']);
+
+    expect(fn () => agentDriver()->restoreVolume('shop', 'uploads', 'uploads-20261103-040000.tar.gz'))->toThrow(HostOperationFailed::class, 'stop the app first')
+        ->and(fn () => agentDriver()->restoreVolume('../x', 'uploads', 'f'))->toThrow(InvalidArgumentException::class);
+});

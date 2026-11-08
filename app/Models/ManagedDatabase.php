@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $restore_status
  * @property string|null $restore_from
  * @property string|null $restore_error
+ * @property string|null $restore_notice
  */
 class ManagedDatabase extends Model
 {

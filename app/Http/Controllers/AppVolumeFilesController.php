@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Audit\AuditLogger;
+use App\Console\Commands\BackupCommand;
 use App\Host\Data\VolumeEntry;
 use App\Host\Data\VolumeUsage;
 use App\Host\Exceptions\HostOperationFailed;
@@ -47,6 +48,8 @@ class AppVolumeFilesController extends Controller
             'volumes' => $all->all(),
             'total_bytes' => $all->sum('bytes'),
             'running' => $app->active_deployment_id !== null,
+            'nightly_at' => BackupCommand::AT,
+            'keep' => (int) config('commypanel.backups.keep_volumes'),
         ]);
     }
 
@@ -182,6 +185,7 @@ class AppVolumeFilesController extends Controller
         return [
             'id' => $volume?->id,
             'locked' => $volume !== null && $volume->isLocked(),
+            'nightly' => $volume !== null && $volume->nightly_backup,
             'name' => $name,
             'path' => $path,
             'attached' => $path !== null,

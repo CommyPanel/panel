@@ -706,15 +706,28 @@ class AgentHostDriver implements HostDriver
         );
     }
 
-    public function restoreDatabase(DatabaseTarget $server, string $database, string $user, string $serverSlug, string $file): void
+    public function restoreDatabase(DatabaseTarget $server, string $database, string $user, string $serverSlug, string $file, string $mode = 'new'): void
     {
         ResourceName::assertValid($serverSlug);
 
         // Loading a large dump takes as long as making it did (the agent stops at 30 minutes).
         $response = $this->request(fn () => $this->client(timeout: 1900)
-            ->post('/v1/databases/restore', [...$this->target($server), 'database' => $database, 'user' => $user, 'server' => $serverSlug, 'file' => $file]));
+            ->post('/v1/databases/restore', [...$this->target($server), 'database' => $database, 'user' => $user, 'server' => $serverSlug, 'file' => $file] + ($mode === 'replace' ? ['mode' => 'replace'] : [])));
 
         $this->handle($response);
+    }
+
+    public function restoreVolume(string $app, string $name, string $archive): array
+    {
+        ResourceName::assertValid($app);
+        ResourceName::assertValid($name);
+
+        // Unpacking is as slow as the archive was to make (the agent stops at an hour).
+        $response = $this->request(fn () => $this->client(timeout: 3700)
+            ->post('/v1/volumes/restore', ['app' => $app, 'volume' => $name, 'archive' => $archive]));
+        $d = $this->handle($response);
+
+        return ['files' => (int) ($d['files'] ?? 0), 'bytes' => (int) ($d['bytes'] ?? 0)];
     }
 
     public function removeDatabaseData(string $server): void

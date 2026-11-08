@@ -22,6 +22,7 @@ import { AddDatabaseModal } from '@/components/databases/add-database-modal';
 import { CredentialsModal } from '@/components/databases/credentials-modal';
 import { DatabaseStatusBadge } from '@/components/databases/database-status';
 import { RestoreBackupModal } from '@/components/databases/restore-backup-modal';
+import { RestoreOverModal } from '@/components/databases/restore-over-modal';
 import { RemoteAccessCard } from '@/components/databases/remote-access-card';
 import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
@@ -84,6 +85,8 @@ export default function Show({
     const [restoringFile, setRestoringFile] =
         useState<DatabaseBackupFile | null>(null);
     const [restoreError, setRestoreError] = useState<string | undefined>();
+    const [overFile, setOverFile] = useState<DatabaseBackupFile | null>(null);
+    const [overError, setOverError] = useState<string | undefined>();
     const [busy, setBusy] = useState(false);
 
     const manage = can('databases.manage');
@@ -232,6 +235,30 @@ export default function Show({
                     },
                     onSuccess: () => setRestoringFile(null),
                     onError: (errors) => setRestoreError(errors.database),
+                    onFinish: () => setBusy(false),
+                },
+            ),
+        );
+    };
+
+    const restoreOver = (database: string) => {
+        if (!overFile) return;
+
+        void confirmed.run(() =>
+            router.post(
+                DatabaseBackupController.restoreOver({
+                    server: server.slug,
+                    name: overFile.name,
+                }),
+                { database, confirm: database },
+                {
+                    preserveScroll: true,
+                    onStart: () => {
+                        setBusy(true);
+                        setOverError(undefined);
+                    },
+                    onSuccess: () => setOverFile(null),
+                    onError: (errors) => setOverError(errors.database),
                     onFinish: () => setBusy(false),
                 },
             ),
@@ -430,6 +457,19 @@ export default function Show({
                                                 <span className="badge-soft ml-2 badge badge-info">
                                                     {t('Restoring…')}
                                                 </span>
+                                            )}
+                                            {database.restore?.status ===
+                                                'reverted' && (
+                                                <>
+                                                    <span className="badge-soft ml-2 badge badge-warning">
+                                                        {t(
+                                                            'Restore failed, database kept',
+                                                        )}
+                                                    </span>
+                                                    <p className="mt-1 max-w-sm text-sm break-words text-base-content/70">
+                                                        {database.restore.error}
+                                                    </p>
+                                                </>
                                             )}
                                             {database.restore?.status ===
                                                 'failed' && (
@@ -640,6 +680,30 @@ export default function Show({
                                                             {t('Restore')}
                                                         </Button>
                                                     )}
+                                                    {running &&
+                                                        databases.length >
+                                                            0 && (
+                                                            <Button
+                                                                variant="soft"
+                                                                size="sm"
+                                                                onClick={() => {
+                                                                    setOverError(
+                                                                        undefined,
+                                                                    );
+                                                                    setOverFile(
+                                                                        file,
+                                                                    );
+                                                                }}
+                                                            >
+                                                                <RotateCw
+                                                                    className="size-4"
+                                                                    aria-hidden
+                                                                />
+                                                                {t(
+                                                                    'Restore over…',
+                                                                )}
+                                                            </Button>
+                                                        )}
                                                     <Button
                                                         variant="soft"
                                                         size="sm"
@@ -677,9 +741,11 @@ export default function Show({
                         </table>
                     </div>
                 )}
-                <p className="text-sm text-base-content/70">
+                <p
+                    className={`text-sm text-base-content/70 ${backups.length > 0 ? 'px-6 py-4' : ''}`}
+                >
                     <Trans
-                        text="Dumps stay on this server, so copy them somewhere else now and then: a backup on the same disk is lost with it. A dump holds the data itself, so downloading one needs your password and is recorded. To load one back, press <b>Restore</b>: it goes into a new database, and nothing that exists is changed."
+                        text="Dumps stay on this server, so copy them somewhere else now and then: a backup on the same disk is lost with it. A dump holds the data itself, so downloading one needs your password and is recorded. To load one back, press <b>Restore</b>: it goes into a new database, and nothing that exists is changed. <b>Restore over…</b> replaces an existing database instead, after a safety dump of it."
                         components={{ b: <strong /> }}
                     />
                 </p>
@@ -721,6 +787,14 @@ export default function Show({
                 onClose={() => setRestoringFile(null)}
             />
 
+            <RestoreOverModal
+                file={overFile}
+                databases={databases}
+                error={overError}
+                busy={busy}
+                onSubmit={restoreOver}
+                onClose={() => setOverFile(null)}
+            />
             <ConfirmModal
                 open={removingBackup !== null}
                 title={t('Delete this backup?')}

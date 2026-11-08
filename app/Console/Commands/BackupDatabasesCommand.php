@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Alerts\BackupAlerts;
 use App\Databases\DatabaseBackups;
 use App\Databases\DatabaseException;
+use App\Databases\RestoreDatabase;
 use App\Models\ManagedDatabase;
 use Illuminate\Console\Command;
 
@@ -20,7 +21,7 @@ class BackupDatabasesCommand extends Command
         $made = 0;
 
         foreach (ManagedDatabase::query()->with('server')->orderBy('id')->get() as $database) {
-            if (! $database->server->isRunning()) {
+            if (! $database->server->isRunning() || $database->restore_status === RestoreDatabase::RESTORING) {
                 continue;
             }
 

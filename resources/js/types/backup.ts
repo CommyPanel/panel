@@ -17,16 +17,6 @@ export type RemoteBackupSettings = {
     has_secret: boolean;
 };
 
-export type AlertSettings = {
-    enabled: boolean;
-    format: 'slack' | 'discord' | 'json';
-    events: 'failures' | 'all';
-    host: string;
-    has_url: boolean;
-    last_ok_at: string | null;
-    last_error: string | null;
-};
-
 export type GitHubState = {
     connected: boolean;
     installed: boolean;

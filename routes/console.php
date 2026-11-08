@@ -1,5 +1,6 @@
 <?php
 
+use App\Console\Commands\BackupCommand;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -16,7 +17,7 @@ Schedule::command('commypanel:tick-remote-access')->everyMinute()->withoutOverla
 
 Schedule::command('commypanel:renew-certificates')->dailyAt('03:17')->withoutOverlapping();
 
-Schedule::command('commypanel:backup')->dailyAt('03:30')->withoutOverlapping();
+Schedule::command('commypanel:backup')->dailyAt(BackupCommand::AT)->withoutOverlapping();
 
 Schedule::command('commypanel:backup-databases')->dailyAt('04:00')->withoutOverlapping();
 

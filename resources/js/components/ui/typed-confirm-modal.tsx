@@ -13,6 +13,8 @@ type Props = {
     expected: string;
     confirmLabel: string;
     loading?: boolean;
+    /** Another condition (such as a ticked box) that must hold before the button works. */
+    disabled?: boolean;
     error?: string;
     onConfirm: (typed: string) => void;
     onClose: () => void;
@@ -26,6 +28,7 @@ export function TypedConfirmModal({
     expected,
     confirmLabel,
     loading = false,
+    disabled = false,
     error,
     onConfirm,
     onClose,
@@ -41,7 +44,7 @@ export function TypedConfirmModal({
     const submit = (event: FormEvent) => {
         event.preventDefault();
 
-        if (typed === expected) onConfirm(typed);
+        if (typed === expected && !disabled) onConfirm(typed);
     };
 
     return (
@@ -65,7 +68,7 @@ export function TypedConfirmModal({
                         type="submit"
                         variant="error"
                         loading={loading}
-                        disabled={typed !== expected}
+                        disabled={typed !== expected || disabled}
                     >
                         {confirmLabel}
                     </Button>

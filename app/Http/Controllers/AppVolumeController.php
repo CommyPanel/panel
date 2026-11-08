@@ -43,4 +43,19 @@ class AppVolumeController extends Controller
 
         return back()->with('status', __(':path will no longer be mounted once you apply the changes. Its files stay on the server.', ['path' => $volume->path]));
     }
+
+    /**
+     * Switch the nightly archive of one volume on or off.
+     */
+    public function nightly(Request $request, App $app, AppVolume $volume, AuditLogger $audit): RedirectResponse
+    {
+        $on = $request->validate(['nightly' => ['required', 'boolean']])['nightly'];
+
+        $volume->forceFill(['nightly_backup' => $on])->save();
+        $audit->record($on ? 'app.volume_nightly_on' : 'app.volume_nightly_off', $request->user(), ['app' => $app->slug, 'path' => $volume->path, 'name' => $volume->name], $app);
+
+        return back()->with('status', $on
+            ? __(':path is archived every night.', ['path' => $volume->path])
+            : __(':path is no longer archived every night.', ['path' => $volume->path]));
+    }
 }

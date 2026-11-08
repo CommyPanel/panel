@@ -63,6 +63,35 @@ class DatabaseBackupController extends Controller
         return back()->with('status', __('Loading the backup into the new database :name. It is ready when its "Restoring" label is gone.', ['name' => $database->name]));
     }
 
+    /**
+     * Replace an existing database with a dump. A safety dump is taken first and the
+     * old data is put back if loading fails. The person typed the database's name.
+     */
+    public function restoreOver(Request $request, DatabaseServer $server, RestoreDatabase $restore, AuditLogger $audit, string $name): RedirectResponse
+    {
+        $data = $request->validate(['database' => ['required', 'string', 'max:31'], 'confirm' => ['required', 'string', 'max:31']]);
+
+        $database = $server->databases()->where('name', $data['database'])->first();
+
+        if ($database === null) {
+            return back()->withErrors(['database' => __('That database is not on this server.')]);
+        }
+
+        if ($data['confirm'] !== $database->name) {
+            return back()->withErrors(['database' => __('Type the name of the database to confirm.')]);
+        }
+
+        try {
+            $restore->startOver($server, $database, $name);
+        } catch (DatabaseException $e) {
+            return back()->withErrors(['database' => $e->getMessage()]);
+        }
+
+        $audit->record('database.restore_replaced', $request->user(), ['server' => $server->slug, 'file' => $name, 'database' => $database->name]);
+
+        return back()->with('status', __('Replacing :name with the backup. A safety copy of it is made first; the database shows "Restoring" until this is done.', ['name' => $database->name]));
+    }
+
     public function destroy(Request $request, DatabaseServer $server, DatabaseBackups $backups, AuditLogger $audit, string $name): RedirectResponse
     {
         try {

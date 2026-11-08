@@ -6,42 +6,42 @@ target. Email is not supported.
 
 ## Targets
 
-| Kind | What you give | What is sent |
-|---|---|---|
-| Slack (also Mattermost, Rocket.Chat) | Incoming webhook address | `{"text": ...}` |
-| Discord | Channel webhook address | `{"content": ..., "allowed_mentions": {"parse": []}}` |
-| Microsoft Teams | Address of a Workflows webhook | An Adaptive Card in the `message` / `attachments` envelope, with an "Open in CommyPanel" button |
-| ntfy | Full topic address (https) | A plain-text POST with the headers `Title`, `Priority` (`high` for problems), `Tags` and `Click` |
-| Telegram | Bot token and a chat id (a number, or `@channelname`) | JSON to `https://api.telegram.org/bot<token>/sendMessage`; the panel builds this address itself, so the host is fixed |
-| Generic JSON | Any https address | The same text plus `event`, `app`, `url` and the fields of the event (for deployments `deployment`, `succeeded`, `commit`, `error`) |
+| Kind                                 | What you give                                         | What is sent                                                                                                                        |
+| ------------------------------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Slack (also Mattermost, Rocket.Chat) | Incoming webhook address                              | `{"text": ...}`                                                                                                                     |
+| Discord                              | Channel webhook address                               | `{"content": ..., "allowed_mentions": {"parse": []}}`                                                                               |
+| Microsoft Teams                      | Address of a Workflows webhook                        | An Adaptive Card in the `message` / `attachments` envelope, with an "Open in CommyPanel" button                                     |
+| ntfy                                 | Full topic address (https)                            | A plain-text POST with the headers `Title`, `Priority` (`high` for problems), `Tags` and `Click`                                    |
+| Telegram                             | Bot token and a chat id (a number, or `@channelname`) | JSON to `https://api.telegram.org/bot<token>/sendMessage`; the panel builds this address itself, so the host is fixed               |
+| Generic JSON                         | Any https address                                     | The same text plus `event`, `app`, `url` and the fields of the event (for deployments `deployment`, `succeeded`, `commit`, `error`) |
 
 Each target can be switched off without deleting it, has a "Send a test message" button (it sends to the
 saved target at once and shows the error if it fails), and shows when the last message arrived or why the
 last one did not.
 
 An existing single webhook from an earlier version became one target called "Default" when you upgraded,
-with the same address and format; "failures only" became *deployment failed* and *rolled back*, "every
-result" also *deployment succeeded*.
+with the same address and format; "failures only" became _deployment failed_ and _rolled back_, "every
+result" also _deployment succeeded_.
 
 ## Events
 
 A new target listens to the events marked "on".
 
-| Event | Default | When |
-|---|---|---|
-| `deployment.failed` | on | A deployment failed |
-| `deployment.rolled_back` | on | A release was rolled back automatically (watch or gradual rollout) |
-| `deployment.succeeded` | off | A deployment went live |
-| `app.down` | on | A running app did not answer its health path for 3 minutes in a row |
-| `app.recovered` | off | The app answers again (says how long it was down) |
-| `certificate.failed` | on | A certificate (an app's or the panel's own) could not be issued or renewed |
-| `certificate.expiring` | on | A certificate expires within 14 days and is still not renewed |
-| `disk.warning` | on | The disk reached the warning level (85% full) |
-| `disk.critical` | on | The disk reached the critical level (95% full) |
-| `disk.recovered` | off | The disk is back under its warning level |
-| `backup.failed` | on | The nightly panel backup, a database dump, a volume archive or the off-server copy failed |
-| `database.stopped` | on | A database server the panel thinks is running has no running container |
-| `database.recovered` | off | It runs again |
+| Event                    | Default | When                                                                                      |
+| ------------------------ | ------- | ----------------------------------------------------------------------------------------- |
+| `deployment.failed`      | on      | A deployment failed                                                                       |
+| `deployment.rolled_back` | on      | A release was rolled back automatically (watch or gradual rollout)                        |
+| `deployment.succeeded`   | off     | A deployment went live                                                                    |
+| `app.down`               | on      | A running app did not answer its health path for 3 minutes in a row                       |
+| `app.recovered`          | off     | The app answers again (says how long it was down)                                         |
+| `certificate.failed`     | on      | A certificate (an app's or the panel's own) could not be issued or renewed                |
+| `certificate.expiring`   | on      | A certificate expires within 14 days and is still not renewed                             |
+| `disk.warning`           | on      | The disk reached the warning level (85% full)                                             |
+| `disk.critical`          | on      | The disk reached the critical level (95% full)                                            |
+| `disk.recovered`         | off     | The disk is back under its warning level                                                  |
+| `backup.failed`          | on      | The nightly panel backup, a database dump, a volume archive or the off-server copy failed |
+| `database.stopped`       | on      | A database server the panel thinks is running has no running container                    |
+| `database.recovered`     | off     | It runs again                                                                             |
 
 ## How detection works
 

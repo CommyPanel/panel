@@ -12,8 +12,8 @@ use App\Models\App;
  * files, kept on this server in <data dir>/backups/volumes/<app>/, readable by
  * the panel user only. Only the newest few of each volume are kept.
  *
- * To put one back, stop the app and unpack it over the volume's folder as root
- * (docs/databases.md explains); the panel does not overwrite live data.
+ * To put one back, `RestoreVolumeJob` stops the app, has the agent unpack the archive over
+ * the volume's folder, and starts the app again.
  */
 class VolumeBackups
 {
@@ -31,7 +31,7 @@ class VolumeBackups
      *
      * @throws BackupFailed
      */
-    public function create(App $app, string $volume): array
+    public function create(App $app, string $volume, bool $prune = true): array
     {
         $dir = $this->directory($app);
 
@@ -39,7 +39,14 @@ class VolumeBackups
             throw new BackupFailed(__('The backup folder :dir could not be created.', ['dir' => $dir]));
         }
 
-        $name = $volume.'-'.date('Ymd-His').'.tar.gz';
+        $stamp = time();
+
+        // Never overwrite a backup made in the same second (a safety copy right after a dump).
+        while (is_file($dir.'/'.$volume.'-'.date('Ymd-His', $stamp).'.tar.gz')) {
+            $stamp++;
+        }
+
+        $name = $volume.'-'.date('Ymd-His', $stamp).'.tar.gz';
 
         try {
             $this->host->backupVolume($app->slug, $volume, $dir.'/'.$name);
@@ -48,7 +55,11 @@ class VolumeBackups
         }
 
         @chmod($dir.'/'.$name, 0600);
-        $this->prune($app, $volume, (int) config('commypanel.backups.keep_volumes'));
+        // A safety archive taken before a restore must not push out the one about to be unpacked.
+        if ($prune) {
+            $this->prune($app, $volume, (int) config('commypanel.backups.keep_volumes'));
+        }
+
         app(RemoteBackups::class)->queue('volumes/'.$app->slug, $dir.'/'.$name);
 
         return $this->describe($app, $name);

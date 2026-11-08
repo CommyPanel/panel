@@ -143,6 +143,7 @@ Route::middleware('auth')->group(function () {
             Route::post('source', [AppSourceController::class, 'upload'])->name('source.upload');
             Route::put('lock', [AppLockController::class, 'app'])->name('lock');
             Route::put('volumes/{volume}/lock', [AppLockController::class, 'volume'])->whereNumber('volume')->name('volumes.lock');
+            Route::put('volumes/{volume}/nightly', [AppVolumeController::class, 'nightly'])->whereNumber('volume')->name('volumes.nightly');
             Route::post('volumes', [AppVolumeController::class, 'store'])->name('volumes.store');
             Route::delete('volumes/{volume}', [AppVolumeController::class, 'destroy'])->whereNumber('volume')->name('volumes.destroy');
             Route::delete('volumes/{name}/data', [AppVolumeFilesController::class, 'destroyData'])->where('name', '[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?')->middleware('password.confirm')->name('volumes.data.destroy');
@@ -170,6 +171,7 @@ Route::middleware('auth')->group(function () {
             Route::get('volume-backups', [AppVolumeBackupController::class, 'index'])->name('volume-backups.index');
             Route::post('volumes/{name}/backup', [AppVolumeBackupController::class, 'store'])->name('volumes.backup');
             Route::get('volume-backups/{file}', [AppVolumeBackupController::class, 'download'])->where('file', '[a-z0-9_.-]+')->middleware('password.confirm')->name('volume-backups.download');
+            Route::post('volume-backups/{file}/restore', [AppVolumeBackupController::class, 'restore'])->where('file', '[a-z0-9_.-]+')->middleware('password.confirm')->name('volume-backups.restore');
             Route::delete('volume-backups/{file}', [AppVolumeBackupController::class, 'destroy'])->where('file', '[a-z0-9_.-]+')->middleware('password.confirm')->name('volume-backups.destroy');
         });
 
@@ -216,6 +218,7 @@ Route::middleware('auth')->group(function () {
             Route::post('{server:slug}/databases/{database}/backup', [DatabaseBackupController::class, 'store'])->whereNumber('database')->name('databases.backup');
             Route::get('{server:slug}/backups/{name}', [DatabaseBackupController::class, 'download'])->where('name', '[a-z0-9_.-]+')->middleware('password.confirm')->name('backups.download');
             Route::post('{server:slug}/backups/{name}/restore', [DatabaseBackupController::class, 'restore'])->where('name', '[a-z0-9_.-]+')->middleware('password.confirm')->name('backups.restore');
+            Route::post('{server:slug}/backups/{name}/restore-over', [DatabaseBackupController::class, 'restoreOver'])->where('name', '[a-z0-9_.-]+')->middleware('password.confirm')->name('backups.restore-over');
             Route::delete('{server:slug}/backups/{name}', [DatabaseBackupController::class, 'destroy'])->where('name', '[a-z0-9_.-]+')->middleware('password.confirm')->name('backups.destroy');
             Route::post('{server:slug}/databases/{database}/password', [ManagedDatabaseController::class, 'password'])->whereNumber('database')->middleware('password.confirm')->name('databases.password');
         });
@@ -291,6 +294,8 @@ Route::middleware('auth')->group(function () {
         Route::put('/settings/backups/remote', [BackupRemoteController::class, 'update'])->middleware('password.confirm')->name('settings.backups.remote.update');
         Route::post('/settings/backups/remote/test', [BackupRemoteController::class, 'test'])->middleware('throttle:6,1')->name('settings.backups.remote.test');
         Route::delete('/settings/backups/remote', [BackupRemoteController::class, 'destroy'])->middleware('password.confirm')->name('settings.backups.remote.destroy');
+        Route::get('/settings/backups/remote/files', [BackupRemoteController::class, 'files'])->middleware('throttle:12,1')->name('settings.backups.remote.files');
+        Route::get('/settings/backups/remote/download', [BackupRemoteController::class, 'download'])->middleware('password.confirm')->name('settings.backups.remote.download');
         Route::get('/settings/backups/{name}', [BackupController::class, 'download'])->where('name', $name)->middleware('password.confirm')->name('settings.backups.download');
         Route::delete('/settings/backups/{name}', [BackupController::class, 'destroy'])->where('name', $name)->middleware('password.confirm')->name('settings.backups.destroy');
     });

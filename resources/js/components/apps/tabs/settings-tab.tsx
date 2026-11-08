@@ -4,6 +4,7 @@ import AppController from '@/actions/App/Http/Controllers/AppController';
 import { RuntimeFields, SourceFields } from '@/components/apps/app-fields';
 import type { AppFormData } from '@/components/apps/app-fields';
 import { AccessTokenCard } from '@/components/apps/access-token-card';
+import { AlertsCard } from '@/components/apps/alerts-card';
 import { DeployKeyCard } from '@/components/apps/deploy-key-card';
 import { UploadSourceCard } from '@/components/apps/upload-source-card';
 import { WebhookCard } from '@/components/apps/webhook-card';
@@ -82,6 +83,7 @@ export function SettingsTab({
                 </form>
             </div>
             <div className="min-w-0 space-y-6">
+                <AlertsCard app={app} />
                 {upload ? (
                     <UploadSourceCard slug={app.slug} />
                 ) : (

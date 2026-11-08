@@ -269,11 +269,14 @@ interface HostDriver
     /**
      * Load a dump the agent made earlier into an existing, empty database. `$file`
      * is its name in the server's backup folder; the agent refuses any file it
-     * did not make itself.
+     * did not make itself. In `replace` mode the database and its user must already
+     * exist: the agent drops and recreates the database and loads the dump into it.
+     *
+     * @param  'new'|'replace'  $mode
      *
      * @throws HostOperationFailed
      */
-    public function restoreDatabase(DatabaseTarget $server, string $database, string $user, string $serverSlug, string $file): void;
+    public function restoreDatabase(DatabaseTarget $server, string $database, string $user, string $serverSlug, string $file, string $mode = 'new'): void;
 
     /**
      * Write a volume as a gzipped tar to `$toPath`. The agent skips links and
@@ -282,6 +285,17 @@ interface HostDriver
      * @throws HostOperationFailed
      */
     public function backupVolume(string $app, string $name, string $toPath): void;
+
+    /**
+     * Unpack an archive the agent made (`$archive` is its file name in the app's
+     * backup folder) over a volume's folder. The agent refuses while a container
+     * has the volume mounted and any file it did not make itself.
+     *
+     * @return array{files: int, bytes: int}
+     *
+     * @throws HostOperationFailed
+     */
+    public function restoreVolume(string $app, string $name, string $archive): array;
 
     /**
      * Begin opening a database in its tool (phpMyAdmin for MySQL and MariaDB, pgAdmin for

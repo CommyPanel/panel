@@ -16,6 +16,7 @@ use Illuminate\Support\Carbon;
  * @property string $name
  * @property string $path
  * @property Carbon|null $locked_at
+ * @property bool $nightly_backup
  */
 class AppVolume extends Model
 {
@@ -31,7 +32,7 @@ class AppVolume extends Model
 
     protected function casts(): array
     {
-        return ['locked_at' => 'datetime'];
+        return ['locked_at' => 'datetime', 'nightly_backup' => 'boolean'];
     }
 
     /**

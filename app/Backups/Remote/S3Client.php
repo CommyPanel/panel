@@ -7,6 +7,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Psr\Http\Message\StreamInterface;
 
 /**
  * The few S3 calls the backup copy needs, against any S3-compatible service,
@@ -103,6 +104,58 @@ class S3Client
         } while ($token !== null && $token !== '');
 
         return $out;
+    }
+
+    /**
+     * Objects below a prefix with their sizes, newest first, at most `$limit` of them
+     * (the second value says there were more).
+     *
+     * @return array{0: list<array{key: string, size: int, time: int}>, 1: bool}
+     *
+     * @throws RemoteBackupFailed
+     */
+    public function listDetailed(string $prefix, int $limit = 500): array
+    {
+        $out = [];
+        $token = null;
+        $pages = 0;
+
+        do {
+            $query = ['list-type' => '2', 'prefix' => $prefix] + ($token === null ? [] : ['continuation-token' => $token]);
+            $response = $this->send('GET', '', $query, hash('sha256', ''));
+            $this->check($response, 'list');
+
+            $xml = @simplexml_load_string($response->body());
+
+            if ($xml === false) {
+                throw new RemoteBackupFailed('The storage answered with something that is not a list.');
+            }
+
+            foreach ($xml->Contents ?? [] as $item) {
+                $out[] = ['key' => (string) $item->Key, 'size' => (int) $item->Size, 'time' => (int) strtotime((string) $item->LastModified)];
+            }
+
+            $token = ((string) $xml->IsTruncated) === 'true' ? (string) $xml->NextContinuationToken : null;
+        } while ($token !== null && $token !== '' && ++$pages < 20);
+
+        usort($out, fn (array $a, array $b) => [$b['time'], $a['key']] <=> [$a['time'], $b['key']]);
+
+        return [array_slice($out, 0, $limit), count($out) > $limit || ($token !== null && $token !== '')];
+    }
+
+    /**
+     * Open one object for reading: its size (0 when unknown) and the body as a stream.
+     *
+     * @return array{size: int, stream: StreamInterface}
+     *
+     * @throws RemoteBackupFailed
+     */
+    public function open(string $key): array
+    {
+        $response = $this->send('GET', $key, [], hash('sha256', ''), fn (PendingRequest $r) => $r->withOptions(['stream' => true])->timeout(3600));
+        $this->check($response, 'download');
+
+        return ['size' => (int) $response->header('Content-Length'), 'stream' => $response->toPsrResponse()->getBody()];
     }
 
     /**

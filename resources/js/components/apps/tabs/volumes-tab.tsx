@@ -37,12 +37,18 @@ type VolumeRow = {
     path: string | null;
     attached: boolean;
     locked: boolean;
+    nightly: boolean;
     exists: boolean;
     bytes: number;
     files: number;
     partial: boolean;
 };
-type Overview = { volumes: VolumeRow[]; total_bytes: number; running: boolean };
+type Overview = {
+    volumes: VolumeRow[];
+    total_bytes: number;
+    running: boolean;
+    nightly_at: string;
+};
 
 async function getOverview(
     url: string,
@@ -281,9 +287,14 @@ export function VolumesTab({ app }: { app: AppSettings }) {
             {overview.volumes.some((v) => v.attached && v.exists) && (
                 <VolumeBackupsCard
                     app={app.slug}
+                    nightlyAt={overview.nightly_at}
                     volumes={overview.volumes
-                        .filter((v) => v.attached && v.exists)
-                        .map((v) => v.name)}
+                        .filter((v) => v.attached && v.exists && v.id !== null)
+                        .map((v) => ({
+                            id: v.id as number,
+                            name: v.name,
+                            nightly: v.nightly,
+                        }))}
                 />
             )}
 

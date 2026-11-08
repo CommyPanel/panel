@@ -73,6 +73,8 @@ class FakeHostDriver implements HostDriver
 
     private ?string $restoreFails = null;
 
+    private ?string $volumeRestoreFails = null;
+
     private ?PublicAddresses $publicAddresses = null;
 
     /** @var array{0: string, 1: string|null} */
@@ -109,7 +111,7 @@ class FakeHostDriver implements HostDriver
     private const DOCKER_ACTIONS = [
         'buildImage', 'runContainer', 'runTask', 'stopContainer', 'startContainer', 'restartContainer',
         'removeContainer', 'containerLogs', 'pruneDanglingImages', 'removeImage', 'removeNetwork',
-        'pullImage', 'databaseReady', 'dumpDatabase', 'restoreDatabase', 'backupVolume', 'startDatabaseTool', 'databaseToolStatus', 'databaseToolTicket', 'stopDatabaseTool', 'createDatabase', 'dropDatabase', 'setDatabasePassword', 'connectNetwork', 'disconnectNetwork', 'pruneLinkNetworks',
+        'pullImage', 'databaseReady', 'dumpDatabase', 'restoreDatabase', 'backupVolume', 'restoreVolume', 'startDatabaseTool', 'databaseToolStatus', 'databaseToolTicket', 'stopDatabaseTool', 'createDatabase', 'dropDatabase', 'setDatabasePassword', 'connectNetwork', 'disconnectNetwork', 'pruneLinkNetworks',
     ];
 
     /**
@@ -537,6 +539,27 @@ class FakeHostDriver implements HostDriver
         file_put_contents($toPath, gzencode("fake archive of {$app}/{$name}"));
     }
 
+    public function restoreVolume(string $app, string $name, string $archive): array
+    {
+        ResourceName::assertValid($app);
+        ResourceName::assertValid($name);
+        $this->record('restoreVolume', ['app' => $app, 'volume' => $name, 'archive' => $archive]);
+
+        if ($this->volumeRestoreFails !== null) {
+            throw new HostOperationFailed($this->volumeRestoreFails);
+        }
+
+        return ['files' => 1, 'bytes' => 1];
+    }
+
+    /**
+     * Make volume restores fail with this message (tests).
+     */
+    public function failVolumeRestoresWith(?string $message): void
+    {
+        $this->volumeRestoreFails = $message;
+    }
+
     /**
      * How far the fake tool sessions get (tests): 'ready' by default, or 'pulling', 'failed'.
      */
@@ -582,9 +605,9 @@ class FakeHostDriver implements HostDriver
         unset($this->toolSessions[$session]);
     }
 
-    public function restoreDatabase(DatabaseTarget $server, string $database, string $user, string $serverSlug, string $file): void
+    public function restoreDatabase(DatabaseTarget $server, string $database, string $user, string $serverSlug, string $file, string $mode = 'new'): void
     {
-        $this->record('restoreDatabase', ['container' => $server->container, 'database' => $database, 'user' => $user, 'server' => $serverSlug, 'file' => $file]);
+        $this->record('restoreDatabase', ['container' => $server->container, 'database' => $database, 'user' => $user, 'server' => $serverSlug, 'file' => $file] + ($mode === 'replace' ? ['mode' => 'replace'] : []));
 
         if (! isset($this->databases[$server->container][$database])) {
             throw new HostOperationFailed('Agent error: the database does not exist');
