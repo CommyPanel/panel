@@ -16,6 +16,7 @@ import { useT } from '@/hooks/use-t';
 import { cleanLog, splitMatches } from '@/lib/logs';
 import { cn } from '@/lib/utils';
 import type { AppSettings } from '@/types';
+import { formatNumber } from '@/lib/i18n';
 
 const REFRESH_MS = 3000;
 const LINE_CHOICES = [200, 500, 1000, 5000];
@@ -273,7 +274,7 @@ export function LogsTab({ app }: { app: AppSettings }) {
                     {LINE_CHOICES.map((n) => (
                         <option key={n} value={n}>
                             {t('Last :number lines', {
-                                number: n.toLocaleString(),
+                                number: formatNumber(n),
                             })}
                         </option>
                     ))}

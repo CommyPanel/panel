@@ -174,12 +174,12 @@ export default function Form({ user, roles }: Props) {
                             >
                                 {role.assignable
                                     ? tn(
-                                          'one:::name (:count permission)|other:::name (:count permissions)',
+                                          'one::name (:count permission)|other::name (:count permissions)',
                                           role.permissions,
                                           { name: role.name },
                                       )
                                     : tn(
-                                          'one:::name (:count permission) - more than you can give|other:::name (:count permissions) - more than you can give',
+                                          'one::name (:count permission) - more than you can give|other::name (:count permissions) - more than you can give',
                                           role.permissions,
                                           { name: role.name },
                                       )}

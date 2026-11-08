@@ -6,6 +6,8 @@
 //   node scripts/i18n.mjs sync           write lang/en.json from the sentences found in the code
 //   node scripts/i18n.mjs todo <code>    the sentences <code> still lacks, as JSON to fill in
 //   node scripts/i18n.mjs stats          how complete each language is
+//   node scripts/i18n.mjs chunk <n> [size]            sentences n*size.. of the full list, as a JSON array
+//   node scripts/i18n.mjs merge <code> <n> <file> [size]  put the translations (a JSON array in the same order) of that chunk into lang/<code>.json
 //
 // Sentences are found where the code writes them as a string literal:
 //   React:  t('...')  tn('...', n)  <Trans text="..." />
@@ -161,18 +163,31 @@ function collect() {
     return [...found.keys()].sort((a, b) => a.localeCompare(b, 'en'));
 }
 
+// A plural sentence is a list of forms, "one:text|other:text": every part starts with a category.
+function plurals(s) {
+    const parts = s.split('|');
+    return parts.length > 1 &&
+        parts.every((p) => /^(zero|one|two|few|many|other):/.test(p))
+        ? parts.map((p) => p.split(':')[0])
+        : null;
+}
+
+// Placeholders and tags are read from the text of the forms, never from the "one:" prefixes.
+const body = (s) =>
+    plurals(s)
+        ? s
+              .split('|')
+              .map((p) => p.slice(p.indexOf(':') + 1))
+              .join('|')
+        : s;
 const placeholders = (s) =>
-    [...new Set(s.match(/:[a-zA-Z_][a-zA-Z0-9_]*/g) ?? [])].sort((a, b) =>
+    [...new Set(body(s).match(/:[a-zA-Z_][a-zA-Z0-9_]*/g) ?? [])].sort((a, b) =>
         a.localeCompare(b),
     );
 const tags = (s) =>
-    [...(s.match(/<\/?\w+\s*\/?>/g) ?? [])].sort((a, b) => a.localeCompare(b));
-
-function plurals(s) {
-    return s.includes('|') && /^[a-z]+:/.test(s)
-        ? s.split('|').map((p) => p.split(':')[0])
-        : null;
-}
+    [...(body(s).match(/<\/?\w+\s*\/?>/g) ?? [])].sort((a, b) =>
+        a.localeCompare(b),
+    );
 
 const CATEGORIES = new Set(['zero', 'one', 'two', 'few', 'many', 'other']);
 
@@ -243,6 +258,28 @@ function check(strict) {
                     `lang/${code}.json: tags differ in "${key.slice(0, 60)}" (${tags(key).join(' ') || 'none'} vs ${tags(value).join(' ') || 'none'})`,
                 );
             const keyForms = plurals(key);
+            // A language that has more plural categories than English needs those forms too.
+            const needed = new Intl.PluralRules(code)
+                .resolvedOptions()
+                .pluralCategories.filter(
+                    (c) =>
+                        c === 'zero' ||
+                        c === 'two' ||
+                        c === 'few' ||
+                        (c === 'many' &&
+                            new Intl.PluralRules(code)
+                                .resolvedOptions()
+                                .pluralCategories.includes('few')),
+                );
+            if (
+                keyForms &&
+                plurals(value) &&
+                needed.some((c) => !plurals(value).includes(c))
+            ) {
+                errors.push(
+                    `lang/${code}.json: "${key.slice(0, 60)}" needs the plural forms ${needed.join(', ')}, one, other`,
+                );
+            }
             if (keyForms) {
                 const forms = plurals(value);
                 if (
@@ -306,11 +343,72 @@ function stats() {
     }
 }
 
+function chunk(n, size) {
+    const keys = collect();
+    console.log(JSON.stringify(keys.slice(n * size, (n + 1) * size), null, 2));
+}
+
+// Put a chunk of translations (a JSON array, same order as `chunk`) into lang/<code>.json.
+// An entry that breaks the rules (placeholders, tags, plural forms, empty) is reported and not written.
+function merge(code, n, file, size) {
+    const keys = collect();
+    const sources = keys.slice(n * size, (n + 1) * size);
+    const values = JSON.parse(readFileSync(file, 'utf8'));
+    if (!Array.isArray(values) || values.length !== sources.length) {
+        console.error(
+            `error: expected an array of ${sources.length} translations, got ${Array.isArray(values) ? values.length : typeof values}`,
+        );
+        process.exit(1);
+    }
+    const path = join(LANG, `${code}.json`);
+    const data = existsSync(path) ? load(code) : {};
+    let bad = 0;
+    sources.forEach((key, i) => {
+        const value = values[i];
+        const why =
+            typeof value !== 'string' || value.trim() === ''
+                ? 'empty'
+                : placeholders(value).join() !== placeholders(key).join()
+                  ? `placeholders ${placeholders(key).join(' ') || 'none'} vs ${placeholders(value).join(' ') || 'none'}`
+                  : tags(value).join() !== tags(key).join()
+                    ? `tags ${tags(key).join(' ') || 'none'} vs ${tags(value).join(' ') || 'none'}`
+                    : plurals(key) &&
+                        (!plurals(value) ||
+                            !plurals(value).includes('other') ||
+                            plurals(value).some((f) => !CATEGORIES.has(f)))
+                      ? 'plural forms must be like one:..|other:..'
+                      : null;
+        if (why) {
+            bad++;
+            console.error(`#${i} rejected (${why}): ${key.slice(0, 80)}`);
+            return;
+        }
+        data[key] = value;
+    });
+    const sorted = Object.fromEntries(
+        Object.entries(data).sort(([a], [b]) => a.localeCompare(b, 'en')),
+    );
+    writeFileSync(path, `${JSON.stringify(sorted, null, 4)}\n`);
+    console.log(
+        `${code}: chunk ${n}: ${sources.length - bad} written, ${bad} rejected`,
+    );
+    process.exit(bad ? 1 : 0);
+}
+
 const [command, arg] = process.argv.slice(2);
 if (command === 'check') check(arg === '--strict');
 else if (command === 'sync') sync();
 else if (command === 'todo' && arg) todo(arg);
 else if (command === 'stats') stats();
+else if (command === 'chunk')
+    chunk(Number(arg ?? 0), Number(process.argv[4] ?? 250));
+else if (command === 'merge')
+    merge(
+        arg,
+        Number(process.argv[4]),
+        process.argv[5],
+        Number(process.argv[6] ?? 250),
+    );
 else {
     console.error(
         'usage: node scripts/i18n.mjs check [--strict] | sync | todo <code> | stats',

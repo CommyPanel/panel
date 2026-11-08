@@ -328,7 +328,7 @@ export default function Updates({ update }: { update: UpdateInfo }) {
                             description={
                                 update.newer.length > 1
                                     ? tn(
-                                          'one::Release notes for the :count release since :version, newest first.|other::Release notes for the :count releases since :version, newest first.',
+                                          'one:Release notes for the :count release since :version, newest first.|other:Release notes for the :count releases since :version, newest first.',
                                           update.newer.length,
                                           { version: update.current },
                                       )

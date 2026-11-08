@@ -23,6 +23,7 @@ import { Modal } from '@/components/ui/modal';
 import { useT } from '@/hooks/use-t';
 import { cn } from '@/lib/utils';
 import type { DeploymentDetail, SafeDeployInfo, SafeStat } from '@/types';
+import { formatNumber, getLocale } from '@/lib/i18n';
 
 type Traffic = SafeDeployInfo['traffic'];
 
@@ -55,14 +56,14 @@ function minutesLeft(
 
 function clock(iso: string | null): string {
     return iso
-        ? new Date(iso).toLocaleTimeString([], {
+        ? new Date(iso).toLocaleTimeString(getLocale(), {
               hour: '2-digit',
               minute: '2-digit',
           })
         : '';
 }
 
-const fmt = (n: number) => n.toLocaleString();
+const fmt = (n: number) => formatNumber(n);
 
 function Verdict({ traffic }: { traffic: NonNullable<Traffic> }) {
     const { state, reason } = traffic.verdict;

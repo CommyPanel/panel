@@ -32,3 +32,25 @@ it('passes the translation checker (placeholders, tags, plural forms, unknown fi
 
     expect($code)->toBe(0, implode("\n", array_filter($output, fn ($l) => str_starts_with($l, 'error'))));
 });
+
+it("has Laravel's own messages (validation, sign-in, passwords, pagination) for every language", function () {
+    foreach (array_keys(Locales::available()) as $code) {
+        if ($code === 'en') {
+            continue;
+        }
+
+        foreach (['validation', 'auth', 'passwords', 'pagination'] as $file) {
+            expect(is_file(lang_path("{$code}/{$file}.php")))->toBeTrue("lang/{$code}/{$file}.php is missing");
+        }
+
+        app()->setLocale($code);
+
+        try {
+            expect(__('validation.required', ['attribute' => 'x']))->not->toBe('validation.required')
+                ->and(__('validation.required', ['attribute' => 'x']))->not->toBe('The x field is required.')
+                ->and(__('auth.failed'))->not->toBe('These credentials do not match our records.');
+        } finally {
+            app()->setLocale('en');
+        }
+    }
+});

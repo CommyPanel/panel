@@ -6,6 +6,7 @@ import type { AuditFilters, Severity } from '@/components/audit/audit-filters';
 import { Card } from '@/components/ui/card';
 import { useT } from '@/hooks/use-t';
 import AppLayout from '@/layouts/app-layout';
+import { formatDate } from '@/lib/format';
 
 const ROW: Record<Severity, string> = {
     danger: 'bg-error/10 hover:bg-error/15',
@@ -99,9 +100,7 @@ export default function AuditLog({ logs, filters }: Props) {
                                     <td
                                         className={`whitespace-nowrap ${EDGE[log.severity]}`}
                                     >
-                                        {new Date(
-                                            log.created_at,
-                                        ).toLocaleString()}
+                                        {formatDate(log.created_at)}
                                     </td>
                                     <td>{log.user ?? '-'}</td>
                                     <td>

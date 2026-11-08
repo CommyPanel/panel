@@ -4,6 +4,7 @@ import AppTrafficController from '@/actions/App/Http/Controllers/AppTrafficContr
 import { Card } from '@/components/ui/card';
 import { TimeSeriesChart } from '@/components/usage/time-series-chart';
 import { useT } from '@/hooks/use-t';
+import { formatNumber } from '@/lib/i18n';
 
 type Release = {
     number: number;
@@ -108,10 +109,9 @@ export function AppTrafficCard({ slug }: { slug: string }) {
                                     {t(
                                         ':requests requests, :percent% errors, slowest 5% under :ms ms',
                                         {
-                                            requests:
-                                                r.requests.toLocaleString(),
+                                            requests: formatNumber(r.requests),
                                             percent: r.error_percent,
-                                            ms: r.p95_ms.toLocaleString(),
+                                            ms: formatNumber(r.p95_ms),
                                         },
                                     )}
                                 </dd>

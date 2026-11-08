@@ -162,6 +162,34 @@ If you are unsure whether your change touches one of these, say so in the pull r
 - Form fields always fill the card they are in; stack fields vertically.
 - Use the generated route helpers (Laravel Wayfinder) instead of hard-coded URLs.
 
+## Translating the panel
+
+The panel's interface is available in English, French, German, Spanish, Russian, Ukrainian and Turkish. Translating it, or improving a translation, needs no coding: it is a JSON file. The command line, the agent, the documentation site and the audit-log action codes stay in English.
+
+**How it works.** The English sentence is the key. `lang/<code>.json` maps each English sentence to its translation, and one file serves both the React pages and the PHP messages. A sentence that is missing from a file shows in English, so a partial translation is fine. Each person chooses their own language in **Settings → Appearance**; the first-run setup page and the login page have a language box too.
+
+**Fix or improve a translation.** Edit the value in `lang/<code>.json` and open a pull request. The statuses of the languages are in `lang/README.md`; a native speaker's review is the most valuable contribution.
+
+**Add a language.**
+
+1. Add a line to `locales` in `config/commypanel.php`: the code and the language's own name, for example `'it' => 'Italiano'`.
+2. Create `lang/it.json` containing `{}`. Laravel's own messages (validation errors, sign-in, passwords, pagination) live in `lang/it/validation.php`, `auth.php`, `passwords.php` and `pagination.php`: take them from the MIT-licensed [laravel-lang/lang](https://github.com/Laravel-Lang/lang) project (its `locales/it/php.json`, split by file) and add your language's names for the form fields under `attributes` in `validation.php`.
+3. Fill it in. `node scripts/i18n.mjs todo it` prints every sentence that is still missing, as JSON to fill in. For a big first pass, `chunk` and `merge` work 250 sentences at a time (see the comments at the top of `scripts/i18n.mjs`).
+4. Run `npm run i18n:check`. It must report 0 errors. `node scripts/i18n.mjs check --strict` also fails while sentences are missing.
+5. Open a pull request. Say whether you are a native speaker and whether the translation was drafted with a tool.
+
+**The rules**
+
+- Keep `:placeholders` (`:name`, `:count`, `:app`...) exactly as they are. You may move them where your grammar needs them.
+- Keep the tags (`<b>…</b>`, `<code>…</code>`, `<link>…</link>`, `<br/>`) and translate the words inside them. A sentence with two `<code>` parts uses `<code>` and `<code2>`.
+- Plural sentences look like `one::count app|other::count apps`: forms separated by `|`, each `form:text`. List the forms your language has (`one`, `few`, `many`, `other`; `other` is required). Russian and Ukrainian need `one`, `few`, `many` and `other`.
+- Text that only looks like a placeholder, such as `git@github.com:acme/app.git`, stays as it is.
+- Keep product and technology names, commands, paths and environment variable names in English.
+- Fragments such as `" and "` are joined in code: keep their leading and trailing spaces.
+- Be consistent with the terms already used in the file.
+
+**When you write code.** Every sentence a person reads goes through the helpers, with a string literal as the key, so `npm run i18n:check` can find it. In a React component use `const { t, tn } = useT();` (from `@/hooks/use-t`) and `t('Save settings')`, `t('Deleted :name', { name })`, `tn('one::count app|other::count apps', n)`, or `<Trans text="Open <b>Domains</b>." components={{ b: <strong /> }} />` for a sentence with markup. In PHP use `__('Deleted :name', ['name' => $name])`. Do not build sentences from pieces, because word order differs between languages. Do not translate text that is stored and shown later (deployment logs and errors, audit entries, webhook texts, API errors); it stays English.
+
 ## Reporting bugs and suggesting features
 
 - **Bug?** [Open an issue](https://github.com/commypanel/panel/issues/new/choose) with the version (`sudo commypanel status`), your distribution, what you did, what you expected and what happened. Logs help (`sudo commypanel logs`), but remove anything private first.

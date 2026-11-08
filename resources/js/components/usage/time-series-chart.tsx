@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent } from 'react';
 import { useT } from '@/hooks/use-t';
 import { cn } from '@/lib/utils';
+import { getLocale } from '@/lib/i18n';
 
 export type ChartSeries = {
     label: string;
@@ -63,7 +64,7 @@ function useWidth<T extends HTMLElement>() {
 }
 
 function clock(t: number): string {
-    return new Date(t).toLocaleTimeString([], {
+    return new Date(t).toLocaleTimeString(getLocale(), {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
