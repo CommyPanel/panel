@@ -67,6 +67,9 @@ type Docker interface {
 	RegisterDump(sum string) error
 	ScratchDir() (string, error)
 	RestoreDatabase(ctx context.Context, t docker.DatabaseTarget, db, user, server, file string) error
+	ReplaceDatabase(ctx context.Context, t docker.DatabaseTarget, db, user, server, file string) error
+	RegisterVolumeArchive(sum string) error
+	RestoreVolume(ctx context.Context, app, volume, archive string) (volumefs.Summary, error)
 	Logs(ctx context.Context, name string, tail int) (string, error)
 	ValidateBuild(s docker.BuildSpec) error
 	Build(ctx context.Context, s docker.BuildSpec, onLine func(string)) error
@@ -244,6 +247,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/terminal/tickets", s.terminalTicket)
 	mux.HandleFunc("POST /v1/volumes/remove", s.removeVolumes)
 	mux.HandleFunc("POST /v1/volumes/backup", s.backupVolume)
+	mux.HandleFunc("POST /v1/volumes/restore", s.restoreVolume)
 	mux.HandleFunc("POST /v1/dbtools/start", s.dbtoolStart)
 	mux.HandleFunc("GET /v1/dbtools/{id}", s.dbtoolStatus)
 	mux.HandleFunc("POST /v1/dbtools/{id}/ticket", s.dbtoolTicket)
@@ -780,7 +784,8 @@ func (s *Server) databaseDump(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// databaseRestore loads one of the dumps the agent made into an empty database.
+// databaseRestore loads one of the dumps the agent made into an empty database,
+// or (mode "replace") over a database that already exists.
 func (s *Server) databaseRestore(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		docker.DatabaseTarget
@@ -788,8 +793,13 @@ func (s *Server) databaseRestore(w http.ResponseWriter, r *http.Request) {
 		User     string `json:"user"`
 		Server   string `json:"server"`
 		File     string `json:"file"`
+		Mode     string `json:"mode"`
 	}
 	if !decode(w, r, &body) {
+		return
+	}
+	if body.Mode != "" && body.Mode != "replace" {
+		s.respond(w, &validate.InputError{Msg: `mode must be "replace" or left out`})
 		return
 	}
 	done, ok := s.startHeavy(w)
@@ -797,6 +807,10 @@ func (s *Server) databaseRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer done()
+	if body.Mode == "replace" {
+		s.respond(w, s.opts.Docker.ReplaceDatabase(r.Context(), body.DatabaseTarget, body.Database, body.User, body.Server, body.File))
+		return
+	}
 	s.respond(w, s.opts.Docker.RestoreDatabase(r.Context(), body.DatabaseTarget, body.Database, body.User, body.Server, body.File))
 }
 
@@ -1027,7 +1041,38 @@ func (s *Server) backupVolume(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/gzip")
 	w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
 	w.WriteHeader(http.StatusOK)
-	_, _ = io.Copy(w, f)
+	// What is sent is hashed and remembered once all of it has gone out, so a
+	// later restore can tell this exact archive from one somebody made up.
+	sum := sha256.New()
+	if _, err := io.Copy(io.MultiWriter(w, sum), f); err != nil {
+		return
+	}
+	if err := s.opts.Docker.RegisterVolumeArchive(hex.EncodeToString(sum.Sum(nil))); err != nil {
+		slog.Warn("could not remember a volume archive", "err", err)
+	}
+}
+
+// restoreVolume replaces an app volume's content with an archive the agent made.
+func (s *Server) restoreVolume(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		App     string `json:"app"`
+		Volume  string `json:"volume"`
+		Archive string `json:"archive"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	done, ok := s.startHeavy(w)
+	if !ok {
+		return
+	}
+	defer done()
+	sum, err := s.opts.Docker.RestoreVolume(r.Context(), body.App, body.Volume, body.Archive)
+	if err != nil {
+		s.respond(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "files": sum.Files, "bytes": sum.Bytes})
 }
 
 func (s *Server) removeVolumes(w http.ResponseWriter, r *http.Request) {

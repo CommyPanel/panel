@@ -307,6 +307,21 @@ func (f *fakeDocker) RestoreDatabase(_ context.Context, t docker.DatabaseTarget,
 	return f.err
 }
 
+func (f *fakeDocker) ReplaceDatabase(_ context.Context, t docker.DatabaseTarget, db, user, server, file string) error {
+	f.calls = append(f.calls, "replace "+t.Container+" "+db+" "+user+" "+server+" "+file)
+	return f.err
+}
+
+func (f *fakeDocker) RegisterVolumeArchive(sum string) error {
+	f.calls = append(f.calls, "register-volume "+sum)
+	return f.err
+}
+
+func (f *fakeDocker) RestoreVolume(_ context.Context, app, volume, archive string) (volumefs.Summary, error) {
+	f.calls = append(f.calls, "restore-volume "+app+" "+volume+" "+archive)
+	return volumefs.Summary{Files: 3, Bytes: 42}, f.err
+}
+
 func (f *fakeDocker) DumpDatabase(_ context.Context, t docker.DatabaseTarget, db string) (string, error) {
 	if f.err != nil {
 		return "", f.err
@@ -964,6 +979,59 @@ func TestDatabaseRestoreRoutePassesTheFileOnWithoutTheSecrets(t *testing.T) {
 	}
 }
 
+func TestDatabaseRestoreRouteReplaceModeAndUnknownModes(t *testing.T) {
+	d := &fakeDocker{}
+	s := newDockerServer(d)
+	target := `"container":"db-main","engine":"postgres","root_password":"abcdefghijklmnop1234"`
+	rest := `"database":"shop","user":"shop","server":"main","file":"shop-20261103-040000.sql.gz"`
+
+	rec := do(t, s, "POST", "/v1/databases/restore", `{`+target+`,`+rest+`,"mode":"replace"}`)
+	if rec.Code != 200 || len(d.calls) != 1 || d.calls[0] != "replace db-main shop shop main shop-20261103-040000.sql.gz" {
+		t.Fatalf("replace: %d %s %v", rec.Code, rec.Body, d.calls)
+	}
+	d.calls = nil
+	if rec := do(t, s, "POST", "/v1/databases/restore", `{`+target+`,`+rest+`,"mode":""}`); rec.Code != 200 || !strings.HasPrefix(d.calls[0], "restore ") {
+		t.Errorf("empty mode must be the old behaviour: %d %v", rec.Code, d.calls)
+	}
+	d.calls = nil
+	for _, mode := range []string{"new", "REPLACE", "drop"} {
+		if rec := do(t, s, "POST", "/v1/databases/restore", `{`+target+`,`+rest+`,"mode":"`+mode+`"}`); rec.Code != 400 {
+			t.Errorf("mode %q: %d", mode, rec.Code)
+		}
+	}
+	if len(d.calls) != 0 {
+		t.Errorf("calls = %v", d.calls)
+	}
+	d.err = &validate.InputError{Msg: "the database \"shop\" does not exist on this server, so there is nothing to replace"}
+	rec = do(t, s, "POST", "/v1/databases/restore", `{`+target+`,`+rest+`,"mode":"replace"}`)
+	if rec.Code != 400 || !strings.Contains(rec.Body.String(), `"error":`) {
+		t.Errorf("error answer: %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestVolumeRestoreRoute(t *testing.T) {
+	d := &fakeDocker{}
+	s := newDockerServer(d)
+	rec := do(t, s, "POST", "/v1/volumes/restore", `{"app":"shop","volume":"uploads","archive":"uploads-20261103-040000.tar.gz"}`)
+	if rec.Code != 200 || strings.TrimSpace(rec.Body.String()) != `{"bytes":42,"files":3,"ok":true}` {
+		t.Fatalf("restore: %d %s", rec.Code, rec.Body)
+	}
+	if len(d.calls) != 1 || d.calls[0] != "restore-volume shop uploads uploads-20261103-040000.tar.gz" {
+		t.Errorf("calls = %v", d.calls)
+	}
+	if rec := do(t, s, "POST", "/v1/volumes/restore", `{"app":"shop","volume":"uploads"}`); rec.Code != 200 {
+		// The fake accepts anything; validation is the manager's, tested there.
+		t.Logf("missing archive reaches the manager: %d", rec.Code)
+	}
+	if rec := do(t, s, "POST", "/v1/volumes/restore", `{"app":"shop","volume":"uploads","archive":"x","extra":1}`); rec.Code != 400 {
+		t.Errorf("an unknown field: %d", rec.Code)
+	}
+	d.err = &validate.InputError{Msg: "container shop-1 is running with this volume mounted; stop the app first"}
+	if rec := do(t, s, "POST", "/v1/volumes/restore", `{"app":"shop","volume":"uploads","archive":"uploads-20261103-040000.tar.gz"}`); rec.Code != 400 || !strings.Contains(rec.Body.String(), "stop the app first") {
+		t.Errorf("a refusal: %d %s", rec.Code, rec.Body)
+	}
+}
+
 func TestVolumeBackupRouteStreamsAGzippedArchiveAndLeavesNoCopy(t *testing.T) {
 	dir := t.TempDir()
 	vol := filepath.Join(dir, "volumes", "shop", "uploads")
@@ -978,6 +1046,10 @@ func TestVolumeBackupRouteStreamsAGzippedArchiveAndLeavesNoCopy(t *testing.T) {
 	rec := do(t, s, "POST", "/v1/volumes/backup", `{"app":"shop","name":"uploads"}`)
 	if rec.Code != 200 || rec.Header().Get("Content-Type") != "application/gzip" {
 		t.Fatalf("backup: %d %v %s", rec.Code, rec.Header(), rec.Body)
+	}
+	fd := s.opts.Docker.(*fakeDocker)
+	if len(fd.calls) != 1 || !strings.HasPrefix(fd.calls[0], "register-volume ") {
+		t.Errorf("the archive was not remembered: %v", fd.calls)
 	}
 	zr, err := gzip.NewReader(rec.Body)
 	if err != nil {

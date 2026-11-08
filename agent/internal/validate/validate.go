@@ -291,3 +291,14 @@ func within(base, p string) bool {
 	rel, err := filepath.Rel(filepath.Clean(base), p)
 	return err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
+
+var volumeArchiveRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?-\d{8}-\d{6}\.tar\.gz$`)
+
+// VolumeArchive checks the name of a volume archive as the panel keeps it:
+// volume name, date, time. It has no slash, so it can only name a file in one folder.
+func VolumeArchive(s string) error {
+	if !volumeArchiveRe.MatchString(s) {
+		return invalid("not a volume archive file name")
+	}
+	return nil
+}

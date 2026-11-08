@@ -42,6 +42,9 @@ type fakeDaemon struct {
 	connected       []string
 	connectBody     map[string]any
 	execBody        map[string]any
+	execScript      func(cmd []string, stdin string) (reply string, exit int) // answers each exec itself when set
+	execLog         []string                                                  // "cmd | stdin" of every exec, in order
+	listState       string                                                    // State the container list reports (default running)
 	resized         string
 	netMissing      bool // the per-app network does not exist yet
 	netForeign      bool // it exists but was not created by the agent
@@ -78,6 +81,14 @@ func (f *fakeDaemon) handler() http.Handler {
 				f.mu.Lock()
 				f.stdin = string(input)
 				reply := f.execReply
+				if f.execScript != nil {
+					var cmd []string
+					for _, c := range f.execBody["Cmd"].([]any) {
+						cmd = append(cmd, c.(string))
+					}
+					f.execLog = append(f.execLog, strings.Join(cmd, " ")+" | "+string(input))
+					reply, f.execExit = f.execScript(cmd, string(input))
+				}
 				f.mu.Unlock()
 				if reply == "" {
 					reply = "OUT:" + string(input)
@@ -189,7 +200,7 @@ func (f *fakeDaemon) handler() http.Handler {
 			// A mount outside the volumes directory is not named.
 			mounts = append(mounts, map[string]any{"Source": "/etc/secret", "Destination": "/x", "RW": false})
 			_ = json.NewEncoder(w).Encode([]map[string]any{{
-				"Names": []string{"/demo-1"}, "Image": "demo:1", "State": "running", "Status": "Up 2 minutes", "Mounts": mounts,
+				"Names": []string{"/demo-1"}, "Image": "demo:1", "State": cmpOr(f.listState, "running"), "Status": "Up 2 minutes", "Mounts": mounts,
 				"Ports": []map[string]any{
 					{"IP": "127.0.0.1", "PrivatePort": 8080, "PublicPort": 20001, "Type": "tcp"},
 					{"PrivatePort": 9090, "Type": "tcp"}, // exposed but not published
@@ -650,4 +661,11 @@ func TestAMountSourceCannotSmuggleInBindOptions(t *testing.T) {
 			t.Errorf("source %q was accepted", source)
 		}
 	}
+}
+
+func cmpOr(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
 }
