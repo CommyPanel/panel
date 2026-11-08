@@ -4,12 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Audit\AuditLogger;
 use App\Auth\SyncRolesAndPermissions;
+use App\I18n\Locales;
 use App\Models\SetupToken;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -31,6 +34,7 @@ class SetupController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255'],
             'password' => ['required', 'confirmed', Password::defaults()],
+            'locale' => ['nullable', 'string', Rule::in(array_keys(Locales::available()))],
         ]);
 
         $user = DB::transaction(function () use ($token, $data): User {
@@ -40,7 +44,8 @@ class SetupController extends Controller
 
             $setupToken->forceFill(['used_at' => now()])->save();
 
-            $user = User::query()->create([...$data, 'email_verified_at' => now()]);
+            $user = User::query()->create(Arr::except($data, ['locale']) + ['email_verified_at' => now()]);
+            $user->forceFill(['locale' => Locales::resolve($data['locale'] ?? app()->getLocale())])->save();
             // The first account is the super user. The flag is never mass-assignable.
             $user->forceFill(['is_super' => true])->save();
 

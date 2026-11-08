@@ -1,0 +1,22 @@
+{
+    "Appearance": "Appearance",
+    "Confirm password": "Confirm password",
+    "Create admin": "Create admin",
+    "Create the admin account": "Create the admin account",
+    "Email": "Email",
+    "Language": "Language",
+    "Log in": "Log in",
+    "Name": "Name",
+    "Password": "Password",
+    "Pick how CommyPanel looks and which language it speaks.": "Pick how CommyPanel looks and which language it speaks.",
+    "Remember me": "Remember me",
+    "Set up CommyPanel": "Set up CommyPanel",
+    "Sign in to manage your server.": "Sign in to manage your server.",
+    "The choice is remembered in this browser.": "The choice is remembered in this browser.",
+    "The language of the panel for your account. Other people choose their own.": "The language of the panel for your account. Other people choose their own.",
+    "The language of your panel. You can change it later, and everyone you add chooses their own.": "The language of your panel. You can change it later, and everyone you add chooses their own.",
+    "The provided password does not match your current password.": "The provided password does not match your current password.",
+    "Theme": "Theme",
+    "This account can do everything, and it cannot be removed from inside the panel. The link you used works only once.": "This account can do everything, and it cannot be removed from inside the panel. The link you used works only once.",
+    "Welcome. A few steps to get your server ready, starting with the first admin account.": "Welcome. A few steps to get your server ready, starting with the first admin account."
+}

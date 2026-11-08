@@ -5,8 +5,11 @@ namespace App\Http\Middleware;
 use App\Auth\Permissions;
 use App\Auth\UserAccess;
 use App\Host\HostHealth;
+use App\I18n\Locales;
+use App\I18n\Translations;
 use App\Updates\UpdateChecker;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -42,6 +45,10 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'locale' => app()->getLocale(),
+            'locales' => collect(Locales::available())->map(fn (string $name, string $code) => ['code' => $code, 'name' => $name])->values()->all(),
+            // Every sentence of the person's language, sent once and remembered by the browser for that language.
+            'translations' => Inertia::once(fn () => Translations::for(app()->getLocale()))->as('translations-'.app()->getLocale()),
             // Lazy, so partial reloads that do not ask for it never contact the agent.
             'hostHealth' => fn () => $request->user() === null ? null : app(HostHealth::class)->status(),
             // Read from what is already remembered; this never contacts GitHub.

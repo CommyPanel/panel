@@ -5,6 +5,7 @@ use App\Http\Controllers\GitHubWebhookController;
 use App\Http\Controllers\PushWebhookController;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\LimitApiFailures;
+use App\Http\Middleware\SetLocale;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\SQLiteDatabaseDoesNotExistException;
@@ -47,6 +48,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // send a header block bigger than nginx's default 4k FastCGI buffer,
         // which nginx reports as a 502 on a full reload.
         $middleware->web(append: [
+            SetLocale::class,
             HandleInertiaRequests::class,
         ]);
     })

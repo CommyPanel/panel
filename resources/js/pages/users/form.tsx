@@ -6,6 +6,8 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { LanguageSelect } from '@/components/language-select';
+import { useT } from '@/hooks/use-t';
 import { Select } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 
@@ -21,6 +23,7 @@ type Props = {
         id: number;
         name: string;
         email: string;
+        locale: string;
         role_id: number | null;
         is_you: boolean;
     } | null;
@@ -28,6 +31,7 @@ type Props = {
 };
 
 export default function Form({ user, roles }: Props) {
+    const { locale } = useT();
     const editing = user !== null;
     const form = useForm({
         name: user?.name ?? '',
@@ -35,6 +39,8 @@ export default function Form({ user, roles }: Props) {
         password: '',
         password_confirmation: '',
         role: user?.role_id ? String(user.role_id) : '',
+        // A new person starts with the language of whoever adds them, and can change it.
+        locale: user?.locale ?? locale,
     });
 
     const submit = (event: FormEvent) => {
@@ -78,6 +84,16 @@ export default function Form({ user, roles }: Props) {
                         value={form.data.email}
                         onChange={(e) => form.setData('email', e.target.value)}
                         error={form.errors.email}
+                    />
+                    <LanguageSelect
+                        value={form.data.locale}
+                        onChange={(code) => form.setData('locale', code)}
+                        error={form.errors.locale}
+                        hint={
+                            editing
+                                ? undefined
+                                : 'The language of their panel. They can change it themselves.'
+                        }
                     />
                     <Input
                         label={editing ? 'New password' : 'Password'}

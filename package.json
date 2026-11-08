@@ -8,7 +8,9 @@
         "dev": "vp dev",
         "check": "vp check",
         "check:fix": "vp check --fix",
-        "types:check": "tsc --noEmit"
+        "types:check": "tsc --noEmit",
+        "i18n:check": "node scripts/i18n.mjs check",
+        "i18n:sync": "node scripts/i18n.mjs sync"
     },
     "dependencies": {
         "@inertiajs/react": "^3.0.0",

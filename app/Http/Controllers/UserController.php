@@ -7,6 +7,7 @@ use App\Auth\RevokeSessions;
 use App\Auth\UserAccess;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
+use App\I18n\Locales;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -54,7 +55,7 @@ class UserController extends Controller
             'email' => $request->validated('email'),
             'password' => $request->validated('password'),
         ]);
-        $user->forceFill(['email_verified_at' => now()])->save();
+        $user->forceFill(['email_verified_at' => now(), 'locale' => Locales::resolve($request->validated('locale') ?? $request->user()->locale)])->save();
 
         if ($role !== null) {
             $user->syncRoles([$role]);
@@ -73,6 +74,7 @@ class UserController extends Controller
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
+                'locale' => Locales::resolve($user->locale),
                 'email' => $user->email,
                 'role_id' => Role::query()->where('guard_name', 'web')->whereIn('name', $user->getRoleNames())->value('id'),
                 'is_you' => $user->is($request->user()),
@@ -90,6 +92,10 @@ class UserController extends Controller
         $before = $user->getRoleNames()->first();
 
         $user->fill($request->safe()->only(['name', 'email']));
+
+        if ($request->filled('locale')) {
+            $user->forceFill(['locale' => Locales::resolve($request->validated('locale'))]);
+        }
         $passwordChanged = filled($request->validated('password'));
 
         if ($passwordChanged) {

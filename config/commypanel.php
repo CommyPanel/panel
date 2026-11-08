@@ -151,6 +151,24 @@ return [
         'max_files' => (int) env('UPLOAD_MAX_FILES', 20000),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Languages of the panel's interface
+    |--------------------------------------------------------------------------
+    |
+    | Code => the language's own name. Every language listed here must have a lang/<code>.json file
+    | (English is the fallback and needs none). To add a language, add its file and one line here.
+    */
+    'locales' => [
+        'en' => 'English',
+        'fr' => 'Français',
+        'de' => 'Deutsch',
+        'es' => 'Español',
+        'ru' => 'Русский',
+        'uk' => 'Українська',
+        'tr' => 'Türkçe',
+    ],
+
     'databases' => [
         // Official image tags that can be chosen, newest first.
         'versions' => [

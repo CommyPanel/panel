@@ -37,6 +37,7 @@ use App\Http\Controllers\EnvVarController;
 use App\Http\Controllers\GitHubController;
 use App\Http\Controllers\GitTokenController;
 use App\Http\Controllers\HttpsController;
+use App\Http\Controllers\LanguageController;
 use App\Http\Controllers\ManagedDatabaseController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PermissionController;
@@ -64,6 +65,7 @@ Route::middleware('auth')->group(function () {
     // Any signed-in user: their own dashboard and account settings.
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::inertia('/settings/appearance', 'settings/appearance')->name('settings.appearance');
+    Route::put('/settings/language', [LanguageController::class, 'update'])->name('settings.language');
     Route::inertia('/settings/security', 'settings/security')
         ->middleware('password.confirm')
         ->name('settings.security');

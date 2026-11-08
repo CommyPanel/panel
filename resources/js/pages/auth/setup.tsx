@@ -1,19 +1,38 @@
-import { useForm } from '@inertiajs/react';
+import { router, useForm } from '@inertiajs/react';
 import type { FormEvent } from 'react';
+import { LanguageSelect } from '@/components/language-select';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { useT } from '@/hooks/use-t';
 import SetupLayout from '@/layouts/setup-layout';
 
 type Props = { token: string };
 
 export default function Setup({ token }: Props) {
+    const { t, locale } = useT();
     const form = useForm({
+        locale,
         name: '',
         email: '',
         password: '',
         password_confirmation: '',
     });
+
+    // Choosing a language shows this page in it at once, and it becomes the admin's language.
+    const chooseLanguage = (code: string) => {
+        form.setData('locale', code);
+        router.get(
+            `/setup/${token}`,
+            { lang: code },
+            {
+                only: ['locale', 'translations'],
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            },
+        );
+    };
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -24,17 +43,29 @@ export default function Setup({ token }: Props) {
 
     return (
         <SetupLayout
-            title="Set up CommyPanel"
-            description="Welcome. A few steps to get your server ready, starting with the first admin account."
+            title={t('Set up CommyPanel')}
+            description={t(
+                'Welcome. A few steps to get your server ready, starting with the first admin account.',
+            )}
             step={0}
         >
             <Card
-                title="Create the admin account"
-                description="This account can do everything, and it cannot be removed from inside the panel. The link you used works only once."
+                title={t('Create the admin account')}
+                description={t(
+                    'This account can do everything, and it cannot be removed from inside the panel. The link you used works only once.',
+                )}
             >
                 <form onSubmit={submit} className="space-y-4">
+                    <LanguageSelect
+                        value={form.data.locale}
+                        onChange={chooseLanguage}
+                        error={form.errors.locale}
+                        hint={t(
+                            'The language of your panel. You can change it later, and everyone you add chooses their own.',
+                        )}
+                    />
                     <Input
-                        label="Name"
+                        label={t('Name')}
                         autoComplete="name"
                         autoFocus
                         required
@@ -43,7 +74,7 @@ export default function Setup({ token }: Props) {
                         error={form.errors.name}
                     />
                     <Input
-                        label="Email"
+                        label={t('Email')}
                         type="email"
                         autoComplete="username"
                         required
@@ -52,7 +83,7 @@ export default function Setup({ token }: Props) {
                         error={form.errors.email}
                     />
                     <Input
-                        label="Password"
+                        label={t('Password')}
                         type="password"
                         autoComplete="new-password"
                         required
@@ -63,7 +94,7 @@ export default function Setup({ token }: Props) {
                         error={form.errors.password}
                     />
                     <Input
-                        label="Confirm password"
+                        label={t('Confirm password')}
                         type="password"
                         autoComplete="new-password"
                         required
@@ -81,7 +112,7 @@ export default function Setup({ token }: Props) {
                         className="w-full"
                         loading={form.processing}
                     >
-                        Create admin
+                        {t('Create admin')}
                     </Button>
                 </form>
             </Card>

@@ -1,11 +1,14 @@
-import { useForm } from '@inertiajs/react';
+import { router, useForm } from '@inertiajs/react';
 import type { FormEvent } from 'react';
+import { LanguageSelect } from '@/components/language-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useT } from '@/hooks/use-t';
 import AuthLayout from '@/layouts/auth-layout';
 import { fortify } from '@/lib/fortify';
 
 export default function Login() {
+    const { t, locale } = useT();
     const form = useForm({ email: '', password: '', remember: false });
 
     const submit = (event: FormEvent) => {
@@ -15,11 +18,27 @@ export default function Login() {
         });
     };
 
+    // Before signing in, the language is the browser's, and can be changed here for this session.
+    const chooseLanguage = (code: string) =>
+        router.get(
+            window.location.pathname,
+            { lang: code },
+            {
+                only: ['locale', 'translations'],
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            },
+        );
+
     return (
-        <AuthLayout title="Log in" description="Sign in to manage your server.">
+        <AuthLayout
+            title={t('Log in')}
+            description={t('Sign in to manage your server.')}
+        >
             <form onSubmit={submit} className="space-y-4">
                 <Input
-                    label="Email"
+                    label={t('Email')}
                     type="email"
                     autoComplete="username"
                     autoFocus
@@ -29,7 +48,7 @@ export default function Login() {
                     error={form.errors.email}
                 />
                 <Input
-                    label="Password"
+                    label={t('Password')}
                     type="password"
                     autoComplete="current-password"
                     required
@@ -46,15 +65,16 @@ export default function Login() {
                             form.setData('remember', e.target.checked)
                         }
                     />
-                    Remember me
+                    {t('Remember me')}
                 </label>
                 <Button
                     type="submit"
                     className="w-full"
                     loading={form.processing}
                 >
-                    Log in
+                    {t('Log in')}
                 </Button>
+                <LanguageSelect value={locale} onChange={chooseLanguage} />
             </form>
         </AuthLayout>
     );
