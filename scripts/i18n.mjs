@@ -6,6 +6,8 @@
 //   node scripts/i18n.mjs sync           write lang/en.json from the sentences found in the code
 //   node scripts/i18n.mjs todo <code>    the sentences <code> still lacks, as JSON to fill in
 //   node scripts/i18n.mjs stats          how complete each language is
+//   node scripts/i18n.mjs apply <code> <file>        put translations (a JSON object, sentence => translation, as printed by `todo`) into lang/<code>.json
+//   node scripts/i18n.mjs prune                       remove sentences the code no longer uses from every language file
 //   node scripts/i18n.mjs chunk <n> [size]            sentences n*size.. of the full list, as a JSON array
 //   node scripts/i18n.mjs merge <code> <n> <file> [size]  put the translations (a JSON array in the same order) of that chunk into lang/<code>.json
 //
@@ -257,6 +259,10 @@ function check(strict) {
                 errors.push(
                     `lang/${code}.json: tags differ in "${key.slice(0, 60)}" (${tags(key).join(' ') || 'none'} vs ${tags(value).join(' ') || 'none'})`,
                 );
+            if (EXTRA_COLON.test(value))
+                errors.push(
+                    `lang/${code}.json: a plural form has an extra colon in "${key.slice(0, 60)}"`,
+                );
             const keyForms = plurals(key);
             // A language that has more plural categories than English needs those forms too.
             const needed = new Intl.PluralRules(code)
@@ -395,11 +401,79 @@ function merge(code, n, file, size) {
     process.exit(bad ? 1 : 0);
 }
 
+const EXTRA_COLON = /(?:^|\|)(?:zero|one|two|few|many|other):::/;
+
+function validate(key, value) {
+    return typeof value === 'string' && EXTRA_COLON.test(value)
+        ? 'a plural form has an extra colon (write one::count, not one:::count)'
+        : typeof value !== 'string' || value.trim() === ''
+          ? 'empty'
+          : placeholders(value).join() !== placeholders(key).join()
+            ? `placeholders ${placeholders(key).join(' ') || 'none'} vs ${placeholders(value).join(' ') || 'none'}`
+            : tags(value).join() !== tags(key).join()
+              ? `tags ${tags(key).join(' ') || 'none'} vs ${tags(value).join(' ') || 'none'}`
+              : plurals(key) &&
+                  (!plurals(value) ||
+                      !plurals(value).includes('other') ||
+                      plurals(value).some((f) => !CATEGORIES.has(f)))
+                ? 'plural forms must be like one:..|other:..'
+                : null;
+}
+
+// Put translations from a JSON object (sentence => translation) into lang/<code>.json; rejects bad entries.
+function apply(code, file) {
+    const keys = new Set(collect());
+    const incoming = JSON.parse(readFileSync(file, 'utf8'));
+    const path = join(LANG, `${code}.json`);
+    const data = existsSync(path) ? load(code) : {};
+    let written = 0;
+    let bad = 0;
+    for (const [key, value] of Object.entries(incoming)) {
+        if (!keys.has(key)) {
+            bad++;
+            console.error(`unknown sentence: ${key.slice(0, 80)}`);
+            continue;
+        }
+        const why = validate(key, value);
+        if (why) {
+            bad++;
+            console.error(`rejected (${why}): ${key.slice(0, 80)}`);
+            continue;
+        }
+        data[key] = value;
+        written++;
+    }
+    const sorted = Object.fromEntries(
+        Object.entries(data).sort(([a], [b]) => a.localeCompare(b, 'en')),
+    );
+    writeFileSync(path, `${JSON.stringify(sorted, null, 4)}\n`);
+    console.log(`${code}: ${written} written, ${bad} rejected`);
+    process.exit(bad ? 1 : 0);
+}
+
+function prune() {
+    const keys = new Set(collect());
+    for (const code of locales()) {
+        const data = load(code);
+        const kept = Object.fromEntries(
+            Object.entries(data).filter(([k]) => keys.has(k)),
+        );
+        const removed = Object.keys(data).length - Object.keys(kept).length;
+        writeFileSync(
+            join(LANG, `${code}.json`),
+            `${JSON.stringify(kept, null, 4)}\n`,
+        );
+        console.log(`${code}: removed ${removed} unused`);
+    }
+}
+
 const [command, arg] = process.argv.slice(2);
 if (command === 'check') check(arg === '--strict');
 else if (command === 'sync') sync();
 else if (command === 'todo' && arg) todo(arg);
 else if (command === 'stats') stats();
+else if (command === 'apply') apply(arg, process.argv[4]);
+else if (command === 'prune') prune();
 else if (command === 'chunk')
     chunk(Number(arg ?? 0), Number(process.argv[4] ?? 250));
 else if (command === 'merge')

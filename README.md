@@ -60,7 +60,7 @@ Deploy .NET, Go and Node apps from Git with zero downtime, connect domains with 
 **Operating it**
 
 - Users, roles and fine-grained permissions, optional two-factor authentication, and an audit log of every privileged action, coloured by risk, that you can filter and search.
-- API tokens for CI, deployment messages to Slack, Discord or any webhook, and backups of the panel itself, with optional copies to any S3-compatible storage.
+- API tokens for CI, alerts to Slack, Discord, Teams, ntfy, Telegram or any webhook, and backups of the panel itself, with optional copies to any S3-compatible storage.
 - Three themes (light, dim and true-black dark), and a first-run setup that is one centered page.
 
 ## Screenshots
@@ -233,7 +233,7 @@ CommyPanel is pre-1.0. What you should know before you rely on it:
 **Integrations and operations**
 
 - GitHub Enterprise Server is not supported. GitLab, Gitea and Bitbucket work with deploy keys or tokens, without one-click connection.
-- Deployment messages are one webhook for the whole panel (no email, no per-app targets).
+- Alerts go to Slack, Discord, Teams, ntfy, Telegram or a JSON webhook (up to 10 targets), not to email. One app can be muted, but targets are not chosen per app.
 - There is no way to upgrade from the UI; you run `sudo commypanel upgrade`.
 - Settings such as the app port, health path and resource limits apply from the next full deployment.
 - The panel has not been exercised on a wide range of real servers yet. Please report what you find.
