@@ -97,6 +97,8 @@ Route::middleware('auth')->group(function () {
             Route::post('setup/continue', [AppSetupController::class, 'continue'])->name('setup.continue');
             Route::post('setup/back', [AppSetupController::class, 'back'])->name('setup.back');
             Route::post('setup/settings', [AppSetupController::class, 'settings'])->name('setup.settings');
+            Route::post('setup/database', [AppSetupController::class, 'database'])->name('setup.database');
+            Route::post('setup/database-server', [AppSetupController::class, 'createServer'])->middleware('throttle:10,1')->name('setup.database-server');
             Route::post('setup/finish', [AppSetupController::class, 'finish'])->name('setup.finish');
             Route::delete('setup', [AppSetupController::class, 'cancel'])->name('setup.cancel');
         });

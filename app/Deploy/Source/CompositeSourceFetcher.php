@@ -10,6 +10,7 @@ class CompositeSourceFetcher implements SourceFetcher
     public function __construct(
         private readonly GitSourceFetcher $git,
         private readonly UploadSourceFetcher $upload,
+        private readonly TemplateSourceFetcher $template,
     ) {}
 
     private ?SourceFetcher $last = null;
@@ -21,7 +22,11 @@ class CompositeSourceFetcher implements SourceFetcher
 
     public function fetch(App $app, string $destination): string
     {
-        $this->last = $app->source_type === SourceType::Upload ? $this->upload : $this->git;
+        $this->last = match ($app->source_type) {
+            SourceType::Upload => $this->upload,
+            SourceType::Template => $this->template,
+            default => $this->git,
+        };
 
         return $this->last->fetch($app, $destination);
     }

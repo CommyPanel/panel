@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Audit\AuditLogger;
+use App\Auth\Permissions;
+use App\Databases\DatabaseException;
+use App\Databases\DatabaseServers;
 use App\Deploy\Deployer;
 use App\Deploy\DestroyApp;
 use App\Deploy\EnvParser;
@@ -15,17 +18,22 @@ use App\Deploy\Source\InvalidArchive;
 use App\Deploy\Source\RepositoryAccessChecker;
 use App\Deploy\Source\UploadStorage;
 use App\Dns\ServerAddress;
+use App\Enums\DatabaseEngine;
 use App\Enums\SetupStep;
 use App\Enums\SourceType;
+use App\FastApps\FastApps;
+use App\FastApps\QuickInstall;
 use App\GitHub\GitHubFailed;
 use App\Http\Requests\FinishSetupRequest;
 use App\Models\App;
 use App\Models\AppEnvVar;
+use App\Models\DatabaseServer;
 use App\Presenters\AppPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -59,9 +67,51 @@ class AppSetupController extends Controller
                 'name' => $provider->label(),
                 ...($app->deploy_key_public === null ? ['url' => null, 'steps' => []] : $provider->deployKeyInstructions((string) $app->git_url)),
             ],
+            'quick' => $app->source_type === SourceType::Template ? $this->quick($app) : null,
             'server' => $server->forPage(),
             'limits' => ['max_archive_mb' => (int) config('commypanel.uploads.max_archive_mb')],
         ]);
+    }
+
+    /**
+     * What the Database step of a quick-install app shows: the servers that work with it, which one is
+     * chosen, and whether it can be used yet.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function quick(App $app): ?array
+    {
+        $template = FastApps::find($app->template);
+
+        if ($template === null) {
+            return null;
+        }
+
+        $quick = app(QuickInstall::class);
+
+        return [
+            'template' => ['id' => $template->id(), 'name' => $template->name(), 'admin_path' => $template->adminPath()],
+            'engines' => collect($template->engines())->map(fn (DatabaseEngine $e) => ['value' => $e->value, 'label' => $e->label(), 'versions' => $e->versions()])->all(),
+            'servers' => collect($quick->servers($template))->map(fn (DatabaseServer $s) => [
+                'id' => $s->id,
+                'slug' => $s->slug,
+                'name' => $s->name,
+                'engine_label' => $s->engine->label(),
+                'version' => $s->version,
+                'status' => $s->status->value,
+                'status_label' => $s->status->label(),
+                'error' => $s->error,
+            ])->all(),
+            'selected' => $app->template_database_server_id,
+            'ready' => $quick->serverReady($app),
+            'database_name' => $app->template_database_server_id === null ? null : $this->previewName($template->id(), $app->slug),
+            'can_create_server' => (bool) request()->user()?->can(Permissions::DATABASES_MANAGE),
+        ];
+    }
+
+    private function previewName(string $id, string $slug): string
+    {
+        return rtrim(substr($id.'_'.str_replace('-', '_', $slug), 0, 26), '_');
     }
 
     /**
@@ -139,7 +189,7 @@ class AppSetupController extends Controller
     {
         $previous = match ($app->setup_step) {
             SetupStep::Settings => SetupStep::Source,
-            SetupStep::Domain => SetupStep::Settings,
+            SetupStep::Domain => $app->source_type === SourceType::Template ? SetupStep::Database : SetupStep::Settings,
             default => abort(404),
         };
 
@@ -167,9 +217,73 @@ class AppSetupController extends Controller
         return redirect()->route('apps.setup', $app);
     }
 
-    public function finish(Request $request, App $app, Deployer $deployer, AuditLogger $audit): RedirectResponse
+    /**
+     * The Database step of a quick-install app: choose the server its database will be made on.
+     */
+    public function database(Request $request, App $app, QuickInstall $quick): RedirectResponse
+    {
+        abort_unless($app->setup_step === SetupStep::Database && $app->source_type === SourceType::Template, 404);
+
+        $data = $request->validate(['server' => ['required', 'integer', Rule::exists('database_servers', 'id')]]);
+        $server = DatabaseServer::query()->whereKey((int) $data['server'])->firstOrFail();
+
+        try {
+            $quick->chooseServer($app, $server);
+
+            if (! $server->isRunning()) {
+                throw new DatabaseException(__('That database server is still starting. Continue when it is running.'));
+            }
+        } catch (DatabaseException $e) {
+            return back()->withErrors(['server' => $e->getMessage()]);
+        }
+
+        $app->forceFill(['setup_step' => SetupStep::Domain])->save();
+
+        return redirect()->route('apps.setup', $app);
+    }
+
+    /**
+     * Make a new database server from inside the wizard, for when none fits. It starts in the
+     * background; the page follows it and the new server is chosen for the app.
+     */
+    public function createServer(Request $request, App $app, DatabaseServers $servers, QuickInstall $quick, AuditLogger $audit): RedirectResponse
+    {
+        abort_unless($app->setup_step === SetupStep::Database && $app->source_type === SourceType::Template, 404);
+        abort_unless($request->user()->can(Permissions::DATABASES_MANAGE), 403);
+
+        $template = FastApps::find($app->template);
+        abort_if($template === null, 404);
+
+        $engines = array_map(fn (DatabaseEngine $e) => $e->value, $template->engines());
+        $data = $request->validate([
+            'name' => ['required', 'string', 'min:2', 'max:60'],
+            'engine' => ['required', Rule::in($engines)],
+            'version' => ['required', 'string', 'max:16'],
+        ]);
+
+        try {
+            $server = $servers->create($data['name'], DatabaseEngine::from($data['engine']), $data['version']);
+            $quick->chooseServer($app, $server);
+        } catch (DatabaseException $e) {
+            return back()->withErrors(['version' => $e->getMessage()]);
+        }
+
+        $audit->record('database_server.created', $request->user(), ['server' => $server->slug, 'engine' => $server->engine->value, 'version' => $server->version, 'for_app' => $app->slug]);
+
+        return back()->with('status', __(':name is being set up. The first start downloads the image and can take a few minutes.', ['name' => $server->name]));
+    }
+
+    public function finish(Request $request, App $app, Deployer $deployer, AuditLogger $audit, QuickInstall $quick): RedirectResponse
     {
         abort_unless($app->setup_step === SetupStep::Domain && $app->source_verified_at !== null, 404);
+
+        if ($app->source_type === SourceType::Template) {
+            try {
+                $quick->finish($app, $request->user());
+            } catch (DatabaseException $e) {
+                return back()->withErrors(['setup' => $e->getMessage()]);
+            }
+        }
 
         $app->forceFill(['setup_step' => null])->save();
 

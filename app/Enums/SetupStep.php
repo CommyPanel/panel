@@ -9,6 +9,8 @@ namespace App\Enums;
 enum SetupStep: string
 {
     case Source = 'source';
+    /** Quick-install apps choose their database here instead of giving repository access. */
+    case Database = 'database';
     case Settings = 'settings';
     case Domain = 'domain';
 }

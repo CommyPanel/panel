@@ -8,6 +8,7 @@ enum Stack: string
     case Dotnet = 'dotnet';
     case Go = 'go';
     case Node = 'node';
+    case Wordpress = 'wordpress';
 
     public function label(): string
     {
@@ -16,6 +17,7 @@ enum Stack: string
             self::Dotnet => '.NET',
             self::Go => 'Go',
             self::Node => 'Node.js',
+            self::Wordpress => 'WordPress',
         };
     }
 }

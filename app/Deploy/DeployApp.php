@@ -13,6 +13,7 @@ use App\Deploy\Stacks\StackDetector;
 use App\Enums\DeploymentStage;
 use App\Enums\DeploymentStatus;
 use App\Enums\Stack;
+use App\FastApps\QuickInstall;
 use App\Host\Data\ContainerSpec;
 use App\Host\Data\ImageBuildSpec;
 use App\Host\Data\TaskSpec;
@@ -46,6 +47,7 @@ class DeployApp
         private readonly ReleaseSwitcher $switcher,
         private readonly WatchService $watch,
         private readonly RolloutService $rollouts,
+        private readonly QuickInstall $quick,
     ) {}
 
     public function __invoke(Deployment $deployment): void
@@ -90,6 +92,11 @@ class DeployApp
             }
 
             $this->switcher->goLive($app, $deployment, $previous, $log);
+
+            // A quick-install app's first-start answers (the first user's password) have done their job.
+            if ($app->template !== null) {
+                $this->quick->afterLive($app);
+            }
 
             $log->line('Deployment finished.');
             $this->audit->record('deploy.succeeded', null, ['app' => $app->slug, 'deployment' => $deployment->number]);

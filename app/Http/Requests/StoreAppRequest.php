@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Deploy\Source\GitUrl;
 use App\Enums\SourceType;
 use App\Enums\Stack;
+use App\FastApps\FastApps;
 use App\GitHub\GitHubApp;
 use App\GitHub\GitHubFailed;
 use Closure;
@@ -22,6 +23,38 @@ class StoreAppRequest extends FormRequest
     }
 
     /**
+     * The fields of the chosen quick-install app: each has its own rules.
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    private function templateRules(): array
+    {
+        $template = $this->input('source') === 'template' ? FastApps::find((string) $this->input('template')) : null;
+        $rules = [];
+
+        foreach ($template?->fields() ?? [] as $field) {
+            $rules["settings.{$field->key}"] = $field->rules;
+        }
+
+        return $rules;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        $template = $this->input('source') === 'template' ? FastApps::find((string) $this->input('template')) : null;
+        $names = [];
+
+        foreach ($template?->fields() ?? [] as $field) {
+            $names["settings.{$field->key}"] = mb_strtolower($field->label);
+        }
+
+        return $names;
+    }
+
+    /**
      * @return array<string, array<int, mixed>>
      */
     public function rules(): array
@@ -29,7 +62,10 @@ class StoreAppRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'min:2', 'max:100'],
             'stack_hint' => ['nullable', Rule::in([Stack::Dotnet->value, Stack::Go->value, Stack::Node->value])],
-            'source' => ['required', Rule::in([SourceType::Git->value, SourceType::Upload->value, 'github'])],
+            'source' => ['required', Rule::in([SourceType::Git->value, SourceType::Upload->value, SourceType::Template->value, 'github'])],
+            'template' => ['exclude_unless:source,template', 'required', Rule::in(array_keys(FastApps::all()))],
+            'settings' => ['exclude_unless:source,template', 'required', 'array'],
+            ...$this->templateRules(),
             'github_repo' => ['exclude_unless:source,github', 'required', 'string', function (string $attribute, mixed $value, Closure $fail) {
                 // Only a repository the installation was given, as GitHub lists it now.
                 try {

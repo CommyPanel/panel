@@ -81,6 +81,7 @@ class App extends Model
             'rollout_auto' => 'boolean',
             'locked_at' => 'datetime',
             'source_type' => SourceType::class,
+            'template_settings' => 'array',
             'deploy_key_private' => 'encrypted',
             'git_token' => 'encrypted',
             'webhook_secret' => 'encrypted',

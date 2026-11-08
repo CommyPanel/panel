@@ -21,7 +21,8 @@ abstract class AppSettingsRequest extends FormRequest
      */
     public function rules(): array
     {
-        $upload = $this->route('app') instanceof App && $this->route('app')->source_type === SourceType::Upload;
+        // An upload or a quick-install app has no repository to ask about.
+        $upload = $this->route('app') instanceof App && in_array($this->route('app')->source_type, [SourceType::Upload, SourceType::Template], true);
         $git = $upload ? [] : [
             'git_url' => ['required', 'string', 'max:500', function (string $attribute, mixed $value, Closure $fail) {
                 if (! GitUrl::isValid((string) $value, (bool) config('commypanel.deploy.git_allow_local'))) {
