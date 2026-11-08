@@ -48,7 +48,8 @@ class HandleInertiaRequests extends Middleware
             'locale' => app()->getLocale(),
             'locales' => collect(Locales::available())->map(fn (string $name, string $code) => ['code' => $code, 'name' => $name])->values()->all(),
             // Every sentence of the person's language, sent once and remembered by the browser for that language.
-            'translations' => Inertia::once(fn () => Translations::for(app()->getLocale()))->as('translations-'.app()->getLocale()),
+            // The bundle says which language it is for, because the browser may hand back an older one it remembered.
+            'translations' => Inertia::once(fn () => ['locale' => app()->getLocale(), 'strings' => Translations::for(app()->getLocale())])->as('translations-'.app()->getLocale()),
             // Lazy, so partial reloads that do not ask for it never contact the agent.
             'hostHealth' => fn () => $request->user() === null ? null : app(HostHealth::class)->status(),
             // Read from what is already remembered; this never contacts GitHub.

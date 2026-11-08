@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { Stepper } from '@/components/apps/setup-steps';
 import { Brand } from '@/components/brand';
 import { HostBanner } from '@/components/host-banner';
+import { LanguageMenu } from '@/components/language-menu';
 import { ThemeMenu } from '@/components/theme-menu';
 import { Toaster } from '@/components/ui/toaster';
 import { useT } from '@/hooks/use-t';
@@ -50,6 +51,7 @@ export default function SetupLayout({
                 <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
                     <div className="flex items-center justify-between">
                         <Brand name={name} />
+                        <LanguageMenu />
                         <ThemeMenu />
                     </div>
                     <header>

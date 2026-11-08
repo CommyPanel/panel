@@ -318,6 +318,7 @@
     "Change an app's name, source, port, health check and resource limits; generate its deploy key; upload a new project archive.": "Bir uygulamanın adını, kaynağını, bağlantı noktasını, sağlık denetimini ve kaynak sınırlarını değiştirin; dağıtım anahtarını oluşturun; yeni bir proje arşivi yükleyin.",
     "Change app settings": "Uygulama ayarlarını değiştir",
     "Change HTTPS and server address": "HTTPS ve sunucu adresini değiştir",
+    "Change language": "Dili değiştir",
     "Change password": "Parolayı değiştir",
     "Change the addresses": "Adresleri değiştir",
     "Change the password?": "Parola değiştirilsin mi?",

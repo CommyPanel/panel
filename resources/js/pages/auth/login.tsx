@@ -1,8 +1,9 @@
-import { router, useForm } from '@inertiajs/react';
+import { useForm } from '@inertiajs/react';
 import type { FormEvent } from 'react';
 import { LanguageSelect } from '@/components/language-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useChangeLanguage } from '@/hooks/use-language';
 import { useT } from '@/hooks/use-t';
 import AuthLayout from '@/layouts/auth-layout';
 import { fortify } from '@/lib/fortify';
@@ -19,17 +20,7 @@ export default function Login() {
     };
 
     // Before signing in, the language is the browser's, and can be changed here for this session.
-    const chooseLanguage = (code: string) =>
-        router.get(
-            window.location.pathname,
-            { lang: code },
-            {
-                only: ['locale', 'translations'],
-                preserveState: true,
-                preserveScroll: true,
-                replace: true,
-            },
-        );
+    const chooseLanguage = useChangeLanguage();
 
     return (
         <AuthLayout

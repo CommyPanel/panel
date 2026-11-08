@@ -318,6 +318,7 @@
     "Change an app's name, source, port, health check and resource limits; generate its deploy key; upload a new project archive.": "Modifier le nom, la source, le port, la vérification de santé et les limites de ressources d'une application ; générer sa clé de déploiement ; envoyer une nouvelle archive de projet.",
     "Change app settings": "Modifier les paramètres de l'application",
     "Change HTTPS and server address": "Modifier le HTTPS et l'adresse du serveur",
+    "Change language": "Changer de langue",
     "Change password": "Changer le mot de passe",
     "Change the addresses": "Modifier les adresses",
     "Change the password?": "Changer le mot de passe ?",

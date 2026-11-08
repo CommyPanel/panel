@@ -16,16 +16,27 @@ export type Params = Record<string, string | number>;
 
 type Dictionary = Record<string, string>;
 
+/** What the server sends: the sentences of one language, and which language that is. */
+export type Bundle = { locale: string; strings: Dictionary };
+
 let dictionary: Dictionary = {};
 let currentLocale = 'en';
+// Every language's sentences the browser has received, so a page that comes back in a language
+// seen before never gets another language's sentences by mistake.
+const received = new Map<string, Dictionary>();
 
 /** Called with the shared props of every page, so the current language is always the page's. */
-export function setLanguage(
-    locale: string,
-    translations: Dictionary | undefined,
-) {
+export function setLanguage(locale: string, bundle: Bundle | undefined) {
+    if (bundle && !Array.isArray(bundle.strings) && bundle.locale) {
+        received.set(bundle.locale, bundle.strings);
+    } else if (bundle && bundle.locale) {
+        received.set(bundle.locale, {});
+    }
+
     currentLocale = locale;
-    dictionary = translations ?? {};
+    dictionary = received.get(locale) ?? {};
+
+    if (typeof document !== 'undefined') document.documentElement.lang = locale;
 }
 
 export function getLocale(): string {

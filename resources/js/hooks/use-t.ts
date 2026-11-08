@@ -1,7 +1,7 @@
 import { usePage } from '@inertiajs/react';
 import { useMemo } from 'react';
-import { formatNumber, t, tn } from '@/lib/i18n';
-import type { Params } from '@/lib/i18n';
+import { formatNumber, getLocale, setLanguage, t, tn } from '@/lib/i18n';
+import type { Bundle, Params } from '@/lib/i18n';
 
 /**
  * The translation helpers, for a component:
@@ -13,8 +13,15 @@ import type { Params } from '@/lib/i18n';
  * (The bare `t` is for text made outside components, and takes its language from the last page.)
  */
 export function useT() {
-    const { locale } = usePage<{ locale?: string }>().props;
+    const { locale, translations } = usePage<{
+        locale?: string;
+        translations?: Bundle;
+    }>().props;
     const language = locale ?? 'en';
+
+    // A new page can arrive in another language (a person changed it). The sentences have to be in
+    // place before this component draws, so they are set here and not after the visit has finished.
+    if (language !== getLocale()) setLanguage(language, translations);
 
     return useMemo(
         () => ({

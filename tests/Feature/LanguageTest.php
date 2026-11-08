@@ -139,7 +139,7 @@ describe('the sentences', function () {
                 ->and(Translations::for('xx'))->toBe([]);
 
             $this->actingAs(User::factory()->create(['locale' => 'fr']))->get('/dashboard')
-                ->assertInertia(fn (Assert $page) => $page->where('translations.Save', 'Enregistrer'));
+                ->assertInertia(fn (Assert $page) => $page->where('translations.locale', 'fr')->where('translations.strings.Save', 'Enregistrer'));
         } finally {
             File::deleteDirectory($dir);
             app()->useLangPath(base_path('lang'));

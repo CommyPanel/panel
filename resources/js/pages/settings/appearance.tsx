@@ -1,10 +1,9 @@
-import { router } from '@inertiajs/react';
 import { useState } from 'react';
-import LanguageController from '@/actions/App/Http/Controllers/LanguageController';
 import { LanguageSelect } from '@/components/language-select';
 import { PageHeader } from '@/components/page-header';
 import { ThemePicker } from '@/components/theme-picker';
 import { Card } from '@/components/ui/card';
+import { useChangeLanguage } from '@/hooks/use-language';
 import { useT } from '@/hooks/use-t';
 import AppLayout from '@/layouts/app-layout';
 
@@ -12,17 +11,11 @@ export default function Appearance() {
     const { t, locale } = useT();
     const [value, setValue] = useState(locale);
 
+    const changeLanguage = useChangeLanguage();
+
     const change = (code: string) => {
         setValue(code);
-        router.put(
-            LanguageController.update().url,
-            { locale: code },
-            {
-                preserveScroll: true,
-                // Every sentence of the page changes: start the page over in the new language.
-                onSuccess: () => window.location.reload(),
-            },
-        );
+        changeLanguage(code);
     };
 
     return (

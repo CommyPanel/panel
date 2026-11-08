@@ -26,6 +26,7 @@ import type { LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Brand } from '@/components/brand';
+import { LanguageMenu } from '@/components/language-menu';
 import { ThemeMenu } from '@/components/theme-menu';
 import { UpdateBadge } from '@/components/update-badge';
 import { Toaster } from '@/components/ui/toaster';
@@ -399,6 +400,7 @@ export default function AppLayout({ title, children }: Props) {
 
                         <div className="ml-auto flex items-center gap-1">
                             <UpdateBadge />
+                            <LanguageMenu />
                             <ThemeMenu />
                             <Dropdown
                                 label={t('Account menu')}

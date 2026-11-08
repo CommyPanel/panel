@@ -1,9 +1,10 @@
-import { router, useForm } from '@inertiajs/react';
+import { useForm } from '@inertiajs/react';
 import type { FormEvent } from 'react';
 import { LanguageSelect } from '@/components/language-select';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useChangeLanguage } from '@/hooks/use-language';
 import { useT } from '@/hooks/use-t';
 import SetupLayout from '@/layouts/setup-layout';
 
@@ -20,18 +21,10 @@ export default function Setup({ token }: Props) {
     });
 
     // Choosing a language shows this page in it at once, and it becomes the admin's language.
+    const changeLanguage = useChangeLanguage();
     const chooseLanguage = (code: string) => {
         form.setData('locale', code);
-        router.get(
-            `/setup/${token}`,
-            { lang: code },
-            {
-                only: ['locale', 'translations'],
-                preserveState: true,
-                preserveScroll: true,
-                replace: true,
-            },
-        );
+        changeLanguage(code);
     };
 
     const submit = (event: FormEvent) => {
