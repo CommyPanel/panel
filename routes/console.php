@@ -19,3 +19,5 @@ Schedule::command('commypanel:renew-certificates')->dailyAt('03:17')->withoutOve
 Schedule::command('commypanel:backup')->dailyAt('03:30')->withoutOverlapping();
 
 Schedule::command('commypanel:backup-databases')->dailyAt('04:00')->withoutOverlapping();
+
+Schedule::command('commypanel:monitor')->everyMinute()->withoutOverlapping();

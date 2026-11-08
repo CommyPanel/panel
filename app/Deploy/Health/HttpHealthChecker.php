@@ -14,7 +14,7 @@ class HttpHealthChecker implements HealthChecker
 {
     public function waitUntilHealthy(int $port, string $path, int $timeoutSeconds): bool
     {
-        $url = "http://127.0.0.1:{$port}".(str_starts_with($path, '/') ? $path : '/'.$path);
+        $url = $this->url($port, $path);
 
         for ($attempt = 0; $attempt < max(1, $timeoutSeconds); $attempt++) {
             try {
@@ -29,5 +29,19 @@ class HttpHealthChecker implements HealthChecker
         }
 
         return false;
+    }
+
+    public function probe(int $port, string $path): bool
+    {
+        try {
+            return Http::timeout(3)->get($this->url($port, $path))->status() < 500;
+        } catch (ConnectionException) {
+            return false;
+        }
+    }
+
+    private function url(int $port, string $path): string
+    {
+        return "http://127.0.0.1:{$port}".(str_starts_with($path, '/') ? $path : '/'.$path);
     }
 }

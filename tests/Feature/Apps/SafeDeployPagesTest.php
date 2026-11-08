@@ -9,7 +9,7 @@ use App\Enums\DeploymentStatus;
 use App\Host\Data\TrafficStat;
 use App\Host\HostDriver;
 use App\Jobs\AdvanceRolloutJob;
-use App\Jobs\SendDeployAlert;
+use App\Jobs\SendAlertJob;
 use App\Jobs\WatchDeploymentJob;
 use App\Models\App;
 use App\Models\Domain;
@@ -26,7 +26,7 @@ beforeEach(function () {
     $this->dataPath = storage_path('framework/testing/data-'.bin2hex(random_bytes(4)));
     config(['commypanel.data_path' => $this->dataPath, 'commypanel.deploy.drain_seconds' => 0]);
     Sleep::fake();
-    Queue::fake([WatchDeploymentJob::class, AdvanceRolloutJob::class, SendDeployAlert::class]);
+    Queue::fake([WatchDeploymentJob::class, AdvanceRolloutJob::class, SendAlertJob::class]);
     app(SyncRolesAndPermissions::class)();
     Carbon::setTestNow('2026-11-07 12:00:00');
     app()->instance(SourceFetcher::class, new FakeSourceFetcher);

@@ -1,10 +1,11 @@
 <?php
 
-use App\Alerts\AlertSettings;
+use App\Alerts\AlertKind;
 use App\Alerts\DeployAlerts;
 use App\Auth\SyncRolesAndPermissions;
 use App\Dns\DnsResolver;
 use App\Enums\DeploymentStatus;
+use App\Models\AlertTarget;
 use App\Models\App;
 use App\Models\AuditLog;
 use App\Models\Deployment;
@@ -74,7 +75,7 @@ it('needs the permission to change the app', function () {
 
 it('says in a message when a release was rolled back by itself, and why', function () {
     Http::fake(['*' => Http::response('ok')]);
-    app(AlertSettings::class)->save(['enabled' => true, 'format' => 'json', 'events' => 'failures', 'url' => 'https://hooks.example.com/x']);
+    AlertTarget::query()->create(['name' => 'Hook', 'kind' => AlertKind::Json, 'address' => 'https://hooks.example.com/x', 'events' => ['deployment.rolled_back']]);
     $deployment = Deployment::factory()->create([
         'app_id' => $this->shop->id, 'number' => 9, 'status' => DeploymentStatus::RolledBack,
         'error' => 'The error rate (5xx) is 20% over 300 requests.',

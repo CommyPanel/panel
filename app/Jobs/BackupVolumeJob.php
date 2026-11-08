@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Alerts\BackupAlerts;
 use App\Audit\AuditLogger;
 use App\Backups\BackupFailed;
 use App\Backups\VolumeBackups;
@@ -43,6 +44,7 @@ class BackupVolumeJob implements ShouldQueue
         } catch (BackupFailed $e) {
             // Shown on the volumes tab until the next try.
             Cache::put($key, ['failed' => $e->getMessage()], now()->addDay());
+            BackupAlerts::failed("volume {$this->volume} of {$app->name}", $e->getMessage());
         }
     }
 }

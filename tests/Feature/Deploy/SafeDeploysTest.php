@@ -1,6 +1,7 @@
 <?php
 
-use App\Alerts\AlertSettings;
+use App\Alerts\AlertEvent;
+use App\Alerts\AlertKind;
 use App\Auth\SyncRolesAndPermissions;
 use App\Deploy\Deployer;
 use App\Deploy\DeploymentFailed;
@@ -13,8 +14,9 @@ use App\Host\Data\TrafficStat;
 use App\Host\HostDriver;
 use App\Jobs\AdvanceRolloutJob;
 use App\Jobs\RunDeployment;
-use App\Jobs\SendDeployAlert;
+use App\Jobs\SendAlertJob;
 use App\Jobs\WatchDeploymentJob;
+use App\Models\AlertTarget;
 use App\Models\App;
 use App\Models\AuditLog;
 use App\Models\Deployment;
@@ -33,11 +35,11 @@ beforeEach(function () {
     config(['commypanel.data_path' => $this->dataPath, 'commypanel.deploy.drain_seconds' => 0]);
     Sleep::fake();
     // Only the looks are held back; deployments run at once, as in the other deploy tests.
-    Queue::fake([WatchDeploymentJob::class, AdvanceRolloutJob::class, SendDeployAlert::class]);
+    Queue::fake([WatchDeploymentJob::class, AdvanceRolloutJob::class, SendAlertJob::class]);
     app(SyncRolesAndPermissions::class)();
     Carbon::setTestNow('2026-11-07 12:00:00');
     // Messages are on, so the ones the panel sends by itself can be seen being queued.
-    app(AlertSettings::class)->save(['enabled' => true, 'format' => 'slack', 'events' => 'failures', 'url' => 'https://hooks.example.com/x']);
+    AlertTarget::query()->create(['name' => 'Chat', 'kind' => AlertKind::Slack, 'address' => 'https://hooks.example.com/x', 'events' => AlertEvent::defaults()]);
 
     $this->health = new FakeHealthChecker;
     app()->instance(SourceFetcher::class, new FakeSourceFetcher);
@@ -152,7 +154,7 @@ describe('watching a release after it goes live', function () {
             ->and(($this->running)($this->first))->toBeTrue()
             ->and($second->log)->toContain('Rolling back automatically')
             ->and(AuditLog::query()->where('action', 'deploy.auto_rolled_back')->first()->metadata['back_to'])->toBe($this->first->number);
-        Queue::assertPushed(SendDeployAlert::class, fn ($job) => $job->deploymentId === $second->id);
+        Queue::assertPushed(SendAlertJob::class, fn ($job) => $job->message->event === AlertEvent::DeploymentRolledBack && $job->message->data['deployment'] === $second->number);
     });
 
     it('does not roll back over a single bad look that clears', function () {
@@ -351,7 +353,7 @@ describe('a gradual rollout', function () {
             ->and(($this->site)()->upstreamPort)->toBe($this->first->host_port)
             ->and(($this->running)($this->new))->toBeFalse()->and(($this->running)($this->first))->toBeTrue()
             ->and(AuditLog::query()->where('action', 'deploy.rollout_rolled_back')->exists())->toBeTrue();
-        Queue::assertPushed(SendDeployAlert::class);
+        Queue::assertPushed(SendAlertJob::class, fn ($job) => $job->message->event === AlertEvent::DeploymentRolledBack);
     });
 
     it('waits for a person when there is too little traffic to decide, and does not guess', function () {
@@ -395,7 +397,7 @@ describe('a gradual rollout', function () {
             ->and($this->new->fresh()->error)->toContain('aborted')
             ->and(($this->site)()->rollout)->toBeNull()
             ->and($this->shop->fresh()->active_deployment_id)->toBe($this->first->id);
-        Queue::assertNotPushed(SendDeployAlert::class, fn ($job) => $job->deploymentId === $this->new->id); // a person did it; no message
+        Queue::assertNotPushed(SendAlertJob::class, fn ($job) => ($job->message->data['deployment'] ?? null) === $this->new->number); // a person did it; no message
     });
 
     it('needs the deploy permission to be steered', function () {

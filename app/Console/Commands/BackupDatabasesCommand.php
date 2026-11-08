@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Alerts\BackupAlerts;
 use App\Databases\DatabaseBackups;
 use App\Databases\DatabaseException;
 use App\Models\ManagedDatabase;
@@ -28,6 +29,7 @@ class BackupDatabasesCommand extends Command
                 $made++;
             } catch (DatabaseException $e) {
                 $failed++;
+                BackupAlerts::failed("database {$database->name} on {$database->server->name}", $e->getMessage());
                 $this->components->error($e->getMessage());
             }
         }

@@ -33,6 +33,7 @@ use Illuminate\Support\Str;
  * @property string|null $git_token_username
  * @property string|null $github_repo
  * @property bool $github_auto_deploy
+ * @property bool $alerts_enabled
  * @property bool $watch_enabled
  * @property int $watch_minutes
  * @property bool $rollout_enabled
@@ -75,6 +76,7 @@ class App extends Model
             'source_verified_at' => 'datetime',
             'stopped_at' => 'datetime',
             'config_changed_at' => 'datetime',
+            'alerts_enabled' => 'boolean',
             'watch_enabled' => 'boolean',
             'rollout_enabled' => 'boolean',
             'rollout_steps' => 'array',

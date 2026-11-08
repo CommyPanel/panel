@@ -17,4 +17,11 @@ class FakeHealthChecker implements HealthChecker
 
         return $this->healthy;
     }
+
+    public function probe(int $port, string $path): bool
+    {
+        $this->calls[] = ['port' => $port, 'path' => $path];
+
+        return $this->healthy;
+    }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Alerts\DeployAlerts;
 use App\Deploy\DeployApp;
 use App\Enums\DeploymentStatus;
 use App\Models\Deployment;
@@ -49,7 +50,7 @@ class RunDeployment implements ShouldQueue
                 'error' => 'The deployment was interrupted.',
                 'finished_at' => now(),
             ])->save();
-            SendDeployAlert::dispatchFor($deployment);
+            DeployAlerts::dispatchFor($deployment);
         }
     }
 }

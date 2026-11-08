@@ -2,6 +2,7 @@
 
 namespace App\Tls;
 
+use App\Alerts\CertificateAlerts;
 use App\Audit\AuditLogger;
 use App\Deploy\Traffic\AppRouting;
 use App\Enums\CertificateStatus;
@@ -20,6 +21,7 @@ class IssueCertificate
         private readonly TlsPlanner $planner,
         private readonly AppRouting $routing,
         private readonly AuditLogger $audit,
+        private readonly CertificateAlerts $alerts,
     ) {}
 
     public function __invoke(App $app): void
@@ -48,6 +50,7 @@ class IssueCertificate
                 'last_error' => $e->getMessage(),
             ])->save();
             $this->audit->record('tls.failed', null, ['app' => $app->slug, 'reason' => $e->getMessage()], $app);
+            $this->alerts->failed($app, $e->getMessage());
 
             return;
         }
@@ -60,6 +63,7 @@ class IssueCertificate
             'expires_at' => $info->notAfter,
             'last_error' => null,
         ])->save();
+        $this->alerts->issued($app);
         $this->audit->record('tls.issued', null, ['app' => $app->slug, 'domains' => $info->domains, 'staging' => $this->https->staging()], $app);
 
         // Switch the nginx site to HTTPS, or reload it to pick up a renewal.

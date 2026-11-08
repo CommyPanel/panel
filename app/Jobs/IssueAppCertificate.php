@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Alerts\CertificateAlerts;
 use App\Enums\CertificateStatus;
 use App\Models\App;
 use App\Models\Certificate;
@@ -43,9 +44,13 @@ class IssueAppCertificate implements ShouldQueue
      */
     public function failed(?Throwable $exception): void
     {
-        Certificate::query()
+        $interrupted = Certificate::query()
             ->where('app_id', $this->appId)
             ->where('status', CertificateStatus::Issuing)
             ->update(['status' => CertificateStatus::Failed, 'last_error' => 'The attempt was interrupted.']);
+
+        if ($interrupted > 0 && ($app = App::query()->find($this->appId)) !== null) {
+            app(CertificateAlerts::class)->failed($app, 'The attempt was interrupted.');
+        }
     }
 }

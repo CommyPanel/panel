@@ -2,6 +2,7 @@
 
 use App\Auth\Permissions;
 use App\Http\Controllers\ApiTokenController;
+use App\Http\Controllers\AppAlertsController;
 use App\Http\Controllers\AppAutoDeployController;
 use App\Http\Controllers\AppContainerController;
 use App\Http\Controllers\AppController;
@@ -135,6 +136,7 @@ Route::middleware('auth')->group(function () {
             Route::post('git-token', [GitTokenController::class, 'store'])->name('git-token.store');
             Route::delete('git-token', [GitTokenController::class, 'destroy'])->name('git-token.destroy');
             Route::put('auto-deploy', [AppAutoDeployController::class, 'update'])->name('auto-deploy.update');
+            Route::put('alerts', [AppAlertsController::class, 'update'])->name('alerts.update');
             Route::put('safe-deploys', [AppSafeDeployController::class, 'update'])->name('safe-deploys.update');
             Route::post('webhook', [AppWebhookController::class, 'store'])->name('webhook.store');
             Route::delete('webhook', [AppWebhookController::class, 'destroy'])->name('webhook.destroy');
@@ -304,9 +306,11 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('can:'.Permissions::NOTIFICATIONS_MANAGE)->group(function () {
         Route::get('/settings/notifications', [NotificationController::class, 'index'])->name('settings.notifications');
-        Route::put('/settings/notifications', [NotificationController::class, 'update'])->middleware('password.confirm')->name('settings.notifications.update');
-        Route::post('/settings/notifications/test', [NotificationController::class, 'test'])->middleware('throttle:6,1')->name('settings.notifications.test');
-        Route::delete('/settings/notifications', [NotificationController::class, 'destroy'])->middleware('password.confirm')->name('settings.notifications.destroy');
+        Route::post('/settings/notifications', [NotificationController::class, 'store'])->middleware('password.confirm')->name('settings.notifications.store');
+        Route::put('/settings/notifications/{alertTarget}', [NotificationController::class, 'update'])->middleware('password.confirm')->whereNumber('alertTarget')->name('settings.notifications.update');
+        Route::put('/settings/notifications/{alertTarget}/toggle', [NotificationController::class, 'toggle'])->whereNumber('alertTarget')->name('settings.notifications.toggle');
+        Route::post('/settings/notifications/{alertTarget}/test', [NotificationController::class, 'test'])->middleware('throttle:6,1')->whereNumber('alertTarget')->name('settings.notifications.test');
+        Route::delete('/settings/notifications/{alertTarget}', [NotificationController::class, 'destroy'])->middleware('password.confirm')->whereNumber('alertTarget')->name('settings.notifications.destroy');
     });
 
     Route::get('/settings/updates', [UpdateController::class, 'show'])

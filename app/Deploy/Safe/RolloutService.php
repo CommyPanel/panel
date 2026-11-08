@@ -2,6 +2,7 @@
 
 namespace App\Deploy\Safe;
 
+use App\Alerts\DeployAlerts;
 use App\Audit\AuditLogger;
 use App\Deploy\DeployLogger;
 use App\Deploy\ReleaseSwitcher;
@@ -11,7 +12,6 @@ use App\Enums\DeploymentStatus;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
 use App\Jobs\AdvanceRolloutJob;
-use App\Jobs\SendDeployAlert;
 use App\Models\App;
 use App\Models\Deployment;
 use App\Models\Rollout;
@@ -252,7 +252,7 @@ class RolloutService
 
         $this->audit->record('deploy.rollout_promoted', $by, ['app' => $app->slug, 'deployment' => $new->number], $app);
         $this->audit->record('deploy.succeeded', null, ['app' => $app->slug, 'deployment' => $new->number], $app);
-        SendDeployAlert::dispatchFor($new);
+        DeployAlerts::dispatchFor($new);
     }
 
     /**
@@ -291,7 +291,7 @@ class RolloutService
         $this->audit->record($automatic ? 'deploy.rollout_rolled_back' : 'deploy.rollout_aborted', $by, ['app' => $app->slug, 'deployment' => $new->number, 'reason' => $reason], $app);
 
         if ($automatic) {
-            SendDeployAlert::dispatchFor($new);
+            DeployAlerts::dispatchFor($new);
         }
     }
 

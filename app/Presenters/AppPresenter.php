@@ -55,6 +55,7 @@ class AppPresenter
             'token_help' => self::tokenHelp($app),
             'release_command' => $app->release_command,
             'pending_changes' => $app->hasPendingChanges(),
+            'alerts_enabled' => $app->alerts_enabled,
             'safe_deploys' => [
                 'watch_enabled' => $app->watch_enabled,
                 'watch_minutes' => $app->watch_minutes,

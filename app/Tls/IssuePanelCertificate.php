@@ -2,6 +2,7 @@
 
 namespace App\Tls;
 
+use App\Alerts\CertificateAlerts;
 use App\Audit\AuditLogger;
 use App\Dns\PanelDomain;
 use App\Host\Data\CertificateRequest;
@@ -18,6 +19,7 @@ class IssuePanelCertificate
         private readonly PanelDomain $panel,
         private readonly PanelRouting $routing,
         private readonly AuditLogger $audit,
+        private readonly CertificateAlerts $alerts,
     ) {}
 
     public function __invoke(): void
@@ -36,11 +38,13 @@ class IssuePanelCertificate
         } catch (HostOperationFailed $e) {
             $this->panel->markFailed($e->getMessage(), $hadUsable);
             $this->audit->record('tls.failed', null, ['app' => PanelDomain::SLUG, 'reason' => $e->getMessage()]);
+            $this->alerts->failed(null, $e->getMessage());
 
             return;
         }
 
         $this->panel->markIssued(Carbon::instance($info->notAfter));
+        $this->alerts->issued(null);
         $this->audit->record('tls.issued', null, ['app' => PanelDomain::SLUG, 'domains' => $info->domains, 'staging' => $this->https->staging()]);
 
         try {

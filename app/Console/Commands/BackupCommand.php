@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Alerts\BackupAlerts;
 use App\Backups\BackupFailed;
 use App\Backups\PanelBackups;
 use Illuminate\Console\Command;
@@ -17,6 +18,7 @@ class BackupCommand extends Command
         try {
             $backup = $backups->create();
         } catch (BackupFailed $e) {
+            BackupAlerts::failed('the panel database', $e->getMessage());
             $this->components->error($e->getMessage());
 
             return self::FAILURE;

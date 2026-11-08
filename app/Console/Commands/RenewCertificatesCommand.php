@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Alerts\CertificateAlerts;
 use App\Jobs\IssuePanelCertificateJob;
 use App\Models\App;
 use App\Tls\IssuePanelCertificate;
@@ -14,7 +15,7 @@ class RenewCertificatesCommand extends Command
 
     protected $description = 'Queue certificates that are missing, expiring soon, failed earlier or need new domains';
 
-    public function handle(TlsPlanner $planner, IssuePanelCertificate $panel): int
+    public function handle(TlsPlanner $planner, IssuePanelCertificate $panel, CertificateAlerts $alerts): int
     {
         $queued = 0;
 
@@ -26,6 +27,8 @@ class RenewCertificatesCommand extends Command
             IssuePanelCertificateJob::dispatch();
             $queued++;
         }
+
+        $alerts->checkExpiring();
 
         $this->components->info("Queued {$queued} certificate(s).");
 

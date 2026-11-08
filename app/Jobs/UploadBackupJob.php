@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Alerts\BackupAlerts;
 use App\Backups\Remote\RemoteBackupFailed;
 use App\Backups\Remote\RemoteBackups;
 use App\Backups\Remote\RemoteSettings;
@@ -33,6 +34,8 @@ class UploadBackupJob implements ShouldQueue
 
     public function failed(Throwable $e): void
     {
-        app(RemoteSettings::class)->recordFailure($e instanceof RemoteBackupFailed ? $e->getMessage() : 'The copy failed.');
+        $reason = $e instanceof RemoteBackupFailed ? $e->getMessage() : 'The copy failed.';
+        app(RemoteSettings::class)->recordFailure($reason);
+        BackupAlerts::failed('the copy to the off-server storage', $reason);
     }
 }

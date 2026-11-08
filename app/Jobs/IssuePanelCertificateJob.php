@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Alerts\CertificateAlerts;
 use App\Dns\PanelDomain;
 use App\Tls\IssuePanelCertificate;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -36,6 +37,7 @@ class IssuePanelCertificateJob implements ShouldQueue
 
         if ($panel->certificateStatus() === 'issuing') {
             $panel->markFailed('The attempt was interrupted.', false);
+            app(CertificateAlerts::class)->failed(null, 'The attempt was interrupted.');
         }
     }
 }

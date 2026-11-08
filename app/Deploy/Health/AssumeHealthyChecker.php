@@ -11,4 +11,9 @@ class AssumeHealthyChecker implements HealthChecker
     {
         return true;
     }
+
+    public function probe(int $port, string $path): bool
+    {
+        return true;
+    }
 }

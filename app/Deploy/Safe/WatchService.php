@@ -2,13 +2,13 @@
 
 namespace App\Deploy\Safe;
 
+use App\Alerts\DeployAlerts;
 use App\Audit\AuditLogger;
 use App\Deploy\DeployLogger;
 use App\Deploy\ReleaseSwitcher;
 use App\Enums\DeploymentStatus;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
-use App\Jobs\SendDeployAlert;
 use App\Models\App;
 use App\Models\Deployment;
 use App\Traffic\TrafficJudge;
@@ -136,7 +136,7 @@ class WatchService
             'back_to' => $previous->number,
             'reason' => $reason,
         ], $app);
-        SendDeployAlert::dispatchFor($new);
+        DeployAlerts::dispatchFor($new);
     }
 
     /**
