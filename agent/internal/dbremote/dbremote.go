@@ -57,7 +57,7 @@ type Docker interface {
 // PortRange is the range of ports a listener may use.
 type PortRange struct{ Min, Max int }
 
-// ParsePortRange parses "20000-29999".
+// ParsePortRange parses "10000-19999".
 func ParsePortRange(s string) (PortRange, error) {
 	lo, hi, ok := strings.Cut(s, "-")
 	min, err1 := strconv.Atoi(strings.TrimSpace(lo))
@@ -96,7 +96,7 @@ type Manager struct {
 // New makes a manager.
 func New(cfg Config, d Docker) *Manager {
 	if cfg.Ports == (PortRange{}) {
-		cfg.Ports = PortRange{20000, 29999}
+		cfg.Ports = PortRange{10000, 19999}
 	}
 	if cfg.Now == nil {
 		cfg.Now = time.Now

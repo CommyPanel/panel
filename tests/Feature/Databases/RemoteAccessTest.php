@@ -150,6 +150,36 @@ it('asks before the first restart, but not again once TLS is on', function () {
     expect($this->server->fresh()->remote_status)->toBe('open');
 });
 
+describe('ports that must not collide', function () {
+    it('keeps the public range apart from everything else the server listens on', function () {
+        [$first, $last] = RemoteAccess::range();
+        $others = [
+            'apps' => [(int) config('commypanel.deploy.port_range_start'), (int) config('commypanel.deploy.port_range_end')],
+            'database tools' => [29000, 29099],
+            'linux outgoing' => [32768, 60999],
+        ];
+
+        foreach ($others as $name => [$from, $to]) {
+            expect($last < $from || $first > $to)->toBeTrue("the public range overlaps {$name}");
+        }
+
+        foreach ([22, 80, 443, 2053, 3306, 5432, 8080, 8081, 8443] as $port) {
+            expect($port >= $first && $port <= $last)->toBeFalse("port {$port} is inside the public range");
+        }
+    });
+
+    it('never picks a port inside a moved app range', function () {
+        [$first, $last] = RemoteAccess::range();
+        config(['commypanel.deploy.port_range_start' => $first, 'commypanel.deploy.port_range_end' => $last - 5]);
+
+        for ($i = 0; $i < 5; $i++) {
+            ($this->confirmed)()->post('/databases/main/remote', openRemote());
+            expect($this->server->fresh()->remote_port)->toBeGreaterThan($last - 5);
+            ($this->confirmed)()->delete('/databases/main/remote');
+        }
+    });
+});
+
 describe('changing and closing', function () {
     beforeEach(function () {
         ($this->confirmed)()->post('/databases/main/remote', openRemote());

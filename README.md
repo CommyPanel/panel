@@ -40,6 +40,7 @@ Deploy .NET, Go and Node apps from Git with zero downtime, connect domains with 
 - Connect a Git repository (any Git URL, a deploy key, an access token, or one click with a GitHub App the panel creates for itself) or upload a zip.
 - The stack is detected for you (.NET, Go, Node), a Dockerfile is generated if your repo has none, and the app is built and started in a container. A Dockerfile in your repo always wins, so any language works if you ship one.
 - **Zero-downtime deployments.** The new version starts next to the old one, must pass a health check, takes the traffic, and only then does the old one stop. A failed build or a failed health check changes nothing. One click rolls back to an earlier release.
+- **Safe deployments.** After going live, a release is watched against the one before it and rolled back by itself when it is clearly worse; **Go live again** overrides it. An optional **gradual rollout** gives a share of the visitors the new release first, with steps and a hold time you choose.
 - Deploy on push (optional, off by default), environment variables, persistent volumes, a release command for migrations, live build logs, resource usage, container logs and a browser terminal.
 - **Apply changes without redeploying.** Changed variables, volumes or links reach the app through a zero-downtime swap of the running version, with no rebuild.
 
@@ -53,11 +54,12 @@ Deploy .NET, Go and Node apps from Git with zero downtime, connect domains with 
 
 - PostgreSQL, MySQL and MariaDB servers in several versions, each in its own container with its own data folder.
 - Create databases and users, link a database to an app (the connection details become environment variables on a private network made for that link), nightly dumps, and restore a dump into a new database.
+- **Remote access** opens a database server to the internet on a random port, only for the real IP addresses you list, only with TLS and only for a time you choose, and closes itself at the end.
 - Open a database in **phpMyAdmin** (MySQL, MariaDB) or **pgAdmin** (PostgreSQL) with one click, already logged in as that database's own user.
 
 **Operating it**
 
-- Users, roles and fine-grained permissions, optional two-factor authentication, and an audit log of every privileged action.
+- Users, roles and fine-grained permissions, optional two-factor authentication, and an audit log of every privileged action, coloured by risk, that you can filter and search.
 - API tokens for CI, deployment messages to Slack, Discord or any webhook, and backups of the panel itself, with optional copies to any S3-compatible storage.
 - Three themes (light, dim and true-black dark), and a first-run setup that is one centered page.
 

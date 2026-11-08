@@ -307,10 +307,10 @@ func TestParseAllow(t *testing.T) {
 }
 
 func TestParsePortRange(t *testing.T) {
-	if r, err := ParsePortRange("20000-29999"); err != nil || r != (PortRange{20000, 29999}) {
+	if r, err := ParsePortRange("10000-19999"); err != nil || r != (PortRange{10000, 19999}) {
 		t.Errorf("%v %v", r, err)
 	}
-	for _, s := range []string{"", "20000", "a-b", "29999-20000", "80-90", "1000-70000", "-"} {
+	for _, s := range []string{"", "10000", "a-b", "19999-10000", "80-90", "1000-70000", "-"} {
 		if _, err := ParsePortRange(s); err == nil {
 			t.Errorf("%q accepted", s)
 		}
@@ -318,23 +318,23 @@ func TestParsePortRange(t *testing.T) {
 }
 
 func TestOpenValidation(t *testing.T) {
-	r := newRig(t, "postgres", func(c *Config) { c.Ports = PortRange{20000, 29999}; c.Reserved = []int{25000} })
+	r := newRig(t, "postgres", func(c *Config) { c.Ports = PortRange{10000, 19999}; c.Reserved = []int{15000} })
 	now := r.clock.Now().Unix()
 	allow := []string{"203.0.113.0/24"}
 	bad := map[string]OpenRequest{
-		"port below range":  {Server: "main", Engine: "postgres", Port: 19999, Allow: allow},
-		"port above range":  {Server: "main", Engine: "postgres", Port: 30000, Allow: allow},
+		"port below range":  {Server: "main", Engine: "postgres", Port: 9999, Allow: allow},
+		"port above range":  {Server: "main", Engine: "postgres", Port: 20000, Allow: allow},
 		"port zero":         {Server: "main", Engine: "postgres", Port: 0, Allow: allow},
-		"reserved by agent": {Server: "main", Engine: "postgres", Port: 25000, Allow: allow},
-		"bad slug":          {Server: "../x", Engine: "postgres", Port: 20001, Allow: allow},
-		"uppercase slug":    {Server: "Main", Engine: "postgres", Port: 20001, Allow: allow},
-		"bad engine":        {Server: "main", Engine: "oracle", Port: 20001, Allow: allow},
-		"no allow":          {Server: "main", Engine: "postgres", Port: 20001},
-		"wide allow":        {Server: "main", Engine: "postgres", Port: 20001, Allow: []string{"0.0.0.0/0"}},
-		"in the past":       {Server: "main", Engine: "postgres", Port: 20001, Allow: allow, ExpiresAt: now - 1},
-		"now":               {Server: "main", Engine: "postgres", Port: 20001, Allow: allow, ExpiresAt: now},
-		"too far":           {Server: "main", Engine: "postgres", Port: 20001, Allow: allow, ExpiresAt: now + 401*86400},
-		"negative":          {Server: "main", Engine: "postgres", Port: 20001, Allow: allow, ExpiresAt: -5},
+		"reserved by agent": {Server: "main", Engine: "postgres", Port: 15000, Allow: allow},
+		"bad slug":          {Server: "../x", Engine: "postgres", Port: 10001, Allow: allow},
+		"uppercase slug":    {Server: "Main", Engine: "postgres", Port: 10001, Allow: allow},
+		"bad engine":        {Server: "main", Engine: "oracle", Port: 10001, Allow: allow},
+		"no allow":          {Server: "main", Engine: "postgres", Port: 10001},
+		"wide allow":        {Server: "main", Engine: "postgres", Port: 10001, Allow: []string{"0.0.0.0/0"}},
+		"in the past":       {Server: "main", Engine: "postgres", Port: 10001, Allow: allow, ExpiresAt: now - 1},
+		"now":               {Server: "main", Engine: "postgres", Port: 10001, Allow: allow, ExpiresAt: now},
+		"too far":           {Server: "main", Engine: "postgres", Port: 10001, Allow: allow, ExpiresAt: now + 401*86400},
+		"negative":          {Server: "main", Engine: "postgres", Port: 10001, Allow: allow, ExpiresAt: -5},
 	}
 	for name, req := range bad {
 		_, err := r.m.Open(context.Background(), req)
@@ -358,12 +358,12 @@ func TestOpenValidation(t *testing.T) {
 	}
 	// Docker's answer (not a database server of this engine) is passed on and nothing is opened.
 	r.d.checkErr = &validate.InputError{Msg: "not a database server"}
-	if _, err := r.openOn("main", "postgres", 20002, allow, 0); err == nil {
+	if _, err := r.openOn("main", "postgres", 10002, allow, 0); err == nil {
 		t.Error("a container that is not a database server was opened")
 	}
 	// 400 days is allowed, and a far-off expiry is reported back.
 	r.d.checkErr = nil
-	if _, err := r.openOn("main", "postgres", 20003, allow, now+399*86400); err != nil {
+	if _, err := r.openOn("main", "postgres", 10003, allow, now+399*86400); err != nil {
 		t.Errorf("399 days: %v", err)
 	}
 	if got := r.m.List()[0].ExpiresAt; got != now+399*86400 {

@@ -75,7 +75,7 @@ func run() error {
 		metricsGroup = flag.String("metrics-socket-group", "www-data", "group that may write to the metrics socket (the web server's)")
 		termGroup    = flag.String("terminal-socket-group", "www-data", "group that may connect to the terminal socket (the web server's)")
 		dryRun       = flag.Bool("dry-run", false, "write configs but never run nginx or Docker (development)")
-		remotePorts  = flag.String("db-remote-ports", "20000-29999", "range of public ports a database server may be opened on (MIN-MAX)")
+		remotePorts  = flag.String("db-remote-ports", "10000-19999", "range of public ports a database server may be opened on (MIN-MAX)")
 		allowed      uidList
 	)
 	flag.Var(&allowed, "allow-uid", "UID allowed to call the agent (repeatable; the panel's user)")

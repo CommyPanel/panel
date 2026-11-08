@@ -302,23 +302,32 @@ class RemoteAccess
         [$first, $last] = self::range();
         $taken = DatabaseServer::query()->whereNotNull('remote_port')->whereKeyNot($server->getKey())->pluck('remote_port')->all();
 
-        do {
-            $port = random_int($first, $last);
-        } while (in_array($port, $taken, true));
+        // Never inside the ports app containers are given, even if someone moved that range here.
+        $appFirst = (int) config('commypanel.deploy.port_range_start');
+        $appLast = (int) config('commypanel.deploy.port_range_end');
 
-        return $port;
+        $free = array_filter(
+            range($first, $last),
+            fn (int $port) => ! in_array($port, $taken, true) && ($port < $appFirst || $port > $appLast),
+        );
+
+        if ($free !== []) {
+            return $free[array_rand($free)];
+        }
+
+        throw new DatabaseException('No free public port is left for a database. Close another one first.');
     }
 
     /**
+     * The ports a public database port is picked from. They sit apart from the ports app containers
+     * use (20000 to 29999, on loopback) and below Linux's own outgoing ports (from 32768), and the
+     * agent holds the same range, so a pick can never be refused for being outside it.
+     *
      * @return array{int, int}
      */
     public static function range(): array
     {
-        if (preg_match('/^(\d{4,5})-(\d{4,5})$/', (string) config('commypanel.databases.remote_ports'), $m) === 1 && (int) $m[1] >= 1024 && (int) $m[2] <= 65535 && (int) $m[1] < (int) $m[2]) {
-            return [(int) $m[1], (int) $m[2]];
-        }
-
-        return [20000, 29999];
+        return [10000, 19999];
     }
 
     /**

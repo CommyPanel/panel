@@ -36,6 +36,10 @@ The **Container** menu on the app page restarts or stops the live version. A sto
 
 This differs from **Deactivate** (Advanced tab), which removes the container and takes the domains offline until you activate the app again.
 
+## Safe deployments
+
+After a release goes live, the previous container stays for the **watch time** (5 minutes by default, per app) and CommyPanel compares the real requests of the two. If the new one is clearly worse (more errors, or much slower, twice in a row, over enough requests) traffic moves back at once and the release is marked **Rolled back** with the reason. **Go live again** puts it live without a watch. A quiet app is never rolled back on a guess. An optional **gradual rollout** (off by default, per app) sends a share of the visitors to the new release in steps, with a hold time, automatic or manual, and a cookie that keeps each visitor on one version. Both are set on the app's **Safe deploys** tab, and the **Usage** tab shows the traffic. During a rollout two versions run against the same database and volumes, so a migration must work with both. The full guide is in the documentation site under _Safe deployments_.
+
 ## Persistent volumes
 
 Everything an app writes inside its container is gone when the next deployment replaces the container. To keep files (uploads, a SQLite database), add a **persistent volume** on the app's **Volumes** tab with **Add volume**: the path inside the container, such as `/app/uploads`. The files are stored on the server under `/var/lib/commypanel/volumes/<app>/<folder>`. The **How volumes work** button on the tab explains this in the panel.
