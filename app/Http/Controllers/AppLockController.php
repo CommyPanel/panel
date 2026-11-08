@@ -26,7 +26,7 @@ class AppLockController extends Controller
         $app->forceFill(['locked_at' => $locked ? now() : null])->save();
         $audit->record($locked ? 'app.locked' : 'app.unlocked', $request->user(), ['app' => $app->slug], $app);
 
-        return back()->with('status', $locked ? "{$app->name} is locked. It cannot be deleted until you unlock it." : "{$app->name} is unlocked.");
+        return back()->with('status', $locked ? __(':name is locked. It cannot be deleted until you unlock it.', ['name' => $app->name]) : __(':name is unlocked.', ['name' => $app->name]));
     }
 
     public function volume(Request $request, App $app, AppVolume $volume, AuditLogger $audit): RedirectResponse
@@ -40,6 +40,6 @@ class AppLockController extends Controller
         $volume->forceFill(['locked_at' => $locked ? now() : null])->save();
         $audit->record($locked ? 'app.volume_locked' : 'app.volume_unlocked', $request->user(), ['app' => $app->slug, 'path' => $volume->path], $app);
 
-        return back()->with('status', $locked ? "{$volume->path} is locked. It cannot be removed until you unlock it." : "{$volume->path} is unlocked.");
+        return back()->with('status', $locked ? __(':path is locked. It cannot be removed until you unlock it.', ['path' => $volume->path]) : __(':path is unlocked.', ['path' => $volume->path]));
     }
 }

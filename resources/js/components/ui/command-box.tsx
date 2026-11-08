@@ -1,8 +1,10 @@
 import { Check, Copy } from 'lucide-react';
 import { useState } from 'react';
+import { useT } from '@/hooks/use-t';
 
 /** A command to run on the server, with a button that copies it. */
 export function CommandBox({ command }: { command: string }) {
+    const { t } = useT();
     const [copied, setCopied] = useState(false);
 
     const copy = async () => {
@@ -24,8 +26,8 @@ export function CommandBox({ command }: { command: string }) {
                 type="button"
                 className="btn btn-square btn-text btn-sm"
                 onClick={copy}
-                aria-label={copied ? 'Copied' : 'Copy the command'}
-                title={copied ? 'Copied' : 'Copy'}
+                aria-label={copied ? t('Copied') : t('Copy the command')}
+                title={copied ? t('Copied') : t('Copy')}
             >
                 {copied ? (
                     <Check className="size-4 text-success" aria-hidden />

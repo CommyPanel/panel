@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
+import { useT } from '@/hooks/use-t';
+import { Trans } from '@/lib/trans';
 import type { EngineChoice } from '@/types';
 
 export function AddServerModal({
@@ -16,6 +18,7 @@ export function AddServerModal({
     onClose: () => void;
     engines: EngineChoice[];
 }) {
+    const { t } = useT();
     const first = engines[0];
     const form = useForm({
         name: '',
@@ -38,21 +41,23 @@ export function AddServerModal({
     };
 
     return (
-        <Modal open={open} onClose={close} title="Add a database server">
+        <Modal open={open} onClose={close} title={t('Add a database server')}>
             <form onSubmit={submit} className="space-y-4">
                 <Input
-                    label="Name"
-                    placeholder="Main database"
+                    label={t('Name')}
+                    placeholder={t('Main database')}
                     required
                     autoFocus
                     autoComplete="off"
                     value={form.data.name}
                     onChange={(e) => form.setData('name', e.target.value)}
                     error={form.errors.name}
-                    hint="Only you see this name. Apps reach the server by a short name made from it."
+                    hint={t(
+                        'Only you see this name. Apps reach the server by a short name made from it.',
+                    )}
                 />
                 <Select
-                    label="Database"
+                    label={t('Database')}
                     value={form.data.engine}
                     onChange={(e) => {
                         const engine = e.target.value;
@@ -73,7 +78,7 @@ export function AddServerModal({
                     ))}
                 </Select>
                 <Select
-                    label="Version"
+                    label={t('Version')}
                     value={form.data.version}
                     onChange={(e) => form.setData('version', e.target.value)}
                     error={form.errors.version}
@@ -86,26 +91,28 @@ export function AddServerModal({
                 </Select>
                 <ul className="list-disc space-y-1.5 pl-5 text-sm text-base-content/80">
                     <li>
-                        The server runs from the official image, downloaded from
-                        Docker Hub. The first start can take a few minutes.
+                        {t(
+                            'The server runs from the official image, downloaded from Docker Hub. The first start can take a few minutes.',
+                        )}
                     </li>
                     <li>
-                        It is <strong>never reachable from the internet</strong>
-                        : no port is published. An app can reach it only after
-                        you link a database to that app.
+                        <Trans
+                            text="It is <b>never reachable from the internet</b>: no port is published. An app can reach it only after you link a database to that app."
+                            components={{ b: <strong /> }}
+                        />
                     </li>
                     <li>
-                        Its data is kept on this server and survives restarts.
-                        Every database is also dumped to a file each night, and
-                        the last 7 are kept on this server.
+                        {t(
+                            'Its data is kept on this server and survives restarts. Every database is also dumped to a file each night, and the last 7 are kept on this server.',
+                        )}
                     </li>
                 </ul>
                 <div className="flex flex-wrap justify-end gap-2">
                     <Button variant="ghost" onClick={close}>
-                        Cancel
+                        {t('Cancel')}
                     </Button>
                     <Button type="submit" loading={form.processing}>
-                        Add server
+                        {t('Add server')}
                     </Button>
                 </div>
             </form>

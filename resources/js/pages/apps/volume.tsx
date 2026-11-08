@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card';
 import { FileIcon } from '@/components/ui/file-icon';
 import { LockIcon } from '@/components/ui/lock-icon';
 import { Modal } from '@/components/ui/modal';
+import { useT } from '@/hooks/use-t';
 import AppLayout from '@/layouts/app-layout';
 import { formatBytes, formatDate } from '@/lib/format';
 import type { AppSummary } from '@/types';
@@ -53,9 +54,6 @@ type Preview = {
     truncated: boolean;
 };
 
-const plural = (n: number, one: string, many: string) =>
-    `${n.toLocaleString()} ${n === 1 ? one : many}`;
-
 function Stat({
     label,
     value,
@@ -88,8 +86,30 @@ export default function Volume({
     folder,
     error,
 }: Props) {
+    const { t, tn } = useT();
     const [preview, setPreview] = useState<Preview | null>(null);
     const [previewError, setPreviewError] = useState<string | null>(null);
+
+    const folderNote = (() => {
+        const folders = tn(
+            'one::count folder|other::count folders',
+            folder.folders,
+        );
+        const base =
+            folder.other > 0
+                ? t(':folders, :other', {
+                      folders,
+                      other: tn(
+                          'one::count other item|other::count other items',
+                          folder.other,
+                      ),
+                  })
+                : folders;
+
+        return folder.truncated
+            ? t(':note (more than are shown)', { note: base })
+            : base;
+    })();
 
     const route = { app: app.slug, name: volume.name };
     const folderUrl = (to: string) =>
@@ -124,18 +144,25 @@ export default function Volume({
             };
 
             if (!response.ok)
-                throw new Error(body.error ?? 'The file could not be read.');
+                throw new Error(body.error ?? t('The file could not be read.'));
 
             setPreview(body);
         } catch (e) {
             setPreviewError(
-                e instanceof Error ? e.message : 'The file could not be read.',
+                e instanceof Error
+                    ? e.message
+                    : t('The file could not be read.'),
             );
         }
     };
 
     return (
-        <AppLayout title={`${volume.path ?? volume.name} · ${app.name}`}>
+        <AppLayout
+            title={t(':volume · :app', {
+                volume: volume.path ?? volume.name,
+                app: app.name,
+            })}
+        >
             <PageHeader
                 title={volume.path ?? volume.name}
                 badge={
@@ -143,15 +170,27 @@ export default function Volume({
                         <span
                             className={`badge-soft badge ${volume.attached ? 'badge-success' : 'badge-warning'}`}
                         >
-                            {volume.attached ? 'Attached' : 'Not attached'}
+                            {volume.attached
+                                ? t('Attached')
+                                : t('Not attached')}
                         </span>
                         {volume.locked && <LockIcon what="volume" />}
                     </>
                 }
                 description={
                     volume.attached
-                        ? `Browsing a volume of ${app.name}. Mounted at ${volume.path} in its containers, kept on the server as ${volume.name}.`
-                        : `Browsing files that are no longer mounted by ${app.name}. Kept on the server as ${volume.name}.`
+                        ? t(
+                              'Browsing a volume of :app. Mounted at :path in its containers, kept on the server as :name.',
+                              {
+                                  app: app.name,
+                                  path: volume.path ?? '',
+                                  name: volume.name,
+                              },
+                          )
+                        : t(
+                              'Browsing files that are no longer mounted by :app. Kept on the server as :name.',
+                              { app: app.name, name: volume.name },
+                          )
                 }
                 actions={
                     <Link
@@ -159,44 +198,49 @@ export default function Volume({
                         className="btn btn-soft"
                     >
                         <ArrowLeft className="size-4" aria-hidden />
-                        All volumes
+                        {t('All volumes')}
                     </Link>
                 }
             />
 
             {error && <Alert variant="error">{error}</Alert>}
 
-            <Card title="Totals">
+            <Card title={t('Totals')}>
                 <dl className="grid gap-6 sm:grid-cols-3">
                     <Stat
-                        label="In this folder"
-                        value={plural(folder.files, 'file', 'files')}
-                        note={`${plural(folder.folders, 'folder', 'folders')}${folder.other > 0 ? `, ${plural(folder.other, 'other item', 'other items')}` : ''}${folder.truncated ? ' (more than are shown)' : ''}`}
+                        label={t('In this folder')}
+                        value={tn(
+                            'one::count file|other::count files',
+                            folder.files,
+                        )}
+                        note={folderNote}
                     />
                     <Stat
-                        label="In the whole volume"
-                        value={`${plural(volume.files, 'file', 'files')}${volume.partial ? '+' : ''}`}
+                        label={t('In the whole volume')}
+                        value={`${tn('one::count file|other::count files', volume.files)}${volume.partial ? '+' : ''}`}
                         note={
                             volume.partial
-                                ? 'Too big to count completely'
-                                : 'Including all subfolders'
+                                ? t('Too big to count completely')
+                                : t('Including all subfolders')
                         }
                     />
                     <Stat
-                        label="Disk space used"
+                        label={t('Disk space used')}
                         value={formatBytes(volume.bytes)}
-                        note="By the whole volume"
+                        note={t('By the whole volume')}
                     />
                 </dl>
             </Card>
 
             <Card
-                title="Files"
-                description="Read only. Click a folder to open it, a file to preview it, and the arrow to download it. Links and special files are shown but never opened."
+                title={t('Files')}
+                description={t(
+                    'Read only. Click a folder to open it, a file to preview it, and the arrow to download it. Links and special files are shown but never opened.',
+                )}
                 flush
             >
                 <nav
-                    aria-label="Folder"
+                    aria-label={t('Folder')}
                     className="flex flex-wrap items-center gap-1 border-b border-base-300 px-5 py-3 text-sm sm:px-6"
                 >
                     <HardDrive
@@ -237,17 +281,18 @@ export default function Volume({
 
                 {!volume.exists && !error ? (
                     <p className="p-5 text-sm text-base-content/70 sm:p-6">
-                        There are no files yet: the folder is created when a
-                        container that uses this volume starts.
+                        {t(
+                            'There are no files yet: the folder is created when a container that uses this volume starts.',
+                        )}
                     </p>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="table">
                             <thead>
                                 <tr>
-                                    <th>Name</th>
-                                    <th className="text-right">Size</th>
-                                    <th>Modified</th>
+                                    <th>{t('Name')}</th>
+                                    <th className="text-right">{t('Size')}</th>
+                                    <th>{t('Modified')}</th>
                                     <th />
                                 </tr>
                             </thead>
@@ -309,11 +354,13 @@ export default function Volume({
                                                         {entry.name}
                                                     </span>
                                                     <span className="text-xs">
-                                                        (
                                                         {entry.kind === 'link'
-                                                            ? 'link'
-                                                            : 'special file'}
-                                                        , not opened)
+                                                            ? t(
+                                                                  '(link, not opened)',
+                                                              )
+                                                            : t(
+                                                                  '(special file, not opened)',
+                                                              )}
                                                     </span>
                                                 </span>
                                             )}
@@ -335,7 +382,12 @@ export default function Volume({
                                                         join(entry.name),
                                                     )}
                                                     className="btn btn-text btn-sm"
-                                                    aria-label={`Download ${entry.name}`}
+                                                    aria-label={t(
+                                                        'Download :name',
+                                                        {
+                                                            name: entry.name,
+                                                        },
+                                                    )}
                                                 >
                                                     <Download
                                                         className="size-4"
@@ -354,7 +406,7 @@ export default function Volume({
                                                 colSpan={4}
                                                 className="text-base-content/70"
                                             >
-                                                This volume is empty.
+                                                {t('This volume is empty.')}
                                             </td>
                                         </tr>
                                     )}
@@ -366,7 +418,7 @@ export default function Volume({
                                                 colSpan={4}
                                                 className="text-base-content/70"
                                             >
-                                                This folder is empty.
+                                                {t('This folder is empty.')}
                                             </td>
                                         </tr>
                                     )}
@@ -376,7 +428,7 @@ export default function Volume({
                 )}
                 {folder.truncated && (
                     <p className="border-t border-base-300 px-5 py-3 text-sm text-base-content/70 sm:px-6">
-                        This folder has more items than are shown here.
+                        {t('This folder has more items than are shown here.')}
                     </p>
                 )}
                 {previewError && (
@@ -389,7 +441,7 @@ export default function Volume({
             <Modal
                 open={preview !== null}
                 onClose={() => setPreview(null)}
-                title={preview?.path ?? 'File'}
+                title={preview?.path ?? t('File')}
                 size="lg"
             >
                 {preview && (
@@ -403,13 +455,14 @@ export default function Volume({
                                 className="btn btn-soft btn-sm"
                             >
                                 <Download className="size-4" aria-hidden />
-                                Download
+                                {t('Download')}
                             </a>
                         </div>
                         {preview.binary ? (
                             <p className="text-sm text-base-content/70">
-                                This is not a text file, so there is no preview.
-                                Download it to open it.
+                                {t(
+                                    'This is not a text file, so there is no preview. Download it to open it.',
+                                )}
                             </p>
                         ) : (
                             <>
@@ -418,13 +471,14 @@ export default function Volume({
                                     className="max-h-96 overflow-auto rounded-field bg-base-200 p-3 font-mono text-xs whitespace-pre"
                                 >
                                     {preview.content === ''
-                                        ? '(empty file)'
+                                        ? t('(empty file)')
                                         : preview.content}
                                 </pre>
                                 {preview.truncated && (
                                     <p className="text-sm text-base-content/70">
-                                        Only the start of the file is shown.
-                                        Download it to see all of it.
+                                        {t(
+                                            'Only the start of the file is shown. Download it to see all of it.',
+                                        )}
                                     </p>
                                 )}
                             </>
@@ -434,7 +488,7 @@ export default function Volume({
                                 variant="ghost"
                                 onClick={() => setPreview(null)}
                             >
-                                Close
+                                {t('Close')}
                             </Button>
                         </div>
                     </div>

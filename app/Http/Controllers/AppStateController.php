@@ -14,7 +14,7 @@ class AppStateController extends Controller
     public function deactivate(Request $request, App $app, DeactivateApp $action): RedirectResponse
     {
         if ($app->isDeploying()) {
-            return back()->withErrors(['state' => 'Wait for the running deployment to finish first.']);
+            return back()->withErrors(['state' => __('Wait for the running deployment to finish first.')]);
         }
 
         try {
@@ -23,13 +23,13 @@ class AppStateController extends Controller
             return back()->withErrors(['state' => $e->getMessage()]);
         }
 
-        return back()->with('status', 'The app is deactivated. Its domains no longer serve it.');
+        return back()->with('status', __('The app is deactivated. Its domains no longer serve it.'));
     }
 
     public function activate(Request $request, App $app, DeactivateApp $action): RedirectResponse
     {
         if ($app->active_deployment_id !== null || $app->isDeploying()) {
-            return back()->withErrors(['state' => 'The app is already running or starting.']);
+            return back()->withErrors(['state' => __('The app is already running or starting.')]);
         }
 
         try {
@@ -43,17 +43,17 @@ class AppStateController extends Controller
 
     public function stop(Request $request, App $app, ControlApp $control): RedirectResponse
     {
-        return $this->control(fn () => $control->stop($app, $request->user()), 'The app is stopped. Its domains show an error until you start it again.');
+        return $this->control(fn () => $control->stop($app, $request->user()), __('The app is stopped. Its domains show an error until you start it again.'));
     }
 
     public function start(Request $request, App $app, ControlApp $control): RedirectResponse
     {
-        return $this->control(fn () => $control->start($app, $request->user()), 'The app is running again.');
+        return $this->control(fn () => $control->start($app, $request->user()), __('The app is running again.'));
     }
 
     public function restart(Request $request, App $app, ControlApp $control): RedirectResponse
     {
-        return $this->control(fn () => $control->restart($app, $request->user()), 'The app was restarted.');
+        return $this->control(fn () => $control->restart($app, $request->user()), __('The app was restarted.'));
     }
 
     /**

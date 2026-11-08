@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
 import { Tabs, tabPanelProps } from '@/components/ui/tabs';
 import type { TabItem } from '@/components/ui/tabs';
+import { useT } from '@/hooks/use-t';
 import AppLayout from '@/layouts/app-layout';
 
 export type ServerTab = 'overview' | 'docker' | 'nginx';
@@ -15,10 +16,10 @@ const PATHS: Record<ServerTab, string> = {
     nginx: '/server/nginx',
 };
 
-const TABS: TabItem<ServerTab>[] = [
+const tabs = (t: (key: string) => string): TabItem<ServerTab>[] => [
     {
         id: 'overview',
-        label: 'Overview',
+        label: t('Overview'),
         icon: <Gauge className="size-4" aria-hidden />,
     },
     {
@@ -37,16 +38,20 @@ type Props = { active: ServerTab; error: string | null; children: ReactNode };
 
 /** Header and tabs shared by the server pages. Each tab is its own page, so only its data is loaded. */
 export function ServerLayout({ active, error, children }: Props) {
+    const { t } = useT();
+
     return (
-        <AppLayout title="Server">
+        <AppLayout title={t('Server')}>
             <PageHeader
-                title="Server"
-                description="The machine CommyPanel runs on, and the Docker and nginx that run your apps."
+                title={t('Server')}
+                description={t(
+                    'The machine CommyPanel runs on, and the Docker and nginx that run your apps.',
+                )}
             />
             <Tabs
-                tabs={TABS}
+                tabs={tabs(t)}
                 active={active}
-                label="Server sections"
+                label={t('Server sections')}
                 onChange={(id) => {
                     if (id !== active) router.visit(PATHS[id]);
                 }}
@@ -55,7 +60,9 @@ export function ServerLayout({ active, error, children }: Props) {
                 {error && (
                     <Alert variant="error">
                         <span>
-                            Could not read this from the server: {error}
+                            {t('Could not read this from the server: :error', {
+                                error,
+                            })}
                         </span>
                     </Alert>
                 )}

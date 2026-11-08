@@ -3,6 +3,7 @@ import { OctagonAlert, Search, TriangleAlert, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import AuditLogController from '@/actions/App/Http/Controllers/AuditLogController';
 import { Card } from '@/components/ui/card';
+import { useT } from '@/hooks/use-t';
 import { cn } from '@/lib/utils';
 
 export type Severity = 'danger' | 'warning' | 'info';
@@ -15,44 +16,6 @@ export type AuditFilters = {
     from: string | null;
     to: string | null;
 };
-
-const RANGES: { id: Range | null; label: string }[] = [
-    { id: null, label: 'All time' },
-    { id: 'today', label: 'Today' },
-    { id: '7d', label: 'Last 7 days' },
-    { id: '30d', label: 'Last month' },
-    { id: 'year', label: 'Last year' },
-    { id: 'custom', label: 'Custom' },
-];
-
-const GRADES: {
-    id: Severity;
-    label: string;
-    hint: string;
-    icon?: typeof OctagonAlert;
-    on: string;
-}[] = [
-    {
-        id: 'danger',
-        label: 'High risk',
-        hint: 'Exposes something or destroys data or access',
-        icon: OctagonAlert,
-        on: 'btn-error',
-    },
-    {
-        id: 'warning',
-        label: 'Sensitive',
-        hint: 'Secrets seen, access or settings changed, a failure',
-        icon: TriangleAlert,
-        on: 'btn-warning',
-    },
-    {
-        id: 'info',
-        label: 'Routine',
-        hint: 'Everything else',
-        on: 'btn-neutral',
-    },
-];
 
 /** The start of a local day, as the instant the server compares with. */
 function startOf(date: string): string {
@@ -100,6 +63,43 @@ export function AuditFilterBar({
     filters: AuditFilters;
     total: number;
 }) {
+    const { t, tn } = useT();
+    const ranges: { id: Range | null; label: string }[] = [
+        { id: null, label: t('All time') },
+        { id: 'today', label: t('Today') },
+        { id: '7d', label: t('Last 7 days') },
+        { id: '30d', label: t('Last month') },
+        { id: 'year', label: t('Last year') },
+        { id: 'custom', label: t('Custom') },
+    ];
+    const grades: {
+        id: Severity;
+        label: string;
+        hint: string;
+        icon?: typeof OctagonAlert;
+        on: string;
+    }[] = [
+        {
+            id: 'danger',
+            label: t('High risk'),
+            hint: t('Exposes something or destroys data or access'),
+            icon: OctagonAlert,
+            on: 'btn-error',
+        },
+        {
+            id: 'warning',
+            label: t('Sensitive'),
+            hint: t('Secrets seen, access or settings changed, a failure'),
+            icon: TriangleAlert,
+            on: 'btn-warning',
+        },
+        {
+            id: 'info',
+            label: t('Routine'),
+            hint: t('Everything else'),
+            on: 'btn-neutral',
+        },
+    ];
     const [search, setSearch] = useState(filters.q);
     const [from, setFrom] = useState(day(filters.from));
     const [to, setTo] = useState(day(filters.to));
@@ -198,8 +198,10 @@ export function AuditFilterBar({
                             className="input w-full pl-9"
                             value={search}
                             onChange={(e) => type(e.target.value)}
-                            placeholder="Search who, action or IP address"
-                            aria-label="Search the audit log by person, action or IP address"
+                            placeholder={t('Search who, action or IP address')}
+                            aria-label={t(
+                                'Search the audit log by person, action or IP address',
+                            )}
                             autoComplete="off"
                             spellCheck={false}
                         />
@@ -209,9 +211,7 @@ export function AuditFilterBar({
                         role="status"
                         aria-live="polite"
                     >
-                        {total === 1
-                            ? '1 entry'
-                            : `${total.toLocaleString()} entries`}
+                        {tn('one::count entry|other::count entries', total)}
                     </p>
                     {active && (
                         <button
@@ -220,7 +220,7 @@ export function AuditFilterBar({
                             onClick={clear}
                         >
                             <X className="size-4" aria-hidden />
-                            Clear filters
+                            {t('Clear filters')}
                         </button>
                     )}
                 </div>
@@ -228,14 +228,16 @@ export function AuditFilterBar({
                 <div className="flex flex-wrap gap-x-8 gap-y-3">
                     <div
                         role="group"
-                        aria-label="Time range"
+                        aria-label={t('Time range')}
                         className="space-y-1.5"
                     >
-                        <p className="text-sm text-base-content/70">When</p>
+                        <p className="text-sm text-base-content/70">
+                            {t('When')}
+                        </p>
                         <div className="flex flex-wrap gap-1.5">
-                            {RANGES.map((r) => (
+                            {ranges.map((r) => (
                                 <button
-                                    key={r.label}
+                                    key={r.id ?? 'all'}
                                     type="button"
                                     aria-pressed={filters.range === r.id}
                                     className={cn(
@@ -252,10 +254,16 @@ export function AuditFilterBar({
                         </div>
                     </div>
 
-                    <div role="group" aria-label="Risk" className="space-y-1.5">
-                        <p className="text-sm text-base-content/70">Risk</p>
+                    <div
+                        role="group"
+                        aria-label={t('Risk')}
+                        className="space-y-1.5"
+                    >
+                        <p className="text-sm text-base-content/70">
+                            {t('Risk')}
+                        </p>
                         <div className="flex flex-wrap gap-1.5">
-                            {GRADES.map((g) => {
+                            {grades.map((g) => {
                                 const on = filters.severity.includes(g.id);
 
                                 return (
@@ -291,7 +299,7 @@ export function AuditFilterBar({
                                 className="mb-1 label-text block px-0!"
                                 htmlFor="audit-from"
                             >
-                                From
+                                {t('From')}
                             </label>
                             <input
                                 id="audit-from"
@@ -310,7 +318,7 @@ export function AuditFilterBar({
                                 className="mb-1 label-text block px-0!"
                                 htmlFor="audit-to"
                             >
-                                To
+                                {t('To')}
                             </label>
                             <input
                                 id="audit-to"

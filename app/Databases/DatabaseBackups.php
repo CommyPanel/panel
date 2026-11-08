@@ -35,13 +35,13 @@ class DatabaseBackups
         $server = $database->server;
 
         if (! $server->isRunning()) {
-            throw new DatabaseException('The server is not running. Start it first.');
+            throw new DatabaseException(__('The server is not running. Start it first.'));
         }
 
         $dir = $this->directory($server);
 
         if (! is_dir($dir) && ! @mkdir($dir, 0700, true) && ! is_dir($dir)) {
-            throw new DatabaseException("The backup folder {$dir} could not be created.");
+            throw new DatabaseException(__('The backup folder :dir could not be created.', ['dir' => $dir]));
         }
 
         $name = $database->name.'-'.date('Ymd-His').'.sql.gz';
@@ -49,7 +49,7 @@ class DatabaseBackups
         try {
             $this->host->dumpDatabase($server->target(), $database->name, $dir.'/'.$name);
         } catch (HostOperationFailed $e) {
-            throw new DatabaseException("Could not back up {$database->name}: {$e->getMessage()}", 0, $e);
+            throw new DatabaseException(__('Could not back up :name: :error', ['name' => $database->name, 'error' => $e->getMessage()]), 0, $e);
         }
 
         @chmod($dir.'/'.$name, 0600);
@@ -85,7 +85,7 @@ class DatabaseBackups
         $path = $this->directory($server).'/'.$name;
 
         if (preg_match(self::NAME, $name) !== 1 || ! is_file($path)) {
-            throw new DatabaseException('There is no such backup.');
+            throw new DatabaseException(__('There is no such backup.'));
         }
 
         return $path;

@@ -10,6 +10,7 @@ import { WebhookCard } from '@/components/apps/webhook-card';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useT } from '@/hooks/use-t';
 import type { AppSettings, AppWebhook } from '@/types';
 
 export function SettingsTab({
@@ -19,6 +20,7 @@ export function SettingsTab({
     app: AppSettings;
     webhook: AppWebhook | null;
 }) {
+    const { t } = useT();
     const upload = app.source_type === 'upload';
     const form = useForm<AppFormData>({
         name: app.name,
@@ -47,9 +49,9 @@ export function SettingsTab({
             <div className="min-w-0 space-y-6 xl:col-span-2">
                 <form onSubmit={submit} className="space-y-6">
                     {upload ? (
-                        <Card title="Name">
+                        <Card title={t('Name')}>
                             <Input
-                                label="App name"
+                                label={t('App name')}
                                 required
                                 value={form.data.name}
                                 onChange={(e) =>
@@ -60,20 +62,22 @@ export function SettingsTab({
                         </Card>
                     ) : (
                         <Card
-                            title="Source"
-                            description="Where the code comes from."
+                            title={t('Source')}
+                            description={t('Where the code comes from.')}
                         >
                             <SourceFields {...fields} />
                         </Card>
                     )}
                     <Card
-                        title="Runtime"
-                        description="How the app runs. Changes apply from the next deployment."
+                        title={t('Runtime')}
+                        description={t(
+                            'How the app runs. Changes apply from the next deployment.',
+                        )}
                     >
                         <RuntimeFields {...fields} />
                     </Card>
                     <Button type="submit" loading={form.processing}>
-                        Save settings
+                        {t('Save settings')}
                     </Button>
                 </form>
             </div>

@@ -19,7 +19,7 @@ class RolloutController extends Controller
         $rollout = $this->active($app);
         $rollouts->advance($rollout, $request->user());
 
-        return back()->with('status', 'The rollout moved on.');
+        return back()->with('status', __('The rollout moved on.'));
     }
 
     public function promote(Request $request, App $app, RolloutService $rollouts): RedirectResponse
@@ -27,7 +27,7 @@ class RolloutController extends Controller
         $rollout = $this->active($app);
         $rollouts->complete($rollout, 'Everyone was given the new version by '.$request->user()?->name.'.', $request->user());
 
-        return back()->with('status', 'Everyone has the new version now, and the old container was stopped.');
+        return back()->with('status', __('Everyone has the new version now, and the old container was stopped.'));
     }
 
     public function abort(Request $request, App $app, RolloutService $rollouts): RedirectResponse
@@ -35,7 +35,7 @@ class RolloutController extends Controller
         $rollout = $this->active($app);
         $rollouts->abort($rollout, $request->user(), 'Aborted.');
 
-        return back()->with('status', 'The rollout was aborted. All traffic is on the previous version.');
+        return back()->with('status', __('The rollout was aborted. All traffic is on the previous version.'));
     }
 
     private function active(App $app): Rollout

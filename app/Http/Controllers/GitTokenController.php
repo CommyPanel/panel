@@ -55,7 +55,7 @@ class GitTokenController extends Controller
 
         $audit->record('app.git_token_saved', null, ['app' => $app->slug], $app);
 
-        return back()->with('status', 'Access token saved. This server can read the repository.');
+        return back()->with('status', __('Access token saved. This server can read the repository.'));
     }
 
     public function destroy(App $app, AuditLogger $audit): RedirectResponse
@@ -77,7 +77,7 @@ class GitTokenController extends Controller
         $audit->record('app.git_token_removed', null, ['app' => $app->slug], $app);
 
         return back()->with('status', $app->deploy_key_private !== null
-            ? 'Access token removed. Deployments use the deploy key again.'
-            : 'Access token removed. Deployments only work if the repository is public.');
+            ? __('Access token removed. Deployments use the deploy key again.')
+            : __('Access token removed. Deployments only work if the repository is public.'));
     }
 }

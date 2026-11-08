@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
+import { useT } from '@/hooks/use-t';
 import type { SafeDeploys } from '@/types';
 
 const MAX_STEPS = 4;
@@ -83,6 +84,7 @@ export function SafeDeploysCard({
     slug: string;
     settings: SafeDeploys;
 }) {
+    const { t } = useT();
     const { errors } = usePage().props;
     const [data, setData] = useState<SafeDeploys>(settings);
     const [understood, setUnderstood] = useState(false);
@@ -133,23 +135,27 @@ export function SafeDeploysCard({
 
     return (
         <Card
-            title="Safe deployments"
-            description="Keep a bad release from hurting your visitors: CommyPanel watches each new release and can roll it out gradually."
+            title={t('Safe deployments')}
+            description={t(
+                'Keep a bad release from hurting your visitors: CommyPanel watches each new release and can roll it out gradually.',
+            )}
         >
             <div className="space-y-8">
                 <Section
                     icon={<ShieldCheck className="size-6" aria-hidden />}
-                    title="Watch new releases"
+                    title={t('Watch new releases')}
                 >
                     <Switch
                         checked={data.watch_enabled}
                         onChange={(v) => set('watch_enabled', v)}
-                        label="Roll back by itself if a release does worse"
-                        description="After a release goes live, the previous one keeps running for a few minutes. If the new release fails clearly more requests (5xx) or is much slower than the one before it, or its container stops, traffic goes straight back to the previous release and you get a message. You can always try the release again by hand."
+                        label={t('Roll back by itself if a release does worse')}
+                        description={t(
+                            'After a release goes live, the previous one keeps running for a few minutes. If the new release fails clearly more requests (5xx) or is much slower than the one before it, or its container stops, traffic goes straight back to the previous release and you get a message. You can always try the release again by hand.',
+                        )}
                     />
                     {data.watch_enabled && (
                         <Input
-                            label="Watch for (minutes)"
+                            label={t('Watch for (minutes)')}
                             type="number"
                             min={1}
                             max={60}
@@ -158,34 +164,31 @@ export function SafeDeploysCard({
                                 set('watch_minutes', Number(e.target.value))
                             }
                             error={error('watch_minutes')}
-                            hint="The previous container uses memory until the watch ends. It needs enough requests to judge: an app with almost no traffic is simply accepted."
+                            hint={t(
+                                'The previous container uses memory until the watch ends. It needs enough requests to judge: an app with almost no traffic is simply accepted.',
+                            )}
                         />
                     )}
                 </Section>
 
                 <Section
                     icon={<Split className="size-6" aria-hidden />}
-                    title="Gradual rollout"
+                    title={t('Gradual rollout')}
                 >
                     <Switch
                         checked={data.rollout_enabled}
                         onChange={turnRolloutOn}
-                        label="Roll new releases out in steps"
-                        description={
-                            <>
-                                Instead of switching everyone at once, give the
-                                new release a growing share of the visitors (for
-                                example {path}) and look at the requests at each
-                                step. For busy apps only. Off unless you turn it
-                                on.
-                            </>
-                        }
+                        label={t('Roll new releases out in steps')}
+                        description={t(
+                            'Instead of switching everyone at once, give the new release a growing share of the visitors (for example :path) and look at the requests at each step. For busy apps only. Off unless you turn it on.',
+                            { path },
+                        )}
                     />
                     {data.rollout_enabled && (
                         <div className="space-y-4">
                             <fieldset className="space-y-2">
                                 <legend className="mb-1 label-text">
-                                    Steps (share of visitors)
+                                    {t('Steps (share of visitors)')}
                                 </legend>
                                 <div className="flex flex-wrap items-center gap-2">
                                     {data.rollout_steps.map((step, index) => (
@@ -194,7 +197,12 @@ export function SafeDeploysCard({
                                             className="flex items-center gap-1 rounded-field border border-base-300 pr-1 pl-2"
                                         >
                                             <input
-                                                aria-label={`Step ${index + 1} percent`}
+                                                aria-label={t(
+                                                    'Step :number percent',
+                                                    {
+                                                        number: index + 1,
+                                                    },
+                                                )}
                                                 type="number"
                                                 min={1}
                                                 max={99}
@@ -214,7 +222,12 @@ export function SafeDeploysCard({
                                                 <button
                                                     type="button"
                                                     className="btn btn-circle btn-text btn-xs"
-                                                    aria-label={`Remove step ${index + 1}`}
+                                                    aria-label={t(
+                                                        'Remove step :number',
+                                                        {
+                                                            number: index + 1,
+                                                        },
+                                                    )}
                                                     onClick={() =>
                                                         set(
                                                             'rollout_steps',
@@ -253,7 +266,7 @@ export function SafeDeploysCard({
                                                 className="size-4"
                                                 aria-hidden
                                             />
-                                            Add a step
+                                            {t('Add a step')}
                                         </Button>
                                     )}
                                 </div>
@@ -267,14 +280,15 @@ export function SafeDeploysCard({
                                     </p>
                                 )}
                                 <p className="text-sm text-base-content/70">
-                                    Up to four steps, each between 1 and 99, in
-                                    rising order. After the last one everybody
-                                    gets the release: {path}.
+                                    {t(
+                                        'Up to four steps, each between 1 and 99, in rising order. After the last one everybody gets the release: :path.',
+                                        { path },
+                                    )}
                                 </p>
                             </fieldset>
 
                             <Input
-                                label="Hold each step for (minutes)"
+                                label={t('Hold each step for (minutes)')}
                                 type="number"
                                 min={1}
                                 max={120}
@@ -286,12 +300,14 @@ export function SafeDeploysCard({
                                     )
                                 }
                                 error={error('rollout_hold_minutes')}
-                                hint="A step with too little traffic is held up to three times as long, then CommyPanel asks you instead of guessing."
+                                hint={t(
+                                    'A step with too little traffic is held up to three times as long, then CommyPanel asks you instead of guessing.',
+                                )}
                             />
 
                             <fieldset className="space-y-2">
                                 <legend className="mb-1 label-text">
-                                    Moving to the next step
+                                    {t('Moving to the next step')}
                                 </legend>
                                 <label className="flex cursor-pointer items-start gap-3 text-sm">
                                     <input
@@ -304,11 +320,14 @@ export function SafeDeploysCard({
                                     />
                                     <span>
                                         <span className="font-medium">
-                                            By itself while it looks healthy
+                                            {t(
+                                                'By itself while it looks healthy',
+                                            )}
                                         </span>
                                         <span className="block text-base-content/70">
-                                            Rolls back by itself if the release
-                                            does clearly worse.
+                                            {t(
+                                                'Rolls back by itself if the release does clearly worse.',
+                                            )}
                                         </span>
                                     </span>
                                 </label>
@@ -323,12 +342,12 @@ export function SafeDeploysCard({
                                     />
                                     <span>
                                         <span className="font-medium">
-                                            Wait for me after each step
+                                            {t('Wait for me after each step')}
                                         </span>
                                         <span className="block text-base-content/70">
-                                            You press Move on (or Abort). It
-                                            still rolls back by itself if the
-                                            release does clearly worse.
+                                            {t(
+                                                'You press Move on (or Abort). It still rolls back by itself if the release does clearly worse.',
+                                            )}
                                         </span>
                                     </span>
                                 </label>
@@ -342,7 +361,7 @@ export function SafeDeploysCard({
 
                 <div className="flex justify-end">
                     <Button onClick={save} loading={saving}>
-                        Save
+                        {t('Save')}
                     </Button>
                 </div>
             </div>
@@ -350,48 +369,56 @@ export function SafeDeploysCard({
             <Modal
                 open={asking}
                 onClose={() => setAsking(false)}
-                title="Before you turn on gradual rollouts"
+                title={t('Before you turn on gradual rollouts')}
                 footer={
                     <>
                         <Button
                             variant="ghost"
                             onClick={() => setAsking(false)}
                         >
-                            Cancel
+                            {t('Cancel')}
                         </Button>
                         <Button onClick={confirmRollout} disabled={!agreed}>
-                            Turn on
+                            {t('Turn on')}
                         </Button>
                     </>
                 }
             >
                 <div className="space-y-4 text-sm">
                     <p>
-                        A gradual rollout is a power tool. It only makes sense
-                        for an app with a lot of traffic, and it asks a few
-                        things of your app:
+                        {t(
+                            'A gradual rollout is a power tool. It only makes sense for an app with a lot of traffic, and it asks a few things of your app:',
+                        )}
                     </p>
                     <ul className="space-y-3">
                         {[
                             [
                                 TriangleAlert,
-                                'Two versions run side by side',
-                                'For the whole rollout (steps × hold time), the old and the new release both serve visitors and share the same database and volumes. A migration must work with both: add first, remove later.',
+                                t('Two versions run side by side.'),
+                                t(
+                                    'For the whole rollout (steps × hold time), the old and the new release both serve visitors and share the same database and volumes. A migration must work with both: add first, remove later.',
+                                ),
                             ],
                             [
                                 Gauge,
-                                'It needs enough requests to judge',
-                                'A step of 10% on a quiet app may see too few requests to say anything. CommyPanel then waits longer and finally asks you, instead of guessing.',
+                                t('It needs enough requests to judge.'),
+                                t(
+                                    'A step of 10% on a quiet app may see too few requests to say anything. CommyPanel then waits longer and finally asks you, instead of guessing.',
+                                ),
                             ],
                             [
                                 Timer,
-                                'A deployment takes longer',
-                                'A new release only goes live after its last step. New deployments wait until it ends, and you can move on, give everyone the release, or abort at any time.',
+                                t('A deployment takes longer.'),
+                                t(
+                                    'A new release only goes live after its last step. New deployments wait until it ends, and you can move on, give everyone the release, or abort at any time.',
+                                ),
                             ],
                             [
                                 Split,
-                                'Visitors stay on one version',
-                                'A cookie keeps each visitor on one release. A client that refuses cookies can switch between versions. Long requests and open connections stay on the version they started on.',
+                                t('Visitors stay on one version.'),
+                                t(
+                                    'A cookie keeps each visitor on one release. A client that refuses cookies can switch between versions. Long requests and open connections stay on the version they started on.',
+                                ),
                             ],
                         ].map(([Icon, head, text]) => {
                             const I = Icon as typeof Gauge;
@@ -403,7 +430,7 @@ export function SafeDeploysCard({
                                         aria-hidden
                                     />
                                     <span>
-                                        <strong>{head as string}.</strong>{' '}
+                                        <strong>{head as string}</strong>{' '}
                                         <span className="text-base-content/80">
                                             {text as string}
                                         </span>
@@ -413,9 +440,9 @@ export function SafeDeploysCard({
                         })}
                     </ul>
                     <p className="text-base-content/70">
-                        It also uses memory for two containers while it runs,
-                        and it needs the app to have a domain. Rollbacks and
-                        applying changes stay instant: they are never gradual.
+                        {t(
+                            'It also uses memory for two containers while it runs, and it needs the app to have a domain. Rollbacks and applying changes stay instant: they are never gradual.',
+                        )}
                     </p>
                     <label className="flex cursor-pointer items-start gap-3 rounded-field border border-base-300 p-3">
                         <input
@@ -425,7 +452,9 @@ export function SafeDeploysCard({
                             onChange={(e) => setAgreed(e.target.checked)}
                         />
                         <span>
-                            I understand what a gradual rollout asks of my app.
+                            {t(
+                                'I understand what a gradual rollout asks of my app.',
+                            )}
                         </span>
                     </label>
                 </div>

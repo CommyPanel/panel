@@ -38,8 +38,8 @@ class TokenAccess
     public static function abilities(): array
     {
         return [
-            self::READ => ['label' => 'Read apps and deployments', 'description' => 'List apps, see their status and read how a deployment went.', 'permission' => Permissions::APPS_VIEW],
-            self::DEPLOY => ['label' => 'Start deployments', 'description' => 'Deploy an app, for example from a CI pipeline after the tests pass.', 'permission' => Permissions::APPS_DEPLOY],
+            self::READ => ['label' => __('Read apps and deployments'), 'description' => __('List apps, see their status and read how a deployment went.'), 'permission' => Permissions::APPS_VIEW],
+            self::DEPLOY => ['label' => __('Start deployments'), 'description' => __('Deploy an app, for example from a CI pipeline after the tests pass.'), 'permission' => Permissions::APPS_DEPLOY],
         ];
     }
 

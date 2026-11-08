@@ -4,10 +4,12 @@ import EnvVarController from '@/actions/App/Http/Controllers/EnvVarController';
 import { EnvCard } from '@/components/apps/env-card';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useT } from '@/hooks/use-t';
 
 type Props = { slug: string; keys: string[] };
 
 function ImportCard({ slug }: { slug: string }) {
+    const { t } = useT();
     const form = useForm({ env: '' });
 
     const submit = (event: FormEvent) => {
@@ -20,8 +22,10 @@ function ImportCard({ slug }: { slug: string }) {
 
     return (
         <Card
-            title="Paste a .env file"
-            description="Adds every KEY=value line and overwrites variables with the same name. Existing variables not listed here are kept."
+            title={t('Paste a .env file')}
+            description={t(
+                'Adds every KEY=value line and overwrites variables with the same name. Existing variables not listed here are kept.',
+            )}
         >
             <form onSubmit={submit} className="space-y-4">
                 <div className="w-full">
@@ -29,7 +33,7 @@ function ImportCard({ slug }: { slug: string }) {
                         htmlFor="env-import"
                         className="mb-1 label-text block px-0!"
                     >
-                        Variables
+                        {t('Variables')}
                     </label>
                     <textarea
                         id="env-import"
@@ -54,7 +58,7 @@ function ImportCard({ slug }: { slug: string }) {
                     loading={form.processing}
                     disabled={form.data.env.trim() === ''}
                 >
-                    Import variables
+                    {t('Import variables')}
                 </Button>
             </form>
         </Card>

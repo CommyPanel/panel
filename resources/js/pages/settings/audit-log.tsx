@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/page-header';
 import { AuditFilterBar } from '@/components/audit/audit-filters';
 import type { AuditFilters, Severity } from '@/components/audit/audit-filters';
 import { Card } from '@/components/ui/card';
+import { useT } from '@/hooks/use-t';
 import AppLayout from '@/layouts/app-layout';
 
 const ROW: Record<Severity, string> = {
@@ -36,40 +37,46 @@ type Props = {
 };
 
 export default function AuditLog({ logs, filters }: Props) {
+    const { t } = useT();
+
     return (
-        <AppLayout title="Audit log">
+        <AppLayout title={t('Audit log')}>
             <PageHeader
-                title="Audit log"
-                description="Security-relevant actions on this panel, newest first."
+                title={t('Audit log')}
+                description={t(
+                    'Security-relevant actions on this panel, newest first.',
+                )}
             />
             <ul
                 className="mb-4 flex flex-wrap gap-x-6 gap-y-2 text-sm"
-                aria-label="What the colours mean"
+                aria-label={t('What the colours mean')}
             >
                 <li className="flex items-center gap-2">
                     <span className="badge-soft badge badge-error">
                         <OctagonAlert className="size-3.5" aria-hidden />
-                        High risk
+                        {t('High risk')}
                     </span>
                     <span className="text-base-content/70">
-                        exposes something or destroys data or access
+                        {t('exposes something or destroys data or access')}
                     </span>
                 </li>
                 <li className="flex items-center gap-2">
                     <span className="badge-soft badge badge-warning">
                         <TriangleAlert className="size-3.5" aria-hidden />
-                        Sensitive
+                        {t('Sensitive')}
                     </span>
                     <span className="text-base-content/70">
-                        secrets seen, access or settings changed, a failure
+                        {t(
+                            'secrets seen, access or settings changed, a failure',
+                        )}
                     </span>
                 </li>
                 <li className="flex items-center gap-2">
                     <span className="badge-soft badge-neutral badge">
-                        Routine
+                        {t('Routine')}
                     </span>
                     <span className="text-base-content/70">
-                        everything else
+                        {t('everything else')}
                     </span>
                 </li>
             </ul>
@@ -79,11 +86,11 @@ export default function AuditLog({ logs, filters }: Props) {
                     <table className="table">
                         <thead>
                             <tr>
-                                <th>When</th>
-                                <th>Who</th>
-                                <th>Action</th>
-                                <th>IP</th>
-                                <th>Details</th>
+                                <th>{t('When')}</th>
+                                <th>{t('Who')}</th>
+                                <th>{t('Action')}</th>
+                                <th>{t('IP')}</th>
+                                <th>{t('Details')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -102,13 +109,13 @@ export default function AuditLog({ logs, filters }: Props) {
                                             {log.severity === 'danger' && (
                                                 <OctagonAlert
                                                     className="size-4 shrink-0 text-error"
-                                                    aria-label="High risk"
+                                                    aria-label={t('High risk')}
                                                 />
                                             )}
                                             {log.severity === 'warning' && (
                                                 <TriangleAlert
                                                     className="size-4 shrink-0 text-warning"
-                                                    aria-label="Sensitive"
+                                                    aria-label={t('Sensitive')}
                                                 />
                                             )}
                                             <code>{log.action}</code>
@@ -129,8 +136,10 @@ export default function AuditLog({ logs, filters }: Props) {
                                         (filters.q !== '' ||
                                             filters.severity.length > 0 ||
                                             filters.range !== null)
-                                            ? 'No entries match these filters.'
-                                            : 'Nothing recorded yet.'}
+                                            ? t(
+                                                  'No entries match these filters.',
+                                              )
+                                            : t('Nothing recorded yet.')}
                                     </td>
                                 </tr>
                             )}
@@ -139,7 +148,7 @@ export default function AuditLog({ logs, filters }: Props) {
                 </div>
                 <nav
                     className="flex flex-wrap gap-1 border-t border-base-300 p-3"
-                    aria-label="Audit log pages"
+                    aria-label={t('Audit log pages')}
                 >
                     {logs.links.map((link, index) =>
                         link.url ? (

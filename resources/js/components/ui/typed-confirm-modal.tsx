@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
+import { useT } from '@/hooks/use-t';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
@@ -29,6 +30,7 @@ export function TypedConfirmModal({
     onConfirm,
     onClose,
 }: Props) {
+    const { t } = useT();
     const [typed, setTyped] = useState('');
 
     const close = () => {
@@ -47,7 +49,7 @@ export function TypedConfirmModal({
             <form onSubmit={submit} className="space-y-4">
                 <div className="space-y-3 text-sm">{children}</div>
                 <Input
-                    label={`Type ${expected} to confirm`}
+                    label={t('Type :expected to confirm', { expected })}
                     autoComplete="off"
                     autoFocus
                     spellCheck={false}
@@ -57,7 +59,7 @@ export function TypedConfirmModal({
                 />
                 <div className="flex flex-wrap justify-end gap-2">
                     <Button variant="ghost" onClick={close}>
-                        Cancel
+                        {t('Cancel')}
                     </Button>
                     <Button
                         type="submit"

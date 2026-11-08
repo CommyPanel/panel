@@ -4,7 +4,9 @@ import { ServerLayout } from '@/components/server/server-layout';
 import { StateMark, toneOfService } from '@/components/server/state-mark';
 import { Card } from '@/components/ui/card';
 import { LiveUsage } from '@/components/usage/live-usage';
+import { useT } from '@/hooks/use-t';
 import { formatBytes, formatUptime } from '@/lib/format';
+import { Trans } from '@/lib/trans';
 
 type Props = {
     error: string | null;
@@ -42,47 +44,60 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function Overview({ error, host, volumes }: Props) {
+    const { t, tn } = useT();
+
     return (
         <ServerLayout active="overview" error={error}>
             {host && <LiveUsage />}
             {host && (
                 <div className="grid items-start gap-6 xl:grid-cols-2">
                     <div className="min-w-0 space-y-6">
-                        <Card title="This server">
+                        <Card title={t('This server')}>
                             <dl className="divide-y divide-base-300 text-sm">
-                                <Row label="Hostname" value={host.hostname} />
-                                <Row label="System" value={host.os} />
-                                <Row label="Kernel" value={host.kernel} />
                                 <Row
-                                    label="Processor"
-                                    value={`${host.cpus} ${host.cpus === 1 ? 'core' : 'cores'} (${host.arch})`}
+                                    label={t('Hostname')}
+                                    value={host.hostname}
+                                />
+                                <Row label={t('System')} value={host.os} />
+                                <Row label={t('Kernel')} value={host.kernel} />
+                                <Row
+                                    label={t('Processor')}
+                                    value={tn(
+                                        'one::count core (:arch)|other::count cores (:arch)',
+                                        host.cpus,
+                                        { arch: host.arch },
+                                    )}
                                 />
                                 <Row
-                                    label="Uptime"
+                                    label={t('Uptime')}
                                     value={formatUptime(host.uptime_seconds)}
                                 />
                                 <Row
-                                    label="Load (1, 5, 15 min)"
+                                    label={t('Load (1, 5, 15 min)')}
                                     value={host.load
                                         .map((n) => n.toFixed(2))
                                         .join('  ')}
                                 />
                                 <Row
-                                    label="CommyPanel agent"
+                                    label={t('CommyPanel agent')}
                                     value={host.agent_version}
                                 />
                             </dl>
                         </Card>
                         <Card
-                            title="Disk"
-                            description="Everything CommyPanel keeps (apps' volumes, database servers, backups, images) shares this disk."
+                            title={t('Disk')}
+                            description={t(
+                                "Everything CommyPanel keeps (apps' volumes, database servers, backups, images) shares this disk.",
+                            )}
                         >
                             <DiskUsage disk={host.disk} volumes={volumes} />
                         </Card>
                     </div>
                     <Card
-                        title="Services"
-                        description="The programs CommyPanel needs. A failed one is the first place to look when something stops working."
+                        title={t('Services')}
+                        description={t(
+                            'The programs CommyPanel needs. A failed one is the first place to look when something stops working.',
+                        )}
                     >
                         <ul className="divide-y divide-base-300 rounded-field border border-base-300">
                             {host.services.map((service) => (
@@ -114,6 +129,7 @@ function DiskUsage({
     disk: { total: number; free: number };
     volumes: Props['volumes'];
 }) {
+    const { t } = useT();
     const used = Math.max(0, disk.total - disk.free);
     const percent = disk.total > 0 ? Math.round((100 * used) / disk.total) : 0;
 
@@ -122,7 +138,10 @@ function DiskUsage({
             <div>
                 <div className="mb-1 flex justify-between">
                     <span>
-                        {formatBytes(used)} used of {formatBytes(disk.total)}
+                        {t(':used used of :total', {
+                            used: formatBytes(used),
+                            total: formatBytes(disk.total),
+                        })}
                     </span>
                     <span className="font-medium">{percent}%</span>
                 </div>
@@ -130,14 +149,14 @@ function DiskUsage({
                     className={`progress w-full ${percent >= 95 ? 'progress-error' : percent >= 85 ? 'progress-warning' : 'progress-primary'}`}
                     value={percent}
                     max={100}
-                    aria-label="Disk used"
+                    aria-label={t('Disk used')}
                 />
             </div>
             <div>
-                <h3 className="mb-1 font-medium">Biggest app volumes</h3>
+                <h3 className="mb-1 font-medium">{t('Biggest app volumes')}</h3>
                 {volumes.length === 0 ? (
                     <p className="text-base-content/70">
-                        No app keeps files in a volume.
+                        {t('No app keeps files in a volume.')}
                     </p>
                 ) : (
                     <ul className="divide-y divide-base-300 rounded-field border border-base-300">
@@ -153,18 +172,21 @@ function DiskUsage({
                                     {volume.app} / {volume.name}
                                 </Link>
                                 <span className="font-medium">
-                                    {volume.partial ? 'more than ' : ''}
-                                    {formatBytes(volume.bytes)}
+                                    {volume.partial
+                                        ? t('more than :size', {
+                                              size: formatBytes(volume.bytes),
+                                          })
+                                        : formatBytes(volume.bytes)}
                                 </span>
                             </li>
                         ))}
                     </ul>
                 )}
                 <p className="mt-2 text-base-content/60">
-                    Database servers keep their data in{' '}
-                    <code>/var/lib/commypanel/databases</code> and backups in{' '}
-                    <code>/var/lib/commypanel/backups</code>; images are listed
-                    under Docker.
+                    <Trans
+                        text="Database servers keep their data in <code>/var/lib/commypanel/databases</code> and backups in <code>/var/lib/commypanel/backups</code>; images are listed under Docker."
+                        components={{ code: <code /> }}
+                    />
                 </p>
             </div>
         </div>

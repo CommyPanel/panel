@@ -31,10 +31,10 @@ class ControlApp
         $container = $this->liveContainer($app);
 
         if ($app->stopped_at !== null) {
-            throw new DeploymentFailed('The app is already stopped.');
+            throw new DeploymentFailed(__('The app is already stopped.'));
         }
 
-        $this->attempt('stop', fn () => $this->host->stopContainer($container));
+        $this->attempt(__('Could not stop the app: :reason'), __('Could not stop the app: Docker is not running on this server. See Server > Docker.'), fn () => $this->host->stopContainer($container));
         $app->forceFill(['stopped_at' => now()])->save();
 
         $this->audit->record('app.stopped', $by, ['app' => $app->slug], $app);
@@ -48,10 +48,10 @@ class ControlApp
         $container = $this->liveContainer($app);
 
         if ($app->stopped_at === null) {
-            throw new DeploymentFailed('The app is already running.');
+            throw new DeploymentFailed(__('The app is already running.'));
         }
 
-        $this->attempt('start', fn () => $this->host->startContainer($container));
+        $this->attempt(__('Could not start the app: :reason'), __('Could not start the app: Docker is not running on this server. See Server > Docker.'), fn () => $this->host->startContainer($container));
         $app->forceFill(['stopped_at' => null])->save();
 
         $this->audit->record('app.started', $by, ['app' => $app->slug], $app);
@@ -65,10 +65,10 @@ class ControlApp
         $container = $this->liveContainer($app);
 
         if ($app->stopped_at !== null) {
-            throw new DeploymentFailed('The app is stopped. Start it instead.');
+            throw new DeploymentFailed(__('The app is stopped. Start it instead.'));
         }
 
-        $this->attempt('restart', fn () => $this->host->restartContainer($container));
+        $this->attempt(__('Could not restart the app: :reason'), __('Could not restart the app: Docker is not running on this server. See Server > Docker.'), fn () => $this->host->restartContainer($container));
 
         $this->audit->record('app.restarted', $by, ['app' => $app->slug], $app);
     }
@@ -79,14 +79,14 @@ class ControlApp
     private function liveContainer(App $app): string
     {
         if ($app->isDeploying()) {
-            throw new DeploymentFailed('Wait for the running deployment to finish first.');
+            throw new DeploymentFailed(__('Wait for the running deployment to finish first.'));
         }
 
         /** @var Deployment|null $live */
         $live = $app->activeDeployment()->first();
 
         if ($live === null || $live->container_name === null) {
-            throw new DeploymentFailed('This app has no live release. Deploy it first.');
+            throw new DeploymentFailed(__('This app has no live release. Deploy it first.'));
         }
 
         return $live->container_name;
@@ -97,14 +97,18 @@ class ControlApp
      *
      * @throws DeploymentFailed
      */
-    private function attempt(string $verb, callable $operation): void
+    /**
+     * @param  string  $failure  shown if it fails, with `:reason` for what the host said
+     * @param  string  $dockerDown  shown if Docker is not running
+     */
+    private function attempt(string $failure, string $dockerDown, callable $operation): void
     {
         try {
             $operation();
         } catch (DockerUnavailable $e) {
-            throw new DeploymentFailed("Could not {$verb} the app: Docker is not running on this server. See Server > Docker.", 0, $e);
+            throw new DeploymentFailed($dockerDown, 0, $e);
         } catch (HostOperationFailed $e) {
-            throw new DeploymentFailed("Could not {$verb} the app: {$e->getMessage()}", 0, $e);
+            throw new DeploymentFailed(strtr($failure, [':reason' => $e->getMessage()]), 0, $e);
         }
     }
 }

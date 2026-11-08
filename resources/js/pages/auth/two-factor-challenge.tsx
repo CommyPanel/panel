@@ -3,10 +3,12 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useT } from '@/hooks/use-t';
 import AuthLayout from '@/layouts/auth-layout';
 import { fortify } from '@/lib/fortify';
 
 export default function TwoFactorChallenge() {
+    const { t } = useT();
     const [useRecovery, setUseRecovery] = useState(false);
     const form = useForm({ code: '', recovery_code: '' });
 
@@ -23,18 +25,18 @@ export default function TwoFactorChallenge() {
 
     return (
         <AuthLayout
-            title="Two-factor authentication"
+            title={t('Two-factor authentication')}
             description={
                 useRecovery
-                    ? 'Enter one of your emergency recovery codes.'
-                    : 'Enter the code from your authenticator app.'
+                    ? t('Enter one of your emergency recovery codes.')
+                    : t('Enter the code from your authenticator app.')
             }
         >
             <form onSubmit={submit} className="space-y-4">
                 {useRecovery ? (
                     <Input
                         key="recovery"
-                        label="Recovery code"
+                        label={t('Recovery code')}
                         autoComplete="one-time-code"
                         autoFocus
                         required
@@ -47,7 +49,7 @@ export default function TwoFactorChallenge() {
                 ) : (
                     <Input
                         key="code"
-                        label="Authentication code"
+                        label={t('Authentication code')}
                         inputMode="numeric"
                         autoComplete="one-time-code"
                         autoFocus
@@ -62,12 +64,12 @@ export default function TwoFactorChallenge() {
                     className="w-full"
                     loading={form.processing}
                 >
-                    Continue
+                    {t('Continue')}
                 </Button>
                 <Button variant="ghost" className="w-full" onClick={toggle}>
                     {useRecovery
-                        ? 'Use an authentication code'
-                        : 'Use a recovery code'}
+                        ? t('Use an authentication code')
+                        : t('Use a recovery code')}
                 </Button>
             </form>
         </AuthLayout>

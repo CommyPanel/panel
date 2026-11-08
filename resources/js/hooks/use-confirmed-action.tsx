@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
+import { useT } from '@/hooks/use-t';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
@@ -16,6 +17,7 @@ export function useConfirmedAction(): {
     run: (action: () => void) => Promise<void>;
     modal: ReactNode;
 } {
+    const { t } = useT();
     const pending = useRef<(() => void) | null>(null);
     const [open, setOpen] = useState(false);
     const [password, setPassword] = useState('');
@@ -62,8 +64,8 @@ export function useConfirmedAction(): {
             if (!response.ok) {
                 setError(
                     response.status === 422
-                        ? 'That password is not correct.'
-                        : 'The password could not be checked. Try again.',
+                        ? t('That password is not correct.')
+                        : t('The password could not be checked. Try again.'),
                 );
                 return;
             }
@@ -71,7 +73,7 @@ export function useConfirmedAction(): {
             close();
             action?.();
         } catch {
-            setError('The password could not be checked. Try again.');
+            setError(t('The password could not be checked. Try again.'));
         } finally {
             setBusy(false);
         }
@@ -81,16 +83,17 @@ export function useConfirmedAction(): {
         <Modal
             open={open}
             onClose={close}
-            title="Confirm your password"
+            title={t('Confirm your password')}
             size="sm"
         >
             <form onSubmit={submit} className="space-y-4">
                 <p className="text-sm text-base-content/70">
-                    This action affects the whole server. Enter your password to
-                    continue.
+                    {t(
+                        'This action affects the whole server. Enter your password to continue.',
+                    )}
                 </p>
                 <Input
-                    label="Password"
+                    label={t('Password')}
                     type="password"
                     autoComplete="current-password"
                     required
@@ -101,10 +104,10 @@ export function useConfirmedAction(): {
                 />
                 <div className="flex flex-wrap justify-end gap-2">
                     <Button variant="ghost" onClick={close}>
-                        Cancel
+                        {t('Cancel')}
                     </Button>
                     <Button type="submit" loading={busy}>
-                        Confirm
+                        {t('Confirm')}
                     </Button>
                 </div>
             </form>

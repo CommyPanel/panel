@@ -54,7 +54,7 @@ class RoleController extends Controller
 
         $audit->record('role.created', null, ['role' => $role->name, 'permissions' => $permissions]);
 
-        return redirect()->route('roles.index')->with('status', "The role {$role->name} was created.");
+        return redirect()->route('roles.index')->with('status', __('The role :name was created.', ['name' => $role->name]));
     }
 
     public function edit(Request $request, Role $role): Response
@@ -92,7 +92,7 @@ class RoleController extends Controller
             'removed' => array_values(array_diff($current, $permissions)),
         ]);
 
-        return redirect()->route('roles.index')->with('status', "The role {$role->name} was saved.");
+        return redirect()->route('roles.index')->with('status', __('The role :name was saved.', ['name' => $role->name]));
     }
 
     public function destroy(Request $request, Role $role, AuditLogger $audit): RedirectResponse
@@ -102,14 +102,16 @@ class RoleController extends Controller
         $users = $role->users()->count();
 
         if ($users > 0) {
-            return back()->withErrors(['role' => "{$role->name} is assigned to {$users} ".($users === 1 ? 'user' : 'users').'. Give them another role first.']);
+            return back()->withErrors(['role' => $users === 1
+                ? __(':role is assigned to :count user. Give them another role first.', ['role' => $role->name, 'count' => $users])
+                : __(':role is assigned to :count users. Give them another role first.', ['role' => $role->name, 'count' => $users])]);
         }
 
         $name = $role->name;
         $role->delete();
         $audit->record('role.deleted', null, ['role' => $name]);
 
-        return redirect()->route('roles.index')->with('status', "The role {$name} was deleted.");
+        return redirect()->route('roles.index')->with('status', __('The role :name was deleted.', ['name' => $name]));
     }
 
     /**
@@ -123,8 +125,8 @@ class RoleController extends Controller
 
     private function authorizeEdit(?User $actor, Role $role): void
     {
-        abort_if($role->name === SyncRolesAndPermissions::ADMIN_ROLE, 403, 'The admin role always has every permission and cannot be changed.');
-        abort_if($actor === null || ! $this->access->canHandOutRole($actor, $role), 403, 'That role grants more than you have yourself.');
+        abort_if($role->name === SyncRolesAndPermissions::ADMIN_ROLE, 403, __('The admin role always has every permission and cannot be changed.'));
+        abort_if($actor === null || ! $this->access->canHandOutRole($actor, $role), 403, __('That role grants more than you have yourself.'));
     }
 
     /**
@@ -139,7 +141,7 @@ class RoleController extends Controller
         $wanted = array_values(array_unique($request->validated('permissions') ?? []));
         $added = array_diff($wanted, $current);
 
-        abort_if($actor === null || ! $this->access->holdsAll($actor, $added), 403, 'You can only grant permissions you have yourself.');
+        abort_if($actor === null || ! $this->access->holdsAll($actor, $added), 403, __('You can only grant permissions you have yourself.'));
 
         return $wanted;
     }

@@ -22,21 +22,29 @@ import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useConfirmedAction } from '@/hooks/use-confirmed-action';
+import { useT } from '@/hooks/use-t';
+import type { Params } from '@/lib/i18n';
 import { formatDate } from '@/lib/format';
+import { Trans } from '@/lib/trans';
 import type { DatabaseServer, RemoteAccess } from '@/types';
 
 const NEVER = 'never';
 
-function durationLabel(minutes: number): string {
-    if (minutes < 60) return `${minutes} minutes`;
+function durationLabel(
+    minutes: number,
+    t: (key: string, params?: Params) => string,
+    tn: (key: string, count: number, params?: Params) => string,
+): string {
+    if (minutes < 60) return t(':minutes minutes', { minutes });
     if (minutes < 1440)
-        return `${minutes / 60} hour${minutes === 60 ? '' : 's'}`;
+        return tn('one::count hour|other::count hours', minutes / 60);
 
-    return `${minutes / 1440} day${minutes === 1440 ? '' : 's'}`;
+    return tn('one::count day|other::count days', minutes / 1440);
 }
 
 /** "12 min left", "3 h 5 min left" and so on, kept fresh while the page is open. */
 function useTimeLeft(iso: string | null): string | null {
+    const { t, tn } = useT();
     const [now, setNow] = useState(() => Date.now());
 
     useEffect(() => {
@@ -54,13 +62,20 @@ function useTimeLeft(iso: string | null): string | null {
         Math.round((new Date(iso).getTime() - now) / 1000),
     );
 
-    if (seconds < 60) return 'less than a minute left';
+    if (seconds < 60) return t('less than a minute left');
     const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes} min left`;
+    if (minutes < 60) return t(':minutes min left', { minutes });
     const hours = Math.floor(minutes / 60);
-    if (hours < 48) return `${hours} h ${minutes % 60} min left`;
+    if (hours < 48)
+        return t(':hours h :minutes min left', {
+            hours,
+            minutes: minutes % 60,
+        });
 
-    return `${Math.floor(hours / 24)} days left`;
+    return tn(
+        'one::count day left|other::count days left',
+        Math.floor(hours / 24),
+    );
 }
 
 function connectionCommand(
@@ -98,6 +113,7 @@ function OpenModal({
     changing: boolean;
     onClose: () => void;
 }) {
+    const { t, tn } = useT();
     const confirmed = useConfirmedAction();
     const [allow, setAllow] = useState(changing ? remote.allow.join('\n') : '');
     const [duration, setDuration] = useState<string>(
@@ -155,8 +171,8 @@ function OpenModal({
                 onClose={onClose}
                 title={
                     changing
-                        ? 'Change who may connect'
-                        : 'Open this server to the internet'
+                        ? t('Change who may connect')
+                        : t('Open this server to the internet')
                 }
                 size="lg"
             >
@@ -169,13 +185,9 @@ function OpenModal({
                                     aria-hidden
                                 />
                                 <span>
-                                    This makes the database server reachable
-                                    from outside. Only the addresses you list
-                                    can connect, and only with TLS, but anyone
-                                    holding a database password and coming from
-                                    one of them can log in. Prefer a short time,
-                                    and a VPN or an SSH tunnel for anything
-                                    permanent.
+                                    {t(
+                                        'This makes the database server reachable from outside. Only the addresses you list can connect, and only with TLS, but anyone holding a database password and coming from one of them can log in. Prefer a short time, and a VPN or an SSH tunnel for anything permanent.',
+                                    )}
                                 </span>
                             </span>
                         </Alert>
@@ -186,7 +198,7 @@ function OpenModal({
                             className="mb-1 label-text block px-0!"
                             htmlFor="remote-allow"
                         >
-                            Allowed IP addresses
+                            {t('Allowed IP addresses')}
                         </label>
                         <textarea
                             id="remote-allow"
@@ -199,11 +211,10 @@ function OpenModal({
                             aria-invalid={errors.allow ? true : undefined}
                         />
                         <p className="mt-1 text-sm text-base-content/70">
-                            The <strong>public</strong> address the connection
-                            comes from, one per line: your office, or your VPN
-                            server&apos;s. Ranges such as 198.51.100.0/24 work;
-                            nothing wider than /16 is accepted, and there is no
-                            &ldquo;everybody&rdquo;.
+                            <Trans
+                                text="The <b>public</b> address the connection comes from, one per line: your office, or your VPN server's. Ranges such as 198.51.100.0/24 work; nothing wider than /16 is accepted, and there is no “everybody”."
+                                components={{ b: <strong /> }}
+                            />
                         </p>
                         {errors.allow && (
                             <p className="mt-1 text-sm text-error" role="alert">
@@ -217,25 +228,27 @@ function OpenModal({
                                 className="mt-2"
                                 onClick={addMine}
                             >
-                                Add my address ({myIp})
+                                {t('Add my address (:ip)', { ip: myIp })}
                             </Button>
                         )}
                     </div>
 
                     <Select
-                        label="How long it stays open"
+                        label={t('How long it stays open')}
                         value={duration}
                         onChange={(e) => setDuration(e.target.value)}
                         error={errors.duration}
-                        hint="It closes completely at that time, even while someone is connected."
+                        hint={t(
+                            'It closes completely at that time, even while someone is connected.',
+                        )}
                     >
                         {durations.map((minutes) => (
                             <option key={minutes} value={String(minutes)}>
-                                {durationLabel(minutes)}
+                                {durationLabel(minutes, t, tn)}
                             </option>
                         ))}
                         <option value={NEVER}>
-                            Never: stays open until I close it
+                            {t('Never: stays open until I close it')}
                         </option>
                     </Select>
 
@@ -246,17 +259,14 @@ function OpenModal({
                                     className="size-5 shrink-0"
                                     aria-hidden
                                 />
-                                Very unsafe: it will stay open until you close
-                                it
+                                {t(
+                                    'Very unsafe: it will stay open until you close it',
+                                )}
                             </p>
                             <p className="text-sm">
-                                Nothing closes it, not even a forgotten one. The
-                                addresses are all that stands between the
-                                internet and your database login, and an address
-                                you listed today can belong to someone else next
-                                year. Use this only for a fixed address you
-                                control, such as your own VPN server, and keep
-                                strong passwords.
+                                {t(
+                                    'Nothing closes it, not even a forgotten one. The addresses are all that stands between the internet and your database login, and an address you listed today can belong to someone else next year. Use this only for a fixed address you control, such as your own VPN server, and keep strong passwords.',
+                                )}
                             </p>
                             <label className="flex cursor-pointer items-start gap-3">
                                 <input
@@ -268,8 +278,9 @@ function OpenModal({
                                     }
                                 />
                                 <span className="text-sm">
-                                    I understand and accept the risk of leaving
-                                    this database open to the internet.
+                                    {t(
+                                        'I understand and accept the risk of leaving this database open to the internet.',
+                                    )}
                                 </span>
                             </label>
                             {errors.acknowledge && (
@@ -282,24 +293,28 @@ function OpenModal({
 
                     <ul className="list-disc space-y-1.5 pl-5 text-sm text-base-content/80">
                         <li>
-                            The port is chosen at random from{' '}
-                            <strong>
-                                {ports[0]}&ndash;{ports[1]}
-                            </strong>{' '}
-                            (never{' '}
-                            {server.engine === 'postgres' ? '5432' : '3306'}),
-                            and you see it once it is open. If your server or
-                            hosting provider has a firewall, you can open that
-                            whole range now, for the allowed addresses only.
+                            <Trans
+                                text="The port is chosen at random from <b>:from–:to</b> (never :port), and you see it once it is open. If your server or hosting provider has a firewall, you can open that whole range now, for the allowed addresses only."
+                                components={{ b: <strong /> }}
+                                values={{
+                                    from: ports[0],
+                                    to: ports[1],
+                                    port:
+                                        server.engine === 'postgres'
+                                            ? '5432'
+                                            : '3306',
+                                }}
+                            />
                         </li>
                         <li>
-                            Connections must use TLS. You get a certificate to
-                            check the server with.
+                            {t(
+                                'Connections must use TLS. You get a certificate to check the server with.',
+                            )}
                         </li>
                         <li>
-                            Cloudflare&apos;s proxy does not carry database
-                            traffic: use the server&apos;s own address, not a
-                            proxied (orange cloud) name.
+                            {t(
+                                "Cloudflare's proxy does not carry database traffic: use the server's own address, not a proxied (orange cloud) name.",
+                            )}
                         </li>
                     </ul>
 
@@ -310,16 +325,20 @@ function OpenModal({
                                     className="size-4 shrink-0"
                                     aria-hidden
                                 />
-                                The server restarts once
+                                {t('The server restarts once')}
                                 <Tooltip
                                     align="start"
                                     side="top"
-                                    label="TLS is a start-up setting of the database, so a running server cannot switch it on. It is needed once per server, and again only if the server's public address changes."
+                                    label={t(
+                                        "TLS is a start-up setting of the database, so a running server cannot switch it on. It is needed once per server, and again only if the server's public address changes.",
+                                    )}
                                 >
                                     <button
                                         type="button"
                                         className="btn btn-circle btn-text btn-xs"
-                                        aria-label="Why does the server restart?"
+                                        aria-label={t(
+                                            'Why does the server restart?',
+                                        )}
                                     >
                                         <CircleHelp
                                             className="size-4"
@@ -329,11 +348,9 @@ function OpenModal({
                                 </Tooltip>
                             </p>
                             <p className="text-sm">
-                                To require TLS, the database server is started
-                                again the first time. Your data stays. Apps
-                                linked to it lose their connection for a few
-                                seconds, and longer if the database has to
-                                recover, and reconnect by themselves.
+                                {t(
+                                    'To require TLS, the database server is started again the first time. Your data stays. Apps linked to it lose their connection for a few seconds, and longer if the database has to recover, and reconnect by themselves.',
+                                )}
                             </p>
                             <label className="flex cursor-pointer items-start gap-3">
                                 <input
@@ -345,8 +362,9 @@ function OpenModal({
                                     }
                                 />
                                 <span className="text-sm">
-                                    I understand the server restarts now and
-                                    apps may briefly lose their connection.
+                                    {t(
+                                        'I understand the server restarts now and apps may briefly lose their connection.',
+                                    )}
                                 </span>
                             </label>
                             {errors.acknowledge_restart && (
@@ -359,7 +377,7 @@ function OpenModal({
 
                     <div className="flex flex-wrap justify-end gap-2">
                         <Button variant="ghost" onClick={onClose}>
-                            Cancel
+                            {t('Cancel')}
                         </Button>
                         <Button
                             type="submit"
@@ -371,10 +389,10 @@ function OpenModal({
                             }
                         >
                             {changing
-                                ? 'Save changes'
+                                ? t('Save changes')
                                 : never
-                                  ? 'Open without an end'
-                                  : 'Open'}
+                                  ? t('Open without an end')
+                                  : t('Open')}
                         </Button>
                     </div>
                 </form>
@@ -403,6 +421,7 @@ export function RemoteAccessCard({
     myIp: string | null;
     canChange: boolean;
 }) {
+    const { t } = useT();
     const confirmed = useConfirmedAction();
     const [modal, setModal] = useState<'open' | 'change' | null>(null);
     const [busy, setBusy] = useState(false);
@@ -424,8 +443,10 @@ export function RemoteAccessCard({
 
     return (
         <Card
-            title="Remote access"
-            description="Reach this server from outside, for backups or tools on your own network. Closed unless you open it."
+            title={t('Remote access')}
+            description={t(
+                'Reach this server from outside, for backups or tools on your own network. Closed unless you open it.',
+            )}
             className={isOpen ? 'border-2 border-error' : undefined}
             actions={
                 canChange &&
@@ -437,7 +458,7 @@ export function RemoteAccessCard({
                         onClick={() => setModal('open')}
                     >
                         <LockOpen className="size-4" aria-hidden />
-                        Open…
+                        {t('Open…')}
                     </Button>
                 )
             }
@@ -449,9 +470,10 @@ export function RemoteAccessCard({
                         aria-hidden
                     />
                     <p className="text-sm text-base-content/80">
-                        <strong>Closed.</strong> The server has no port on the
-                        internet. Only apps linked to its databases can reach
-                        it.
+                        <Trans
+                            text="<b>Closed.</b> The server has no port on the internet. Only apps linked to its databases can reach it."
+                            components={{ b: <strong /> }}
+                        />
                     </p>
                 </div>
             )}
@@ -462,8 +484,9 @@ export function RemoteAccessCard({
                         className="size-5 animate-spin text-primary"
                         aria-hidden
                     />
-                    Opening. If the server has to start again with TLS this
-                    takes a moment.
+                    {t(
+                        'Opening. If the server has to start again with TLS this takes a moment.',
+                    )}
                 </div>
             )}
 
@@ -471,8 +494,10 @@ export function RemoteAccessCard({
                 <Alert variant="error">
                     <span className="flex flex-wrap items-center justify-between gap-3">
                         <span className="text-sm">
-                            Could not open it:{' '}
-                            {remote.error ?? 'something went wrong.'}
+                            {t('Could not open it: :error', {
+                                error:
+                                    remote.error ?? t('something went wrong.'),
+                            })}
                         </span>
                         {canChange && (
                             <Button
@@ -481,7 +506,7 @@ export function RemoteAccessCard({
                                 loading={busy}
                                 onClick={close}
                             >
-                                Clear
+                                {t('Clear')}
                             </Button>
                         )}
                     </span>
@@ -497,10 +522,17 @@ export function RemoteAccessCard({
                                 aria-hidden
                             />
                             <span>
-                                <strong>Open to the internet</strong>
-                                {remote.forever
-                                    ? ' with no end. Close it when you no longer need it.'
-                                    : ' until it closes by itself.'}
+                                {remote.forever ? (
+                                    <Trans
+                                        text="<b>Open to the internet</b> with no end. Close it when you no longer need it."
+                                        components={{ b: <strong /> }}
+                                    />
+                                ) : (
+                                    <Trans
+                                        text="<b>Open to the internet</b> until it closes by itself."
+                                        components={{ b: <strong /> }}
+                                    />
+                                )}
                             </span>
                         </span>
                     </Alert>
@@ -508,7 +540,8 @@ export function RemoteAccessCard({
                     <dl className="grid gap-4 sm:grid-cols-2">
                         <div>
                             <dt className="flex items-center gap-1.5 text-sm text-base-content/70">
-                                <Globe className="size-4" aria-hidden /> Address
+                                <Globe className="size-4" aria-hidden />{' '}
+                                {t('Address')}
                             </dt>
                             <dd className="mt-1">
                                 <code className="rounded-field bg-base-200 px-2 py-1 text-sm break-all">
@@ -518,13 +551,13 @@ export function RemoteAccessCard({
                         </div>
                         <div>
                             <dt className="flex items-center gap-1.5 text-sm text-base-content/70">
-                                <Clock className="size-4" aria-hidden /> Open
-                                until
+                                <Clock className="size-4" aria-hidden />{' '}
+                                {t('Open until')}
                             </dt>
                             <dd className="mt-1 text-sm">
                                 {remote.forever ? (
                                     <span className="badge-soft badge badge-error">
-                                        Never closes
+                                        {t('Never closes')}
                                     </span>
                                 ) : (
                                     <>
@@ -538,7 +571,7 @@ export function RemoteAccessCard({
                         </div>
                         <div className="sm:col-span-2">
                             <dt className="text-sm text-base-content/70">
-                                Only these addresses may connect
+                                {t('Only these addresses may connect')}
                             </dt>
                             <dd className="mt-1 flex flex-wrap gap-1.5">
                                 {remote.allow.map((entry) => (
@@ -556,27 +589,31 @@ export function RemoteAccessCard({
                     {canChange && (
                         <div className="space-y-2">
                             <p className="text-sm text-base-content/70">
-                                Connect with TLS and check the server with its
-                                certificate:
+                                {t(
+                                    'Connect with TLS and check the server with its certificate:',
+                                )}
                             </p>
                             <CommandBox
                                 command={connectionCommand(server, remote)}
                             />
                             <p className="text-sm text-base-content/70">
-                                Use the database&apos;s own user and password
-                                (show it from the database list). The
-                                certificate covers this address.
+                                {t(
+                                    "Use the database's own user and password (show it from the database list). The certificate covers this address.",
+                                )}
                             </p>
                         </div>
                     )}
 
                     {remote.opened_by && (
                         <p className="text-sm text-base-content/60">
-                            Opened by {remote.opened_by}
                             {remote.opened_at
-                                ? `, ${formatDate(remote.opened_at)}`
-                                : ''}
-                            .
+                                ? t('Opened by :name, :date.', {
+                                      name: remote.opened_by,
+                                      date: formatDate(remote.opened_at),
+                                  })
+                                : t('Opened by :name.', {
+                                      name: remote.opened_by,
+                                  })}
                         </p>
                     )}
 
@@ -586,7 +623,7 @@ export function RemoteAccessCard({
                                 variant="soft"
                                 onClick={() => setModal('change')}
                             >
-                                Change addresses or time
+                                {t('Change addresses or time')}
                             </Button>
                             <a
                                 className="btn btn-soft"
@@ -595,14 +632,14 @@ export function RemoteAccessCard({
                                 }
                             >
                                 <Download className="size-4" aria-hidden />
-                                Certificate (ca.pem)
+                                {t('Certificate (ca.pem)')}
                             </a>
                             <Button
                                 variant="error"
                                 loading={busy}
                                 onClick={close}
                             >
-                                Close now
+                                {t('Close now')}
                             </Button>
                         </div>
                     )}

@@ -5,10 +5,12 @@ import DeployKeyController from '@/actions/App/Http/Controllers/DeployKeyControl
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useT } from '@/hooks/use-t';
 
 type Props = { slug: string; publicKey: string | null };
 
 export function DeployKeyCard({ slug, publicKey }: Props) {
+    const { t } = useT();
     const { errors } = usePage().props;
     const [busy, setBusy] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -36,8 +38,10 @@ export function DeployKeyCard({ slug, publicKey }: Props) {
 
     return (
         <Card
-            title="Deploy key"
-            description="Needed only for private repositories. Add the public key to your repository as a read-only deploy key."
+            title={t('Deploy key')}
+            description={t(
+                'Needed only for private repositories. Add the public key to your repository as a read-only deploy key.',
+            )}
         >
             {errors.deploy_key && (
                 <Alert variant="error">{errors.deploy_key}</Alert>
@@ -47,21 +51,21 @@ export function DeployKeyCard({ slug, publicKey }: Props) {
                     <textarea
                         readOnly
                         rows={3}
-                        aria-label="Public deploy key"
+                        aria-label={t('Public deploy key')}
                         className="textarea w-full font-mono text-xs"
                         value={publicKey}
                         onFocus={(e) => e.currentTarget.select()}
                     />
                     <div>
                         <Button variant="soft" size="sm" onClick={copy}>
-                            {copied ? 'Copied' : 'Copy public key'}
+                            {copied ? t('Copied') : t('Copy public key')}
                         </Button>
                     </div>
                 </div>
             ) : (
                 <div>
                     <Button variant="soft" onClick={generate} loading={busy}>
-                        Generate deploy key
+                        {t('Generate deploy key')}
                     </Button>
                 </div>
             )}

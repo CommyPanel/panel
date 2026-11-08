@@ -25,7 +25,10 @@ import { Card } from '@/components/ui/card';
 import { LockIcon } from '@/components/ui/lock-icon';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useConfirmedAction } from '@/hooks/use-confirmed-action';
+import { useT } from '@/hooks/use-t';
 import { formatBytes } from '@/lib/format';
+import type { Params } from '@/lib/i18n';
+import { Trans } from '@/lib/trans';
 import type { AppSettings, AppVolume } from '@/types';
 
 type VolumeRow = {
@@ -41,7 +44,10 @@ type VolumeRow = {
 };
 type Overview = { volumes: VolumeRow[]; total_bytes: number; running: boolean };
 
-async function getOverview(url: string): Promise<Overview> {
+async function getOverview(
+    url: string,
+    t: (key: string, params?: Params) => string,
+): Promise<Overview> {
     const response = await fetch(url, {
         credentials: 'same-origin',
         headers: {
@@ -55,7 +61,8 @@ async function getOverview(url: string): Promise<Overview> {
 
     if (!response.ok) {
         throw new Error(
-            body.error ?? `The request failed (${response.status}).`,
+            body.error ??
+                t('The request failed (:status).', { status: response.status }),
         );
     }
 
@@ -68,6 +75,7 @@ async function getOverview(url: string): Promise<Overview> {
  * Only mounted while the tab is open.
  */
 export function VolumesTab({ app }: { app: AppSettings }) {
+    const { t, tn } = useT();
     const { errors } = usePage().props;
     const confirmed = useConfirmedAction();
     const [overview, setOverview] = useState<Overview | null>(null);
@@ -80,17 +88,20 @@ export function VolumesTab({ app }: { app: AppSettings }) {
     const load = useCallback(async () => {
         try {
             setOverview(
-                await getOverview(AppVolumeFilesController.index(app.slug).url),
+                await getOverview(
+                    AppVolumeFilesController.index(app.slug).url,
+                    t,
+                ),
             );
             setError(null);
         } catch (e) {
             setError(
                 e instanceof Error
                     ? e.message
-                    : 'The volumes could not be loaded.',
+                    : t('The volumes could not be loaded.'),
             );
         }
-    }, [app.slug]);
+    }, [app.slug, t]);
 
     // Every Inertia response brings a new volumes list: reload the sizes with it.
     useEffect(() => {
@@ -122,7 +133,9 @@ export function VolumesTab({ app }: { app: AppSettings }) {
         void confirmed.run(() => {
             if (
                 !window.confirm(
-                    `Delete all files in ${row.name}? This cannot be undone.`,
+                    t('Delete all files in :name? This cannot be undone.', {
+                        name: row.name,
+                    }),
                 )
             ) {
                 return;
@@ -142,7 +155,7 @@ export function VolumesTab({ app }: { app: AppSettings }) {
     if (overview === null) {
         return (
             <p className="text-sm text-base-content/70" role="status">
-                Loading...
+                {t('Loading...')}
             </p>
         );
     }
@@ -154,11 +167,15 @@ export function VolumesTab({ app }: { app: AppSettings }) {
             {errors.volume && <Alert variant="error">{errors.volume}</Alert>}
 
             <Card
-                title="Volumes"
+                title={t('Volumes')}
                 description={
                     count === 0
-                        ? 'Folders the app keeps between deployments.'
-                        : `${count} ${count === 1 ? 'volume' : 'volumes'} using ${formatBytes(overview.total_bytes)} on this server.`
+                        ? t('Folders the app keeps between deployments.')
+                        : tn(
+                              'one::count volume using :size on this server.|other::count volumes using :size on this server.',
+                              count,
+                              { size: formatBytes(overview.total_bytes) },
+                          )
                 }
                 actions={
                     <div className="flex flex-wrap items-center gap-2">
@@ -168,20 +185,20 @@ export function VolumesTab({ app }: { app: AppSettings }) {
                             onClick={() => setAbout(true)}
                         >
                             <Info className="size-4" aria-hidden />
-                            How volumes work
+                            {t('How volumes work')}
                         </Button>
                         <Button
                             variant="soft"
                             size="sm"
                             onClick={() => void load()}
-                            aria-label="Refresh the sizes"
+                            aria-label={t('Refresh the sizes')}
                         >
                             <RefreshCw className="size-4" aria-hidden />
-                            Refresh
+                            {t('Refresh')}
                         </Button>
                         <Button size="sm" onClick={() => setAdding(true)}>
                             <Plus className="size-4" aria-hidden />
-                            Add volume
+                            {t('Add volume')}
                         </Button>
                     </div>
                 }
@@ -189,13 +206,14 @@ export function VolumesTab({ app }: { app: AppSettings }) {
                 {count === 0 ? (
                     <div className="space-y-2 text-sm text-base-content/70">
                         <p>
-                            This app has no persistent volumes. Anything it
-                            writes inside its container is lost when the next
-                            deployment replaces the container.
+                            {t(
+                                'This app has no persistent volumes. Anything it writes inside its container is lost when the next deployment replaces the container.',
+                            )}
                         </p>
                         <p>
-                            Add a volume for the folder your app writes files
-                            to, such as uploads or a database.
+                            {t(
+                                'Add a volume for the folder your app writes files to, such as uploads or a database.',
+                            )}
                         </p>
                     </div>
                 ) : (
@@ -205,7 +223,7 @@ export function VolumesTab({ app }: { app: AppSettings }) {
                                 htmlFor="volume-search"
                                 className="mb-1 label-text block px-0!"
                             >
-                                Search volumes
+                                {t('Search volumes')}
                             </label>
                             <Search
                                 className="pointer-events-none absolute bottom-3 left-3 size-4 text-base-content/60"
@@ -215,7 +233,7 @@ export function VolumesTab({ app }: { app: AppSettings }) {
                                 id="volume-search"
                                 type="search"
                                 className="input w-full pl-9"
-                                placeholder="Search by path or folder name"
+                                placeholder={t('Search by path or folder name')}
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
                                 autoComplete="off"
@@ -225,7 +243,7 @@ export function VolumesTab({ app }: { app: AppSettings }) {
 
                         {rows.length === 0 ? (
                             <p className="text-sm text-base-content/70">
-                                No volume matches &ldquo;{query}&rdquo;.
+                                {t('No volume matches “:query”.', { query })}
                             </p>
                         ) : (
                             <VolumeList
@@ -251,11 +269,9 @@ export function VolumesTab({ app }: { app: AppSettings }) {
                         )}
                         {overview.volumes.some((v) => !v.attached) && (
                             <p className="text-sm text-base-content/70">
-                                A volume that is not attached is no longer
-                                mounted from new deployments. Its files stay
-                                until you delete them here, which only works
-                                once no container has it mounted: deploy the app
-                                again first.
+                                {t(
+                                    'A volume that is not attached is no longer mounted from new deployments. Its files stay until you delete them here, which only works once no container has it mounted: deploy the app again first.',
+                                )}
                             </p>
                         )}
                     </>
@@ -302,6 +318,8 @@ function VolumeList({
     onRemove: (row: VolumeRow) => void;
     onDeleteData: (row: VolumeRow) => void;
 }) {
+    const { t, tn } = useT();
+
     return (
         <ul className="divide-y divide-base-300 rounded-field border border-base-300">
             {rows.map((row) => (
@@ -318,7 +336,7 @@ function VolumeList({
                             {row.locked && <LockIcon what="volume" />}
                             {!row.attached && (
                                 <span className="badge-soft badge badge-sm badge-warning">
-                                    Not attached
+                                    {t('Not attached')}
                                 </span>
                             )}
                         </div>
@@ -335,7 +353,7 @@ function VolumeList({
                                         className="size-4"
                                         aria-hidden
                                     />
-                                    Browse
+                                    {t('Browse')}
                                 </Link>
                             )}
                             {row.attached && (
@@ -352,14 +370,16 @@ function VolumeList({
                                     ) : (
                                         <Lock className="size-4" aria-hidden />
                                     )}
-                                    {row.locked ? 'Unlock' : 'Lock'}
+                                    {row.locked ? t('Unlock') : t('Lock')}
                                 </Button>
                             )}
                             {row.attached &&
                                 (row.locked ? (
                                     <Tooltip
                                         side="top"
-                                        label="Volume is locked and cannot be removed. Unlock it first."
+                                        label={t(
+                                            'Volume is locked and cannot be removed. Unlock it first.',
+                                        )}
                                     >
                                         <Button
                                             variant="ghost"
@@ -372,7 +392,7 @@ function VolumeList({
                                                 className="size-4"
                                                 aria-hidden
                                             />
-                                            Remove
+                                            {t('Remove')}
                                         </Button>
                                     </Tooltip>
                                 ) : (
@@ -385,7 +405,7 @@ function VolumeList({
                                             className="size-4"
                                             aria-hidden
                                         />
-                                        Remove
+                                        {t('Remove')}
                                     </Button>
                                 ))}
                             {!row.attached && row.exists && (
@@ -395,14 +415,17 @@ function VolumeList({
                                     onClick={() => onDeleteData(row)}
                                 >
                                     <Trash2 className="size-4" aria-hidden />
-                                    Delete data
+                                    {t('Delete data')}
                                 </Button>
                             )}
                         </div>
                     </div>
                     <div
                         role="img"
-                        aria-label={`${formatBytes(row.bytes)} of ${formatBytes(largest)}, the largest volume`}
+                        aria-label={t(':size of :largest, the largest volume', {
+                            size: formatBytes(row.bytes),
+                            largest: formatBytes(largest),
+                        })}
                         className="h-2 w-full overflow-hidden rounded-full bg-base-200"
                     >
                         <div
@@ -414,17 +437,40 @@ function VolumeList({
                     </div>
                     <p className="text-xs text-base-content/70">
                         {row.exists
-                            ? `${formatBytes(row.bytes)} in ${row.files.toLocaleString()} ${row.files === 1 ? 'file' : 'files'}${row.partial ? ' or more (too big to count completely)' : ''}`
-                            : 'No files yet: the folder is created when a container that uses it starts.'}
+                            ? row.partial
+                                ? tn(
+                                      'one::size in :count file or more (too big to count completely)|other::size in :count files or more (too big to count completely)',
+                                      row.files,
+                                      { size: formatBytes(row.bytes) },
+                                  )
+                                : tn(
+                                      'one::size in :count file|other::size in :count files',
+                                      row.files,
+                                      { size: formatBytes(row.bytes) },
+                                  )
+                            : t(
+                                  'No files yet: the folder is created when a container that uses it starts.',
+                              )}
                         {row.attached ? (
                             <>
-                                {' · '}Mounted at <code>{row.path}</code>, kept
-                                on the server as <code>{row.name}</code>
+                                {' · '}
+                                <Trans
+                                    text="Mounted at <code>:path</code>, kept on the server as <code>:name</code>"
+                                    components={{ code: <code /> }}
+                                    values={{
+                                        path: row.path ?? '',
+                                        name: row.name,
+                                    }}
+                                />
                             </>
                         ) : (
                             <>
-                                {' · '}Kept on the server as{' '}
-                                <code>{row.name}</code>
+                                {' · '}
+                                <Trans
+                                    text="Kept on the server as <code>:name</code>"
+                                    components={{ code: <code /> }}
+                                    values={{ name: row.name }}
+                                />
                             </>
                         )}
                     </p>

@@ -32,6 +32,6 @@ class AppSourceController extends Controller
         $app->forceFill(['source_verified_at' => now()])->save();
         $audit->record('app.source_uploaded', null, ['app' => $app->slug, 'files' => $count], $app);
 
-        return back()->with('status', "Project uploaded ({$count} files). Press Deploy to run it.");
+        return back()->with('status', __('Project uploaded (:count files). Press Deploy to run it.', ['count' => $count]));
     }
 }

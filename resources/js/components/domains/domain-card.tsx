@@ -8,7 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { useT } from '@/hooks/use-t';
 import { formatDate } from '@/lib/format';
+import { Trans } from '@/lib/trans';
 import type { DomainRow, ServerAddress } from '@/types';
 
 type Props = {
@@ -25,6 +27,7 @@ export function RecordsTable({
     domain: string;
     server: ServerAddress;
 }) {
+    const { t } = useT();
     const records = [
         server.ipv4 && { type: 'A', value: server.ipv4 },
         server.ipv6 && { type: 'AAAA', value: server.ipv6 },
@@ -38,15 +41,15 @@ export function RecordsTable({
     return (
         <div className="space-y-2">
             <p className="text-sm font-medium">
-                Create these records at your DNS provider
+                {t('Create these records at your DNS provider')}
             </p>
             <div className="overflow-x-auto rounded-field border border-base-300">
                 <table className="table">
                     <thead>
                         <tr>
-                            <th>Type</th>
-                            <th>Name</th>
-                            <th>Value</th>
+                            <th>{t('Type')}</th>
+                            <th>{t('Name')}</th>
+                            <th>{t('Value')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -67,14 +70,16 @@ export function RecordsTable({
                 </table>
             </div>
             <p className="text-xs text-base-content/70">
-                Some providers want only the part before your main domain as the
-                name (for example app instead of app.example.com).
+                {t(
+                    'Some providers want only the part before your main domain as the name (for example app instead of app.example.com).',
+                )}
             </p>
         </div>
     );
 }
 
 export function DomainCard({ domain, server, showApp = false }: Props) {
+    const { t } = useT();
     const [checking, setChecking] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -109,7 +114,9 @@ export function DomainCard({ domain, server, showApp = false }: Props) {
                     <Button
                         variant="ghost"
                         size="sm"
-                        aria-label={`Delete ${domain.name}`}
+                        aria-label={t('Delete :domain', {
+                            domain: domain.name,
+                        })}
                         onClick={() => setConfirmDelete(true)}
                     >
                         <Trash2 className="size-4" />
@@ -121,19 +128,30 @@ export function DomainCard({ domain, server, showApp = false }: Props) {
                 <p className="text-sm text-base-content/70">
                     {showApp && domain.app && (
                         <>
-                            Serves{' '}
-                            <Link
-                                href={AppController.show(domain.app)}
-                                className="link link-primary"
-                            >
-                                {domain.app_name ?? domain.app}
-                            </Link>
+                            <Trans
+                                text="Serves <link>:app</link>"
+                                components={{
+                                    link: (
+                                        <Link
+                                            href={AppController.show(
+                                                domain.app,
+                                            )}
+                                            className="link link-primary"
+                                        />
+                                    ),
+                                }}
+                                values={{ app: domain.app_name ?? domain.app }}
+                            />
                         </>
                     )}
                     {showApp && domain.app && domain.redirect_to && '. '}
                     {domain.redirect_to && (
                         <>
-                            Redirects to <code>{domain.redirect_to}</code>
+                            <Trans
+                                text="Redirects to <code>:target</code>"
+                                components={{ code: <code /> }}
+                                values={{ target: domain.redirect_to }}
+                            />
                         </>
                     )}
                 </p>
@@ -158,8 +176,10 @@ export function DomainCard({ domain, server, showApp = false }: Props) {
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm text-base-content/70">
                     {domain.last_checked_at
-                        ? `Last checked ${formatDate(domain.last_checked_at)}`
-                        : 'Not checked yet'}
+                        ? t('Last checked :date', {
+                              date: formatDate(domain.last_checked_at),
+                          })
+                        : t('Not checked yet')}
                 </p>
                 <Button
                     variant="soft"
@@ -168,20 +188,21 @@ export function DomainCard({ domain, server, showApp = false }: Props) {
                     loading={checking}
                 >
                     <RefreshCw className="size-4" aria-hidden />
-                    Check DNS
+                    {t('Check DNS')}
                 </Button>
             </div>
 
             <ConfirmModal
                 open={confirmDelete}
-                title={`Remove ${domain.name}?`}
-                confirmLabel="Remove domain"
+                title={t('Remove :domain?', { domain: domain.name })}
+                confirmLabel={t('Remove domain')}
                 loading={deleting}
                 onConfirm={remove}
                 onClose={() => setConfirmDelete(false)}
             >
-                The domain stops serving its app. Your DNS records are not
-                touched.
+                {t(
+                    'The domain stops serving its app. Your DNS records are not touched.',
+                )}
             </ConfirmModal>
         </Card>
     );

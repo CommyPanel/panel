@@ -31,7 +31,7 @@ type Props = {
 };
 
 export default function Form({ user, roles }: Props) {
-    const { locale } = useT();
+    const { t, tn, locale } = useT();
     const editing = user !== null;
     const form = useForm({
         name: user?.name ?? '',
@@ -57,19 +57,31 @@ export default function Form({ user, roles }: Props) {
     };
 
     return (
-        <AppLayout title={editing ? `Edit ${user.name}` : 'New user'}>
+        <AppLayout
+            title={
+                editing ? t('Edit :name', { name: user.name }) : t('New user')
+            }
+        >
             <PageHeader
-                title={editing ? `Edit ${user.name}` : 'New user'}
+                title={
+                    editing
+                        ? t('Edit :name', { name: user.name })
+                        : t('New user')
+                }
                 description={
                     editing
-                        ? 'Changing the password signs this user out everywhere.'
-                        : 'They can sign in with this email and password right away.'
+                        ? t(
+                              'Changing the password signs this user out everywhere.',
+                          )
+                        : t(
+                              'They can sign in with this email and password right away.',
+                          )
                 }
             />
             <form onSubmit={submit} className="space-y-6">
-                <Card title="Account">
+                <Card title={t('Account')}>
                     <Input
-                        label="Name"
+                        label={t('Name')}
                         autoComplete="off"
                         required
                         value={form.data.name}
@@ -77,7 +89,7 @@ export default function Form({ user, roles }: Props) {
                         error={form.errors.name}
                     />
                     <Input
-                        label="Email"
+                        label={t('Email')}
                         type="email"
                         autoComplete="off"
                         required
@@ -92,11 +104,13 @@ export default function Form({ user, roles }: Props) {
                         hint={
                             editing
                                 ? undefined
-                                : 'The language of their panel. They can change it themselves.'
+                                : t(
+                                      'The language of their panel. They can change it themselves.',
+                                  )
                         }
                     />
                     <Input
-                        label={editing ? 'New password' : 'Password'}
+                        label={editing ? t('New password') : t('Password')}
                         type="password"
                         autoComplete="new-password"
                         required={!editing}
@@ -107,12 +121,12 @@ export default function Form({ user, roles }: Props) {
                         error={form.errors.password}
                         hint={
                             editing
-                                ? 'Leave empty to keep the current one.'
+                                ? t('Leave empty to keep the current one.')
                                 : undefined
                         }
                     />
                     <Input
-                        label="Confirm password"
+                        label={t('Confirm password')}
                         type="password"
                         autoComplete="new-password"
                         required={!editing || form.data.password !== ''}
@@ -128,23 +142,27 @@ export default function Form({ user, roles }: Props) {
                 </Card>
 
                 <Card
-                    title="Role"
-                    description="What this user may do. Manage roles and their permissions on the Roles page."
+                    title={t('Role')}
+                    description={t(
+                        'What this user may do. Manage roles and their permissions on the Roles page.',
+                    )}
                 >
                     {user?.is_you && (
                         <Alert variant="info">
-                            You cannot change your own role.
+                            {t('You cannot change your own role.')}
                         </Alert>
                     )}
                     <Select
-                        label="Role"
+                        label={t('Role')}
                         value={form.data.role}
                         disabled={user?.is_you}
                         onChange={(e) => form.setData('role', e.target.value)}
                         error={form.errors.role}
-                        hint="Without a role the user can sign in and change their own settings, nothing else. You can only give roles that grant no more than you have yourself."
+                        hint={t(
+                            'Without a role the user can sign in and change their own settings, nothing else. You can only give roles that grant no more than you have yourself.',
+                        )}
                     >
-                        <option value="">No role</option>
+                        <option value="">{t('No role')}</option>
                         {roles.map((role) => (
                             <option
                                 key={role.id}
@@ -154,10 +172,17 @@ export default function Form({ user, roles }: Props) {
                                     String(role.id) !== form.data.role
                                 }
                             >
-                                {role.name} ({role.permissions} permissions)
-                                {!role.assignable
-                                    ? ' - more than you can give'
-                                    : ''}
+                                {role.assignable
+                                    ? tn(
+                                          'one:::name (:count permission)|other:::name (:count permissions)',
+                                          role.permissions,
+                                          { name: role.name },
+                                      )
+                                    : tn(
+                                          'one:::name (:count permission) - more than you can give|other:::name (:count permissions) - more than you can give',
+                                          role.permissions,
+                                          { name: role.name },
+                                      )}
                             </option>
                         ))}
                     </Select>
@@ -165,13 +190,13 @@ export default function Form({ user, roles }: Props) {
 
                 <div className="flex gap-2">
                     <Button type="submit" loading={form.processing}>
-                        {editing ? 'Save user' : 'Create user'}
+                        {editing ? t('Save user') : t('Create user')}
                     </Button>
                     <Link
                         href={UserController.index()}
                         className="btn btn-text"
                     >
-                        Cancel
+                        {t('Cancel')}
                     </Link>
                 </div>
             </form>

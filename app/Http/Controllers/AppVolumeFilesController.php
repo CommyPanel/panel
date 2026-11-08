@@ -160,7 +160,7 @@ class AppVolumeFilesController extends Controller
     public function destroyData(Request $request, App $app, string $name, HostDriver $host, AuditLogger $audit): RedirectResponse
     {
         if ($app->volumes()->where('name', $name)->exists()) {
-            return back()->withErrors(['volume' => 'This volume is still attached to the app. Remove it from Settings first.']);
+            return back()->withErrors(['volume' => __('This volume is still attached to the app. Remove it from Settings first.')]);
         }
 
         try {
@@ -171,7 +171,7 @@ class AppVolumeFilesController extends Controller
 
         $audit->record('app.volume_data_deleted', $request->user(), ['app' => $app->slug, 'volume' => $name], $app);
 
-        return back()->with('status', 'The files of that volume are deleted.');
+        return back()->with('status', __('The files of that volume are deleted.'));
     }
 
     /**

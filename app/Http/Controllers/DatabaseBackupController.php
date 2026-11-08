@@ -29,7 +29,7 @@ class DatabaseBackupController extends Controller
 
         $audit->record('database.backed_up', $request->user(), ['server' => $server->slug, 'database' => $database->name, 'file' => $backup['name']]);
 
-        return back()->with('status', "{$database->name} was backed up.");
+        return back()->with('status', __(':name was backed up.', ['name' => $database->name]));
     }
 
     public function download(Request $request, DatabaseServer $server, DatabaseBackups $backups, AuditLogger $audit, string $name): BinaryFileResponse|RedirectResponse
@@ -60,7 +60,7 @@ class DatabaseBackupController extends Controller
 
         $audit->record('database.restore_started', $request->user(), ['server' => $server->slug, 'file' => $name, 'database' => $database->name]);
 
-        return back()->with('status', "Loading the backup into the new database {$database->name}. It is ready when its \"Restoring\" label is gone.");
+        return back()->with('status', __('Loading the backup into the new database :name. It is ready when its "Restoring" label is gone.', ['name' => $database->name]));
     }
 
     public function destroy(Request $request, DatabaseServer $server, DatabaseBackups $backups, AuditLogger $audit, string $name): RedirectResponse
@@ -73,6 +73,6 @@ class DatabaseBackupController extends Controller
 
         $audit->record('database.backup_deleted', $request->user(), ['server' => $server->slug, 'file' => $name]);
 
-        return back()->with('status', 'Backup deleted.');
+        return back()->with('status', __('Backup deleted.'));
     }
 }

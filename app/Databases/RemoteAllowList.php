@@ -34,11 +34,11 @@ final class RemoteAllowList
         $out = array_keys($out);
 
         if ($out === []) {
-            throw new DatabaseException('Add at least one IP address. Remote access is never open to everybody.');
+            throw new DatabaseException(__('Add at least one IP address. Remote access is never open to everybody.'));
         }
 
         if (count($out) > self::MAX) {
-            throw new DatabaseException('At most '.self::MAX.' addresses or ranges can be allowed.');
+            throw new DatabaseException(__('At most :max addresses or ranges can be allowed.', ['max' => self::MAX]));
         }
 
         return $out;
@@ -52,7 +52,7 @@ final class RemoteAllowList
         $parts = explode('/', $entry);
 
         if (count($parts) > 2) {
-            throw new DatabaseException("{$entry} is not an IP address or range.");
+            throw new DatabaseException(__(':entry is not an IP address or range.', ['entry' => $entry]));
         }
 
         $ip = $parts[0];
@@ -60,7 +60,7 @@ final class RemoteAllowList
         $v6 = ! $v4 && filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
 
         if (! $v4 && ! $v6) {
-            throw new DatabaseException("{$entry} is not an IP address or range.");
+            throw new DatabaseException(__(':entry is not an IP address or range.', ['entry' => $entry]));
         }
 
         $max = $v4 ? 32 : 128;
@@ -68,19 +68,19 @@ final class RemoteAllowList
 
         if (count($parts) === 2) {
             if (! ctype_digit($parts[1]) || (int) $parts[1] > $max) {
-                throw new DatabaseException("{$entry} has an invalid range length.");
+                throw new DatabaseException(__(':entry has an invalid range length.', ['entry' => $entry]));
             }
 
             $prefix = (int) $parts[1];
         }
 
         if ($prefix < ($v4 ? self::MIN_PREFIX_V4 : self::MIN_PREFIX_V6)) {
-            throw new DatabaseException("{$entry} is too wide. Use /".($v4 ? self::MIN_PREFIX_V4 : self::MIN_PREFIX_V6).' or narrower, or list the addresses one by one.');
+            throw new DatabaseException(__(':entry is too wide. Use /:prefix or narrower, or list the addresses one by one.', ['entry' => $entry, 'prefix' => $v4 ? self::MIN_PREFIX_V4 : self::MIN_PREFIX_V6]));
         }
 
         // Addresses that never come from the internet cannot be meant.
         if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
-            throw new DatabaseException("{$entry} is a private or reserved address. Use the address the server sees, which is your public one.");
+            throw new DatabaseException(__(':entry is a private or reserved address. Use the address the server sees, which is your public one.', ['entry' => $entry]));
         }
 
         $ip = $v6 ? (string) inet_ntop((string) inet_pton($ip)) : $ip;

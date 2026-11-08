@@ -6,17 +6,22 @@ import { DeploymentStatusMark } from '@/components/apps/deployment-status';
 import { RetryModal } from '@/components/apps/safe-deploy-panels';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useT } from '@/hooks/use-t';
 import { formatDate, formatDuration, timeAgo } from '@/lib/format';
 import type { AppSettings, DeploymentSummary } from '@/types';
 
 type Props = { app: AppSettings; deployments: DeploymentSummary[] };
 
 function Overview({ app }: { app: AppSettings }) {
+    const { t } = useT();
     const stats: [string, string][] = [
-        ['Live release', app.active_release ? `#${app.active_release}` : '-'],
-        ['Type', app.stack ?? 'Detected on first deploy'],
-        ['App port', String(app.container_port)],
-        ['Branch', app.git_url ? app.git_branch : 'Upload'],
+        [
+            t('Live release'),
+            app.active_release ? `#${app.active_release}` : '-',
+        ],
+        [t('Type'), app.stack ?? t('Detected on first deploy')],
+        [t('App port'), String(app.container_port)],
+        [t('Branch'), app.git_url ? app.git_branch : t('Upload')],
     ];
 
     return (
@@ -35,6 +40,7 @@ function Overview({ app }: { app: AppSettings }) {
 }
 
 export function DeploymentsTab({ app, deployments }: Props) {
+    const { t } = useT();
     const [retrying, setRetrying] = useState<number | null>(null);
     const rollBack = (number: number) =>
         router.post(
@@ -49,22 +55,23 @@ export function DeploymentsTab({ app, deployments }: Props) {
     return (
         <div className="space-y-6">
             <Overview app={app} />
-            <Card title="Deployments" flush>
+            <Card title={t('Deployments')} flush>
                 {deployments.length === 0 ? (
                     <p className="p-5 text-sm text-base-content/70 sm:p-6">
-                        Nothing deployed yet. Press Deploy to build and start
-                        this app.
+                        {t(
+                            'Nothing deployed yet. Press Deploy to build and start this app.',
+                        )}
                     </p>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="table">
                             <thead>
                                 <tr>
-                                    <th>Status</th>
-                                    <th>Release</th>
-                                    <th>Commit</th>
-                                    <th>When</th>
-                                    <th>Took</th>
+                                    <th>{t('Status')}</th>
+                                    <th>{t('Release')}</th>
+                                    <th>{t('Commit')}</th>
+                                    <th>{t('When')}</th>
+                                    <th>{t('Took')}</th>
                                     <th />
                                 </tr>
                             </thead>
@@ -78,13 +85,15 @@ export function DeploymentsTab({ app, deployments }: Props) {
                                             {d.watch?.state === 'watching' && (
                                                 <span
                                                     className="mt-1 flex items-center gap-1 text-xs text-info"
-                                                    title="The previous version is kept running while this release is watched"
+                                                    title={t(
+                                                        'The previous version is kept running while this release is watched',
+                                                    )}
                                                 >
                                                     <ShieldCheck
                                                         className="size-3.5"
                                                         aria-hidden
                                                     />
-                                                    watching
+                                                    {t('watching')}
                                                 </span>
                                             )}
                                         </td>
@@ -102,12 +111,12 @@ export function DeploymentsTab({ app, deployments }: Props) {
                                             </Link>
                                             {d.is_apply && (
                                                 <span className="badge-soft badge-neutral ml-2 badge badge-sm">
-                                                    applied changes
+                                                    {t('applied changes')}
                                                 </span>
                                             )}
                                             {d.is_rollback && (
                                                 <span className="badge-soft badge-neutral ml-2 badge badge-sm">
-                                                    rollback
+                                                    {t('rollback')}
                                                 </span>
                                             )}
                                         </td>
@@ -157,7 +166,7 @@ export function DeploymentsTab({ app, deployments }: Props) {
                                                         className="size-4"
                                                         aria-hidden
                                                     />
-                                                    Go live again
+                                                    {t('Go live again')}
                                                 </Button>
                                             )}
                                             {d.status === 'superseded' &&
@@ -173,7 +182,7 @@ export function DeploymentsTab({ app, deployments }: Props) {
                                                             className="size-4"
                                                             aria-hidden
                                                         />
-                                                        Roll back
+                                                        {t('Roll back')}
                                                     </Button>
                                                 )}
                                         </td>

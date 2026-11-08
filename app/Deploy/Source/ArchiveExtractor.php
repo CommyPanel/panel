@@ -71,7 +71,7 @@ class ArchiveExtractor
             return 'tar';
         }
 
-        throw new InvalidArchive('That file is not a .zip, .tar.gz or .tgz archive.');
+        throw new InvalidArchive(__('That file is not a .zip, .tar.gz or .tgz archive.'));
     }
 
     /**
@@ -89,13 +89,13 @@ class ArchiveExtractor
         }
 
         if (str_contains($name, "\0") || str_starts_with($name, '/') || preg_match('#^[A-Za-z]:#', $name) === 1) {
-            throw new InvalidArchive("The archive contains an unsafe path ({$this->printable($name)}). Create it again from the project folder.");
+            throw new InvalidArchive(__('The archive contains an unsafe path (:printable_name). Create it again from the project folder.', ['printable_name' => $this->printable($name)]));
         }
 
         $segments = array_values(array_filter(explode('/', $name), fn (string $segment) => $segment !== '' && $segment !== '.'));
 
         if (in_array('..', $segments, true)) {
-            throw new InvalidArchive("The archive contains an unsafe path ({$this->printable($name)}). Create it again from the project folder.");
+            throw new InvalidArchive(__('The archive contains an unsafe path (:printable_name). Create it again from the project folder.', ['printable_name' => $this->printable($name)]));
         }
 
         if ($segments === [] || in_array('__MACOSX', $segments, true) || in_array('.git', $segments, true) || end($segments) === '.DS_Store') {
@@ -120,7 +120,7 @@ class ArchiveExtractor
         $zip = new ZipArchive;
 
         if ($zip->open($archive, ZipArchive::RDONLY) !== true) {
-            throw new InvalidArchive('The ZIP file could not be opened. It may be damaged.');
+            throw new InvalidArchive(__('The ZIP file could not be opened. It may be damaged.'));
         }
 
         try {
@@ -169,7 +169,7 @@ class ArchiveExtractor
         $out = fopen($target, 'wb');
 
         if ($in === false || $out === false) {
-            throw new InvalidArchive('The ZIP file could not be read. It may be damaged.');
+            throw new InvalidArchive(__('The ZIP file could not be read. It may be damaged.'));
         }
 
         // The declared size can lie in a hostile archive, so count what is really written.
@@ -212,7 +212,7 @@ class ArchiveExtractor
 
         // A name containing a line break would shift the two lists apart; refuse it.
         if (count($names) !== count($kinds)) {
-            throw new InvalidArchive('The archive contains unusual file names. Create it again from the project folder.');
+            throw new InvalidArchive(__('The archive contains unusual file names. Create it again from the project folder.'));
         }
 
         $files = 0;
@@ -291,7 +291,7 @@ class ArchiveExtractor
         $this->unwrapSingleFolder($destination);
 
         if ($files === 0) {
-            throw new InvalidArchive('The archive is empty.');
+            throw new InvalidArchive(__('The archive is empty.'));
         }
 
         return $files;

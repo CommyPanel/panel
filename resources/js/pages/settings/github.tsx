@@ -9,8 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { useT } from '@/hooks/use-t';
 import { useConfirmedAction } from '@/hooks/use-confirmed-action';
 import AppLayout from '@/layouts/app-layout';
+import { Trans } from '@/lib/trans';
 import type { GitHubState } from '@/types';
 
 type Props = {
@@ -29,6 +31,7 @@ export default function GitHub({
     error,
     start,
 }: Props) {
+    const { t } = useT();
     const { errors } = usePage().props;
     const confirmed = useConfirmedAction();
     const form = useForm({ account: 'personal', organization: '' });
@@ -45,7 +48,9 @@ export default function GitHub({
         void confirmed.run(() => {
             if (
                 !window.confirm(
-                    'Disconnect GitHub? Apps set up through it cannot fetch their code until you connect again.',
+                    t(
+                        'Disconnect GitHub? Apps set up through it cannot fetch their code until you connect again.',
+                    ),
                 )
             ) {
                 return;
@@ -58,7 +63,9 @@ export default function GitHub({
         <AppLayout title="GitHub">
             <PageHeader
                 title="GitHub"
-                description="Let CommyPanel read your repositories with its own GitHub app, and deploy on every push."
+                description={t(
+                    'Let CommyPanel read your repositories with its own GitHub app, and deploy on every push.',
+                )}
             />
             <div className="grid gap-6 xl:grid-cols-3">
                 <div className="min-w-0 space-y-6 xl:col-span-2">
@@ -69,15 +76,16 @@ export default function GitHub({
 
                     {!github.connected && (
                         <Card
-                            title="1. Create the GitHub app"
-                            description="CommyPanel makes its own GitHub app, so nobody else holds its key. You confirm on github.com, and GitHub sends the key straight back to this server."
+                            title={t('1. Create the GitHub app')}
+                            description={t(
+                                'CommyPanel makes its own GitHub app, so nobody else holds its key. You confirm on github.com, and GitHub sends the key straight back to this server.',
+                            )}
                         >
                             {!panel_ready ? (
                                 <Alert variant="warning">
-                                    GitHub has to reach this panel over https.
-                                    Set the panel&apos;s domain and wait for its
-                                    certificate first (Domains &gt; Automatic
-                                    HTTPS).
+                                    {t(
+                                        "GitHub has to reach this panel over https. Set the panel's domain and wait for its certificate first (Domains > Automatic HTTPS).",
+                                    )}
                                 </Alert>
                             ) : start ? (
                                 <form
@@ -92,18 +100,18 @@ export default function GitHub({
                                         value={start.manifest}
                                     />
                                     <p className="text-sm text-base-content/70">
-                                        You will leave this panel for GitHub, to
-                                        confirm the name and create the app.
-                                        This is valid for ten minutes.
+                                        {t(
+                                            'You will leave this panel for GitHub, to confirm the name and create the app. This is valid for ten minutes.',
+                                        )}
                                     </p>
                                     <Button type="submit">
-                                        Continue to GitHub
+                                        {t('Continue to GitHub')}
                                     </Button>
                                 </form>
                             ) : (
                                 <form onSubmit={prepare} className="space-y-4">
                                     <Select
-                                        label="Create it on"
+                                        label={t('Create it on')}
                                         value={form.data.account}
                                         onChange={(e) =>
                                             form.setData(
@@ -113,15 +121,15 @@ export default function GitHub({
                                         }
                                     >
                                         <option value="personal">
-                                            My GitHub account
+                                            {t('My GitHub account')}
                                         </option>
                                         <option value="organization">
-                                            An organization
+                                            {t('An organization')}
                                         </option>
                                     </Select>
                                     {form.data.account === 'organization' && (
                                         <Input
-                                            label="Organization name"
+                                            label={t('Organization name')}
                                             required
                                             autoComplete="off"
                                             spellCheck={false}
@@ -133,14 +141,16 @@ export default function GitHub({
                                                 )
                                             }
                                             error={form.errors.organization}
-                                            hint="The name in github.com/<name>. You must be an owner."
+                                            hint={t(
+                                                'The name in github.com/<name>. You must be an owner.',
+                                            )}
                                         />
                                     )}
                                     <Button
                                         type="submit"
                                         loading={form.processing}
                                     >
-                                        Connect GitHub
+                                        {t('Connect GitHub')}
                                     </Button>
                                 </form>
                             )}
@@ -149,8 +159,11 @@ export default function GitHub({
 
                     {github.connected && !github.installed && (
                         <Card
-                            title="2. Install it"
-                            description={`The app "${github.name}" exists. Now choose the account and the repositories it may read.`}
+                            title={t('2. Install it')}
+                            description={t(
+                                'The app ":name" exists. Now choose the account and the repositories it may read.',
+                                { name: github.name ?? '' },
+                            )}
                         >
                             <div className="flex flex-wrap gap-2">
                                 {github.install_url && (
@@ -158,7 +171,7 @@ export default function GitHub({
                                         className="btn btn-primary"
                                         href={github.install_url}
                                     >
-                                        Install on GitHub
+                                        {t('Install on GitHub')}
                                     </a>
                                 )}
                                 <Button
@@ -172,7 +185,7 @@ export default function GitHub({
                                     }
                                 >
                                     <RefreshCw className="size-4" aria-hidden />
-                                    I installed it
+                                    {t('I installed it')}
                                 </Button>
                             </div>
                         </Card>
@@ -180,13 +193,17 @@ export default function GitHub({
 
                     {github.installed && (
                         <Card
-                            title="Connected"
-                            description={`Installed on ${github.account}. New apps can pick one of these repositories.`}
+                            title={t('Connected')}
+                            description={t(
+                                'Installed on :account. New apps can pick one of these repositories.',
+                                { account: github.account ?? '' },
+                            )}
                         >
                             {repositories.length === 0 ? (
                                 <p className="text-sm text-base-content/70">
-                                    The app may not read any repository yet.
-                                    Change that on GitHub.
+                                    {t(
+                                        'The app may not read any repository yet. Change that on GitHub.',
+                                    )}
                                 </p>
                             ) : (
                                 <ul className="divide-y divide-base-300">
@@ -200,8 +217,8 @@ export default function GitHub({
                                             </span>
                                             <span className="text-base-content/60">
                                                 {repo.private
-                                                    ? 'private'
-                                                    : 'public'}
+                                                    ? t('private')
+                                                    : t('public')}
                                             </span>
                                         </li>
                                     ))}
@@ -213,7 +230,7 @@ export default function GitHub({
                                         className="btn btn-soft"
                                         href={github.settings_url}
                                     >
-                                        App settings on GitHub
+                                        {t('App settings on GitHub')}
                                     </a>
                                 )}
                                 <Button
@@ -227,7 +244,7 @@ export default function GitHub({
                                     }
                                 >
                                     <RefreshCw className="size-4" aria-hidden />
-                                    Refresh
+                                    {t('Refresh')}
                                 </Button>
                             </div>
                         </Card>
@@ -237,35 +254,39 @@ export default function GitHub({
                         <div className="flex justify-end">
                             <Button variant="ghost" onClick={disconnect}>
                                 <Trash2 className="size-4" aria-hidden />
-                                Disconnect
+                                {t('Disconnect')}
                             </Button>
                         </div>
                     )}
                 </div>
                 <div className="min-w-0">
-                    <Card title="What this allows">
+                    <Card title={t('What this allows')}>
                         <ul className="list-disc space-y-2 pl-5 text-sm text-base-content/70">
                             <li>
-                                The app can only <strong>read code</strong> of
-                                the repositories you choose on GitHub. It cannot
-                                write.
+                                <Trans
+                                    text="The app can only <b>read code</b> of the repositories you choose on GitHub. It cannot write."
+                                    components={{ b: <strong /> }}
+                                />
                             </li>
                             <li>
-                                Each deployment gets a token for one repository
-                                that expires after an hour.
+                                {t(
+                                    'Each deployment gets a token for one repository that expires after an hour.',
+                                )}
                             </li>
                             <li>
-                                Anyone who may create apps can deploy those
-                                repositories. Give the app only what you want
-                                deployable.
+                                {t(
+                                    'Anyone who may create apps can deploy those repositories. Give the app only what you want deployable.',
+                                )}
                             </li>
                             <li>
-                                Deploying on every push is a switch on each app,
-                                off until you turn it on.
+                                {t(
+                                    'Deploying on every push is a switch on each app, off until you turn it on.',
+                                )}
                             </li>
                             <li>
-                                The panel contacts github.com only when you use
-                                this page, create an app or deploy.
+                                {t(
+                                    'The panel contacts github.com only when you use this page, create an app or deploy.',
+                                )}
                             </li>
                         </ul>
                     </Card>

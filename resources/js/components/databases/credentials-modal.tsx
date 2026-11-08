@@ -2,6 +2,7 @@ import { Check, Copy, Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
+import { useT } from '@/hooks/use-t';
 import type { DatabaseCredentials } from '@/types';
 
 function Field({
@@ -15,6 +16,7 @@ function Field({
     secret?: boolean;
     revealed?: boolean;
 }) {
+    const { t } = useT();
     const [copied, setCopied] = useState(false);
 
     const copy = async () => {
@@ -38,7 +40,7 @@ function Field({
                     variant="soft"
                     size="sm"
                     onClick={() => void copy()}
-                    aria-label={`Copy ${label}`}
+                    aria-label={t('Copy :label', { label })}
                 >
                     {copied ? (
                         <Check className="size-4" aria-hidden />
@@ -62,6 +64,7 @@ export function CredentialsModal({
     credentials: DatabaseCredentials | null;
     onClose: () => void;
 }) {
+    const { t } = useT();
     const [revealed, setRevealed] = useState(false);
 
     const close = () => {
@@ -73,35 +76,35 @@ export function CredentialsModal({
         <Modal
             open={credentials !== null}
             onClose={close}
-            title="Connection"
+            title={t('Connection')}
             size="lg"
         >
             {credentials && (
                 <div className="space-y-4">
                     <dl className="space-y-3">
                         <Field
-                            label="Address (what your app connects to)"
+                            label={t('Address (what your app connects to)')}
                             value={`${credentials.host}:${credentials.port}`}
                         />
-                        <Field label="Database" value={credentials.name} />
-                        <Field label="User" value={credentials.user} />
+                        <Field label={t('Database')} value={credentials.name} />
+                        <Field label={t('User')} value={credentials.user} />
                         <Field
-                            label="Password"
+                            label={t('Password')}
                             value={credentials.password}
                             secret
                             revealed={revealed}
                         />
                         <Field
-                            label="Connection URL"
+                            label={t('Connection URL')}
                             value={credentials.url}
                             secret
                             revealed={revealed}
                         />
                     </dl>
                     <p className="text-sm text-base-content/70">
-                        The address works only from an app that is linked to
-                        this database. It is not reachable from the internet.
-                        Showing this is recorded in the audit log.
+                        {t(
+                            'The address works only from an app that is linked to this database. It is not reachable from the internet. Showing this is recorded in the audit log.',
+                        )}
                     </p>
                     <div className="flex flex-wrap justify-between gap-2">
                         <Button
@@ -114,10 +117,10 @@ export function CredentialsModal({
                                 <Eye className="size-4" aria-hidden />
                             )}
                             {revealed
-                                ? 'Hide the password'
-                                : 'Show the password'}
+                                ? t('Hide the password')
+                                : t('Show the password')}
                         </Button>
-                        <Button onClick={close}>Close</Button>
+                        <Button onClick={close}>{t('Close')}</Button>
                     </div>
                 </div>
             )}

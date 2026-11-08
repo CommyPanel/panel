@@ -36,11 +36,11 @@ class Deployer
     public function rollback(App $app, Deployment $target, ?User $by = null): Deployment
     {
         if ($target->app_id !== $app->id || $target->image_tag === null || ! $target->image_available) {
-            throw new DeploymentFailed('That release is no longer available to roll back to.');
+            throw new DeploymentFailed(__('That release is no longer available to roll back to.'));
         }
 
         if ($target->id === $app->active_deployment_id) {
-            throw new DeploymentFailed('That release is already live.');
+            throw new DeploymentFailed(__('That release is already live.'));
         }
 
         $deployment = $this->create($app, [
@@ -70,11 +70,11 @@ class Deployer
     public function retry(App $app, Deployment $rolledBack, ?User $by = null, bool $watch = true): Deployment
     {
         if ($rolledBack->app_id !== $app->id || $rolledBack->status !== DeploymentStatus::RolledBack) {
-            throw new DeploymentFailed('Only a release that was rolled back automatically can be tried again this way.');
+            throw new DeploymentFailed(__('Only a release that was rolled back automatically can be tried again this way.'));
         }
 
         if ($rolledBack->image_tag === null || ! $rolledBack->image_available) {
-            throw new DeploymentFailed('That release\'s image is no longer available. Deploy the app again instead.');
+            throw new DeploymentFailed(__('That release\'s image is no longer available. Deploy the app again instead.'));
         }
 
         $deployment = $this->create($app, [
@@ -110,7 +110,7 @@ class Deployer
         $live = $app->activeDeployment;
 
         if ($live === null || $live->image_tag === null || ! $live->image_available) {
-            throw new DeploymentFailed('There is no running version to apply the changes to. Deploy the app instead.');
+            throw new DeploymentFailed(__('There is no running version to apply the changes to. Deploy the app instead.'));
         }
 
         $deployment = $this->create($app, [

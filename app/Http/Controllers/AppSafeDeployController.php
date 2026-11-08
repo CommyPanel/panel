@@ -31,7 +31,7 @@ class AppSafeDeployController extends Controller
 
         // Not a validation rule, because a rule is skipped when the field was not sent at all.
         if ($data['rollout_enabled'] && ! $app->rollout_enabled && ! $request->boolean('understood')) {
-            throw ValidationException::withMessages(['understood' => 'Read what a gradual rollout asks of your app, and confirm that you understand it.']);
+            throw ValidationException::withMessages(['understood' => __('Read what a gradual rollout asks of your app, and confirm that you understand it.')]);
         }
 
         $steps = array_values(array_map(intval(...), $data['rollout_steps']));
@@ -49,7 +49,7 @@ class AppSafeDeployController extends Controller
 
         $audit->record('app.safe_deploys_changed', $request->user(), ['app' => $app->slug, 'from' => $before, 'to' => $this->summary($app)], $app);
 
-        return back()->with('status', 'Saved. The new settings apply from the next deployment.');
+        return back()->with('status', __('Saved. The new settings apply from the next deployment.'));
     }
 
     /**

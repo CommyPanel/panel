@@ -30,8 +30,8 @@ class BackupRemoteController extends Controller
         ]);
 
         return back()->with('status', $data['enabled']
-            ? 'Saved. Backups made from now on are copied there as well.'
-            : 'Saved. Copying to the storage is off.');
+            ? __('Saved. Backups made from now on are copied there as well.')
+            : __('Saved. Copying to the storage is off.'));
     }
 
     /**
@@ -47,7 +47,7 @@ class BackupRemoteController extends Controller
             return back()->withErrors(['remote' => $e->getMessage()]);
         }
 
-        return back()->with('status', 'The storage accepted a test file, so these settings work.');
+        return back()->with('status', __('The storage accepted a test file, so these settings work.'));
     }
 
     public function destroy(Request $request, RemoteSettings $settings, AuditLogger $audit): RedirectResponse
@@ -55,7 +55,7 @@ class BackupRemoteController extends Controller
         $settings->clear();
         $audit->record('backup.remote_removed', $request->user());
 
-        return back()->with('status', 'The storage settings were removed. Copies already there stay where they are.');
+        return back()->with('status', __('The storage settings were removed. Copies already there stay where they are.'));
     }
 
     /**

@@ -36,8 +36,8 @@ class RoleRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'name.regex' => 'Use letters, numbers, spaces, dashes and underscores.',
-            'name.unique' => 'There is already a role with that name.',
+            'name.regex' => __('Use letters, numbers, spaces, dashes and underscores.'),
+            'name.unique' => __('There is already a role with that name.'),
         ];
     }
 }

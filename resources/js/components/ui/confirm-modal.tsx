@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useT } from '@/hooks/use-t';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 
@@ -22,6 +23,8 @@ export function ConfirmModal({
     onConfirm,
     onClose,
 }: Props) {
+    const { t } = useT();
+
     return (
         <Modal
             open={open}
@@ -31,7 +34,7 @@ export function ConfirmModal({
             footer={
                 <>
                     <Button variant="ghost" onClick={onClose}>
-                        Cancel
+                        {t('Cancel')}
                     </Button>
                     <Button
                         variant="error"

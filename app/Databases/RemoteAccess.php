@@ -47,7 +47,7 @@ class RemoteAccess
         $this->requireDuration($minutes);
 
         if ($server->remoteOpen()) {
-            throw new DatabaseException('This server is already open. Change it, or close it first.');
+            throw new DatabaseException(__('This server is already open. Change it, or close it first.'));
         }
 
         $server->forceFill([
@@ -75,7 +75,7 @@ class RemoteAccess
     public function change(DatabaseServer $server, string|array $allow, ?int $minutes, User $actor): void
     {
         if (! $server->remoteOpen() || $server->remote_status !== 'open') {
-            throw new DatabaseException('This server is not open to the internet.');
+            throw new DatabaseException(__('This server is not open to the internet.'));
         }
 
         $list = RemoteAllowList::parse($allow);
@@ -108,7 +108,7 @@ class RemoteAccess
             $this->host->closeDatabaseRemote($server->slug);
         } catch (HostOperationFailed $e) {
             // Never claim it is closed when it may not be.
-            throw new DatabaseException("Could not close the port: {$e->getMessage()}", 0, $e);
+            throw new DatabaseException(__('Could not close the port: :error', ['error' => $e->getMessage()]), 0, $e);
         }
 
         $details = $this->details($server);
@@ -273,7 +273,7 @@ class RemoteAccess
     private function requireRunning(DatabaseServer $server): void
     {
         if ($server->status !== DatabaseServerStatus::Running) {
-            throw new DatabaseException('The server has to be running to open it to the internet.');
+            throw new DatabaseException(__('The server has to be running to open it to the internet.'));
         }
     }
 
@@ -283,7 +283,7 @@ class RemoteAccess
     private function requireAddress(): void
     {
         if ($this->certificate->hosts() === []) {
-            throw new DatabaseException("The server's public address is not known yet. Set it on the Domains page first: it goes into the certificate.");
+            throw new DatabaseException(__('The server\'s public address is not known yet. Set it on the Domains page first: it goes into the certificate.'));
         }
     }
 
@@ -293,7 +293,7 @@ class RemoteAccess
     private function requireDuration(?int $minutes): void
     {
         if ($minutes !== null && ! in_array($minutes, self::DURATIONS, true)) {
-            throw new DatabaseException('Choose one of the durations offered.');
+            throw new DatabaseException(__('Choose one of the durations offered.'));
         }
     }
 
@@ -315,7 +315,7 @@ class RemoteAccess
             return $free[array_rand($free)];
         }
 
-        throw new DatabaseException('No free public port is left for a database. Close another one first.');
+        throw new DatabaseException(__('No free public port is left for a database. Close another one first.'));
     }
 
     /**

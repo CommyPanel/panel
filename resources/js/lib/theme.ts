@@ -1,25 +1,28 @@
 export type ThemePreference = 'system' | 'light' | 'dim' | 'dark';
 
-export const THEME_OPTIONS: {
+/** The theme choices with their names; `t` is the component's translate function. */
+export const themeOptions = (
+    t: (key: string) => string,
+): {
     value: ThemePreference;
     label: string;
     description: string;
-}[] = [
+}[] => [
     {
         value: 'system',
-        label: 'System',
-        description: 'Light by day, dim at night, following your device.',
+        label: t('System'),
+        description: t('Light by day, dim at night, following your device.'),
     },
-    { value: 'light', label: 'Light', description: 'Warm and bright.' },
+    { value: 'light', label: t('Light'), description: t('Warm and bright.') },
     {
         value: 'dim',
-        label: 'Dim',
-        description: 'A softer dark, easy on the eyes.',
+        label: t('Dim'),
+        description: t('A softer dark, easy on the eyes.'),
     },
     {
         value: 'dark',
-        label: 'Dark',
-        description: 'True black, like "lights out".',
+        label: t('Dark'),
+        description: t('True black, like "lights out".'),
     },
 ];
 

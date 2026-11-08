@@ -58,27 +58,27 @@ class DatabaseServerController extends Controller
 
         $audit->record('database_server.created', $request->user(), ['server' => $server->slug, 'engine' => $server->engine->value, 'version' => $server->version]);
 
-        return redirect()->route('databases.show', $server)->with('status', "{$server->name} is being set up. The first start downloads the image and can take a few minutes.");
+        return redirect()->route('databases.show', $server)->with('status', __(':name is being set up. The first start downloads the image and can take a few minutes.', ['name' => $server->name]));
     }
 
     public function start(Request $request, DatabaseServer $server, DatabaseServers $servers, AuditLogger $audit): RedirectResponse
     {
-        return $this->control($request, $server, $audit, 'started', fn () => $servers->start($server));
+        return $this->control($request, $server, $audit, 'started', __(':name is started.', ['name' => $server->name]), fn () => $servers->start($server));
     }
 
     public function stop(Request $request, DatabaseServer $server, DatabaseServers $servers, AuditLogger $audit): RedirectResponse
     {
-        return $this->control($request, $server, $audit, 'stopped', fn () => $servers->stop($server));
+        return $this->control($request, $server, $audit, 'stopped', __(':name is stopped.', ['name' => $server->name]), fn () => $servers->stop($server));
     }
 
     public function restart(Request $request, DatabaseServer $server, DatabaseServers $servers, AuditLogger $audit): RedirectResponse
     {
-        return $this->control($request, $server, $audit, 'restarted', fn () => $servers->restart($server));
+        return $this->control($request, $server, $audit, 'restarted', __(':name is restarted.', ['name' => $server->name]), fn () => $servers->restart($server));
     }
 
     public function retry(Request $request, DatabaseServer $server, DatabaseServers $servers, AuditLogger $audit): RedirectResponse
     {
-        return $this->control($request, $server, $audit, 'started again', fn () => $servers->retry($server));
+        return $this->control($request, $server, $audit, 'started again', __(':name is started again.', ['name' => $server->name]), fn () => $servers->retry($server));
     }
 
     public function destroy(Request $request, DatabaseServer $server, DatabaseServers $servers, AuditLogger $audit): RedirectResponse
@@ -96,13 +96,13 @@ class DatabaseServerController extends Controller
 
         $audit->record('database_server.deleted', $request->user(), ['server' => $slug, 'databases' => $databases]);
 
-        return redirect()->route('databases.index')->with('status', "Database server {$slug} and its data are deleted.");
+        return redirect()->route('databases.index')->with('status', __('Database server :slug and its data are deleted.', ['slug' => $slug]));
     }
 
     /**
      * @param  callable(): void  $action
      */
-    private function control(Request $request, DatabaseServer $server, AuditLogger $audit, string $verb, callable $action): RedirectResponse
+    private function control(Request $request, DatabaseServer $server, AuditLogger $audit, string $verb, string $done, callable $action): RedirectResponse
     {
         try {
             $action();
@@ -112,6 +112,6 @@ class DatabaseServerController extends Controller
 
         $audit->record("database_server.{$verb}", $request->user(), ['server' => $server->slug]);
 
-        return back()->with('status', "{$server->name} is {$verb}.");
+        return back()->with('status', $done);
     }
 }

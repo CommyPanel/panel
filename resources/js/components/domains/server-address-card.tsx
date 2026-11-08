@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
+import { useT } from '@/hooks/use-t';
+import { Trans } from '@/lib/trans';
 import type { ServerAddress } from '@/types';
 
 /**
@@ -27,10 +29,10 @@ function useWhileDetecting(server: ServerAddress) {
     }, [server.detecting]);
 }
 
-function sourceText(server: ServerAddress): string {
+function sourceText(server: ServerAddress, t: (key: string) => string): string {
     return server.source === 'auto'
-        ? 'Found automatically on this server.'
-        : 'Entered by you.';
+        ? t('Found automatically on this server.')
+        : t('Entered by you.');
 }
 
 /** The two fields, with a way to find the address again. */
@@ -43,6 +45,7 @@ function ServerAddressForm({
     onSaved?: () => void;
     onCancel?: () => void;
 }) {
+    const { t } = useT();
     const form = useForm({ ipv4: server.ipv4 ?? '', ipv6: server.ipv6 ?? '' });
     const [detecting, setDetecting] = useState(false);
 
@@ -69,7 +72,7 @@ function ServerAddressForm({
     return (
         <form onSubmit={submit} className="space-y-4">
             <Input
-                label="IPv4 address"
+                label={t('IPv4 address')}
                 placeholder="203.0.113.7"
                 autoComplete="off"
                 spellCheck={false}
@@ -78,18 +81,20 @@ function ServerAddressForm({
                 error={form.errors.ipv4}
             />
             <Input
-                label="IPv6 address (optional)"
+                label={t('IPv6 address (optional)')}
                 placeholder="2001:db8::7"
                 autoComplete="off"
                 spellCheck={false}
                 value={form.data.ipv6}
                 onChange={(e) => form.setData('ipv6', e.target.value)}
                 error={form.errors.ipv6}
-                hint="Use the server's public address, not a private one from behind a router or load balancer."
+                hint={t(
+                    "Use the server's public address, not a private one from behind a router or load balancer.",
+                )}
             />
             <div className="flex flex-wrap gap-2">
                 <Button type="submit" loading={form.processing}>
-                    Save address
+                    {t('Save address')}
                 </Button>
                 <Button
                     variant="soft"
@@ -97,11 +102,11 @@ function ServerAddressForm({
                     loading={detecting}
                 >
                     <Wand2 className="size-4" aria-hidden />
-                    Detect again
+                    {t('Detect again')}
                 </Button>
                 {onCancel && (
                     <Button variant="ghost" onClick={onCancel}>
-                        Cancel
+                        {t('Cancel')}
                     </Button>
                 )}
             </div>
@@ -114,6 +119,7 @@ function ServerAddressForm({
  * it, or the form straight away when it could not be found.
  */
 export function ServerAddressCard({ server }: { server: ServerAddress }) {
+    const { t } = useT();
     const [editing, setEditing] = useState(false);
     useWhileDetecting(server);
 
@@ -121,21 +127,21 @@ export function ServerAddressCard({ server }: { server: ServerAddress }) {
 
     return (
         <Card
-            title="Server address"
-            description="Your domains must point at these addresses."
+            title={t('Server address')}
+            description={t('Your domains must point at these addresses.')}
         >
             {server.detecting && (
                 <p className="text-sm text-base-content/70" role="status">
-                    Finding this server&apos;s public address…
+                    {t("Finding this server's public address…")}
                 </p>
             )}
 
             {!configured && !server.detecting && (
                 <>
                     <Alert variant="warning">
-                        The address of this server could not be found
-                        automatically. It may sit behind a router or a load
-                        balancer. Enter its public address below.
+                        {t(
+                            'The address of this server could not be found automatically. It may sit behind a router or a load balancer. Enter its public address below.',
+                        )}
                     </Alert>
                     <ServerAddressForm server={server} />
                 </>
@@ -158,7 +164,7 @@ export function ServerAddressCard({ server }: { server: ServerAddress }) {
                         )}
                     </dl>
                     <p className="text-sm text-base-content/70">
-                        {sourceText(server)}
+                        {sourceText(server, t)}
                     </p>
                     <Button
                         variant="soft"
@@ -167,8 +173,8 @@ export function ServerAddressCard({ server }: { server: ServerAddress }) {
                     >
                         <Pencil className="size-4" aria-hidden />
                         {server.source === 'auto'
-                            ? 'Wrong IPs detected?'
-                            : 'Change the addresses'}
+                            ? t('Wrong IPs detected?')
+                            : t('Change the addresses')}
                     </Button>
                 </div>
             )}
@@ -190,6 +196,7 @@ export function ServerAddressCard({ server }: { server: ServerAddress }) {
  * the page.
  */
 export function ServerAddressNote({ server }: { server: ServerAddress }) {
+    const { t } = useT();
     const [open, setOpen] = useState(false);
     useWhileDetecting(server);
 
@@ -199,54 +206,60 @@ export function ServerAddressNote({ server }: { server: ServerAddress }) {
         <div className="text-sm text-base-content/70">
             {server.detecting && (
                 <span role="status">
-                    Finding this server&apos;s public address…
+                    {t("Finding this server's public address…")}
                 </span>
             )}
             {!configured && !server.detecting && (
                 <Alert variant="warning">
                     <span>
-                        The address of this server could not be found
-                        automatically, so the DNS records cannot be shown.{' '}
+                        {t(
+                            'The address of this server could not be found automatically, so the DNS records cannot be shown.',
+                        )}{' '}
                         <button
                             type="button"
                             className="link font-medium"
                             onClick={() => setOpen(true)}
                         >
-                            Enter the address
+                            {t('Enter the address')}
                         </button>
                     </span>
                 </Alert>
             )}
             {configured && (
                 <span>
-                    Domains must point at{' '}
-                    <strong className="font-mono font-medium">
-                        {[server.ipv4, server.ipv6]
-                            .filter(Boolean)
-                            .join(' and ')}
-                    </strong>
-                    . {sourceText(server)}{' '}
+                    <Trans
+                        text="Domains must point at <b>:addresses</b>. :source"
+                        components={{
+                            b: <strong className="font-mono font-medium" />,
+                        }}
+                        values={{
+                            addresses: [server.ipv4, server.ipv6]
+                                .filter(Boolean)
+                                .join(t(' and ')),
+                            source: sourceText(server, t),
+                        }}
+                    />{' '}
                     <button
                         type="button"
                         className="link font-medium"
                         onClick={() => setOpen(true)}
                     >
                         {server.source === 'auto'
-                            ? 'Wrong IPs detected?'
-                            : 'Change'}
+                            ? t('Wrong IPs detected?')
+                            : t('Change')}
                     </button>
                 </span>
             )}
             <Modal
                 open={open}
                 onClose={() => setOpen(false)}
-                title="Server address"
+                title={t('Server address')}
             >
                 <div className="space-y-4">
                     <p className="text-sm">
-                        Domains are connected by checking that their DNS records
-                        point at these addresses. Correct them if the wrong ones
-                        were found.
+                        {t(
+                            'Domains are connected by checking that their DNS records point at these addresses. Correct them if the wrong ones were found.',
+                        )}
                     </p>
                     <ServerAddressForm
                         server={server}

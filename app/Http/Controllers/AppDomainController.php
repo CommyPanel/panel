@@ -20,6 +20,6 @@ class AppDomainController extends Controller
         $domains = $add($app, $data['name'], $data['redirect']);
         $names = implode(' and ', array_map(fn ($domain) => $domain->name, $domains));
 
-        return back()->with('status', "{$names} added. Create the DNS records below, then check again.");
+        return back()->with('status', __(':names added. Create the DNS records below, then check again.', ['names' => $names]));
     }
 }

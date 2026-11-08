@@ -33,19 +33,19 @@ class AppLinks
         $server = $database->server;
 
         if (! $server->isRunning()) {
-            throw new DatabaseException('The database server is not running. Start it first.');
+            throw new DatabaseException(__('The database server is not running. Start it first.'));
         }
 
         if ($database->restore_status !== null) {
             throw new DatabaseException($database->restore_status === RestoreDatabase::RESTORING
-                ? 'A backup is still being loaded into this database. Link it when that is done.'
-                : 'Loading the backup into this database failed. Delete it and try again before linking it.');
+                ? __('A backup is still being loaded into this database. Link it when that is done.')
+                : __('Loading the backup into this database failed. Delete it and try again before linking it.'));
         }
 
         $this->assertPrefixFree($app, $prefix);
 
         if ($app->databaseLinks()->where('managed_database_id', $database->id)->exists()) {
-            throw new DatabaseException('This app is already linked to that database.');
+            throw new DatabaseException(__('This app is already linked to that database.'));
         }
 
         /** @var AppDatabaseLink $link */
@@ -56,7 +56,7 @@ class AppLinks
         } catch (HostOperationFailed $e) {
             $link->delete();
 
-            throw new DatabaseException("Could not connect the database server: {$e->getMessage()}", 0, $e);
+            throw new DatabaseException(__('Could not connect the database server: :error', ['error' => $e->getMessage()]), 0, $e);
         }
 
         return $link;
@@ -79,15 +79,15 @@ class AppLinks
         $prefix = DatabaseNames::envPrefix($prefix);
 
         if ($app->is($target)) {
-            throw new DatabaseException('An app cannot be linked to itself.');
+            throw new DatabaseException(__('An app cannot be linked to itself.'));
         }
 
         if ($target->slug === PanelDomain::SLUG) {
-            throw new DatabaseException('That app cannot be linked.');
+            throw new DatabaseException(__('That app cannot be linked.'));
         }
 
         if ($app->links()->where('target_app_id', $target->id)->exists()) {
-            throw new DatabaseException("{$app->name} is already linked to {$target->name}.");
+            throw new DatabaseException(__(':app is already linked to :target.', ['app' => $app->name, 'target' => $target->name]));
         }
 
         $this->assertPrefixFree($app, $prefix);
@@ -104,7 +104,7 @@ class AppLinks
             } catch (HostOperationFailed $e) {
                 $link->delete();
 
-                throw new DatabaseException("Could not connect {$target->name}: {$e->getMessage()}", 0, $e);
+                throw new DatabaseException(__('Could not connect :name: :error', ['name' => $target->name, 'error' => $e->getMessage()]), 0, $e);
             }
         }
 
@@ -257,7 +257,7 @@ class AppLinks
         $taken = $app->databaseLinks()->where('env_prefix', $prefix)->exists() || $app->links()->where('env_prefix', $prefix)->exists();
 
         if ($taken) {
-            throw new DatabaseException("{$prefix} is already used by another link of this app. Choose another name.");
+            throw new DatabaseException(__(':prefix is already used by another link of this app. Choose another name.', ['prefix' => $prefix]));
         }
     }
 }

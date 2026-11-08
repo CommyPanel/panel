@@ -8,62 +8,66 @@ import {
     XCircle,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useT } from '@/hooks/use-t';
 import type { DeploymentStatus } from '@/types';
 
-const STATES: Record<
+const states = (
+    t: (key: string) => string,
+): Record<
     DeploymentStatus,
     { icon: ReactNode; label: string; tone: string }
-> = {
+> => ({
     queued: {
         icon: <CircleDashed className="size-5" aria-hidden />,
-        label: 'Queued',
+        label: t('Queued'),
         tone: 'text-base-content/60',
     },
     building: {
         icon: <Loader2 className="size-5 animate-spin" aria-hidden />,
-        label: 'Building',
+        label: t('Building'),
         tone: 'text-info',
     },
     starting: {
         icon: <Loader2 className="size-5 animate-spin" aria-hidden />,
-        label: 'Starting',
+        label: t('Starting'),
         tone: 'text-info',
     },
     active: {
         icon: <CheckCircle2 className="size-5" aria-hidden />,
-        label: 'Live',
+        label: t('Live'),
         tone: 'text-success',
     },
     superseded: {
         icon: <CheckCircle2 className="size-5" aria-hidden />,
-        label: 'Succeeded',
+        label: t('Succeeded'),
         tone: 'text-base-content/60',
     },
     failed: {
         icon: <XCircle className="size-5" aria-hidden />,
-        label: 'Failed',
+        label: t('Failed'),
         tone: 'text-error',
     },
     stopped: {
         icon: <PauseCircle className="size-5" aria-hidden />,
-        label: 'Stopped',
+        label: t('Stopped'),
         tone: 'text-warning',
     },
     rollout: {
         icon: <Split className="size-5" aria-hidden />,
-        label: 'Rolling out',
+        label: t('Rolling out'),
         tone: 'text-info',
     },
     rolled_back: {
         icon: <Undo2 className="size-5" aria-hidden />,
-        label: 'Rolled back',
+        label: t('Rolled back'),
         tone: 'text-warning',
     },
-};
+});
 
 /** A tick, cross, spinner... with a word next to it, so colour is never the only signal. */
 export function DeploymentStatusMark({ status }: { status: DeploymentStatus }) {
-    const state = STATES[status];
+    const { t } = useT();
+    const state = states(t)[status];
 
     return (
         <span className={`inline-flex items-center gap-2 ${state.tone}`}>

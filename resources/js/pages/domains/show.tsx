@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { useDomainProgress } from '@/hooks/use-domain-progress';
+import { useT } from '@/hooks/use-t';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/format';
 import type { DomainCertificate, DomainRow, ServerAddress } from '@/types';
@@ -49,6 +50,7 @@ export default function Show({
     certificate,
     redirected_from,
 }: Props) {
+    const { t } = useT();
     useDomainProgress([domain], ['domain', 'certificate', 'server']);
 
     const [checking, setChecking] = useState(false);
@@ -81,7 +83,9 @@ export default function Show({
                 title={domain.name}
                 badge={<DomainStatusMark status={domain.status} />}
                 description={
-                    domain.app_name ? `Serves ${domain.app_name}` : undefined
+                    domain.app_name
+                        ? t('Serves :app', { app: domain.app_name })
+                        : undefined
                 }
                 actions={
                     <>
@@ -89,7 +93,7 @@ export default function Show({
                             href={DomainController.index()}
                             className="btn btn-text"
                         >
-                            All domains
+                            {t('All domains')}
                         </Link>
                         <Button
                             variant="soft"
@@ -97,7 +101,7 @@ export default function Show({
                             loading={checking}
                         >
                             <RefreshCw className="size-4" aria-hidden />
-                            Check DNS
+                            {t('Check DNS')}
                         </Button>
                     </>
                 }
@@ -106,11 +110,13 @@ export default function Show({
             <div className="grid items-start gap-6 xl:grid-cols-3">
                 <div className="min-w-0 space-y-6 xl:col-span-2">
                     <Card
-                        title="DNS"
+                        title={t('DNS')}
                         description={
                             domain.last_checked_at
-                                ? `Last checked ${formatDate(domain.last_checked_at)}`
-                                : 'Not checked yet'
+                                ? t('Last checked :date', {
+                                      date: formatDate(domain.last_checked_at),
+                                  })
+                                : t('Not checked yet')
                         }
                     >
                         {domain.problems.length > 0 && (
@@ -130,12 +136,14 @@ export default function Show({
                         )}
                         {domain.status === 'verified' && (
                             <Alert variant="success">
-                                DNS points at this server.
+                                {t('DNS points at this server.')}
                             </Alert>
                         )}
 
                         <div className="space-y-2">
-                            <p className="text-sm font-medium">What we found</p>
+                            <p className="text-sm font-medium">
+                                {t('What we found')}
+                            </p>
                             {found.length > 0 ? (
                                 <ul className="flex flex-wrap gap-2">
                                     {found.map((ip) => (
@@ -148,7 +156,7 @@ export default function Show({
                                 </ul>
                             ) : (
                                 <p className="text-sm text-base-content/70">
-                                    No A or AAAA records were found.
+                                    {t('No A or AAAA records were found.')}
                                 </p>
                             )}
                         </div>
@@ -159,9 +167,9 @@ export default function Show({
                 </div>
 
                 <div className="min-w-0 space-y-6">
-                    <Card title="Details">
+                    <Card title={t('Details')}>
                         <dl className="divide-y divide-base-300 text-sm">
-                            <Row label="App">
+                            <Row label={t('App')}>
                                 {domain.app ? (
                                     <Link
                                         href={AppController.show(domain.app)}
@@ -170,36 +178,40 @@ export default function Show({
                                         {domain.app_name ?? domain.app}
                                     </Link>
                                 ) : (
-                                    'Not assigned'
+                                    t('Not assigned')
                                 )}
                             </Row>
-                            <Row label="Redirect">
-                                {domain.redirect_to ? (
-                                    <>to {domain.redirect_to}</>
-                                ) : redirected_from.length > 0 ? (
-                                    <>from {redirected_from.join(', ')}</>
-                                ) : (
-                                    'None'
-                                )}
+                            <Row label={t('Redirect')}>
+                                {domain.redirect_to
+                                    ? t('to :target', {
+                                          target: domain.redirect_to,
+                                      })
+                                    : redirected_from.length > 0
+                                      ? t('from :sources', {
+                                            sources: redirected_from.join(', '),
+                                        })
+                                      : t('None')}
                             </Row>
-                            <Row label="HTTPS">
+                            <Row label={t('HTTPS')}>
                                 <DomainTlsMark tls={domain.tls} />
                             </Row>
                         </dl>
                     </Card>
 
                     {certificate && (
-                        <Card title="Certificate">
+                        <Card title={t('Certificate')}>
                             {!certificate.covers_domain && (
                                 <Alert variant="info">
-                                    This domain is not on the app's certificate
-                                    yet. It is added once its DNS is connected.
+                                    {t(
+                                        "This domain is not on the app's certificate yet. It is added once its DNS is connected.",
+                                    )}
                                 </Alert>
                             )}
                             {certificate.staging && (
                                 <Alert variant="warning">
-                                    Test certificate from Let's Encrypt staging:
-                                    browsers will show a warning.
+                                    {t(
+                                        "Test certificate from Let's Encrypt staging: browsers will show a warning.",
+                                    )}
                                 </Alert>
                             )}
                             {certificate.last_error && (
@@ -208,13 +220,13 @@ export default function Show({
                                 </Alert>
                             )}
                             <dl className="divide-y divide-base-300 text-sm">
-                                <Row label="Issued">
+                                <Row label={t('Issued')}>
                                     {formatDate(certificate.issued_at)}
                                 </Row>
-                                <Row label="Expires">
+                                <Row label={t('Expires')}>
                                     {formatDate(certificate.expires_at)}
                                 </Row>
-                                <Row label="Covers">
+                                <Row label={t('Covers')}>
                                     {certificate.domains.join(', ')}
                                 </Row>
                             </dl>
@@ -222,8 +234,10 @@ export default function Show({
                     )}
 
                     <Card
-                        title="Remove domain"
-                        description="The domain stops serving its app. Your DNS records are not touched."
+                        title={t('Remove domain')}
+                        description={t(
+                            'The domain stops serving its app. Your DNS records are not touched.',
+                        )}
                     >
                         <div>
                             <Button
@@ -231,7 +245,7 @@ export default function Show({
                                 onClick={() => setConfirm(true)}
                             >
                                 <Trash2 className="size-4" aria-hidden />
-                                Remove domain
+                                {t('Remove domain')}
                             </Button>
                         </div>
                     </Card>
@@ -240,14 +254,15 @@ export default function Show({
 
             <ConfirmModal
                 open={confirm}
-                title={`Remove ${domain.name}?`}
-                confirmLabel="Remove domain"
+                title={t('Remove :domain?', { domain: domain.name })}
+                confirmLabel={t('Remove domain')}
                 loading={removing}
                 onConfirm={remove}
                 onClose={() => setConfirm(false)}
             >
-                The domain stops serving its app. Your DNS records are not
-                touched.
+                {t(
+                    'The domain stops serving its app. Your DNS records are not touched.',
+                )}
             </ConfirmModal>
         </AppLayout>
     );

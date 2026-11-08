@@ -8,6 +8,7 @@ import { DomainCard } from '@/components/domains/domain-card';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useT } from '@/hooks/use-t';
 import type { DomainRow, ServerAddress } from '@/types';
 
 type Option = {
@@ -17,32 +18,43 @@ type Option = {
     disabled?: boolean;
 };
 
-function redirectOptions(name: string): Option[] {
+function redirectOptions(
+    name: string,
+    t: (key: string, params?: Record<string, string>) => string,
+): Option[] {
     const clean = name.trim().toLowerCase().replace(/\.$/, '');
     const hasWww = clean.startsWith('www.');
     const bare = hasWww ? clean.slice(4) : clean;
-    const options: Option[] = [{ value: 'none', label: 'No redirection' }];
+    const options: Option[] = [{ value: 'none', label: t('No redirection') }];
 
     if (bare.includes('.')) {
         options.push(
             hasWww
                 ? {
                       value: 'apex',
-                      label: `Redirect www.${bare} to ${bare}`,
-                      hint: `Both names are connected; ${bare} serves the app.`,
+                      label: t('Redirect www.:name to :name', { name: bare }),
+                      hint: t(
+                          'Both names are connected; :name serves the app.',
+                          {
+                              name: bare,
+                          },
+                      ),
                   }
                 : {
                       value: 'www',
-                      label: `Redirect ${bare} to www.${bare}`,
-                      hint: `Both names are connected; www.${bare} serves the app.`,
+                      label: t('Redirect :name to www.:name', { name: bare }),
+                      hint: t(
+                          'Both names are connected; www.:name serves the app.',
+                          { name: bare },
+                      ),
                   },
         );
     }
 
     options.push({
         value: 'wildcard',
-        label: 'Wildcard domain (*.example.com)',
-        hint: 'Coming later: it needs DNS provider integration.',
+        label: t('Wildcard domain (*.example.com)'),
+        hint: t('Coming later: it needs DNS provider integration.'),
         disabled: true,
     });
 
@@ -51,8 +63,9 @@ function redirectOptions(name: string): Option[] {
 
 /** Add a domain to one app, with its optional www/bare redirect. */
 export function AddAppDomainCard({ slug }: { slug: string }) {
+    const { t } = useT();
     const form = useForm({ name: '', redirect: 'none' });
-    const options = redirectOptions(form.data.name);
+    const options = redirectOptions(form.data.name, t);
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -64,12 +77,14 @@ export function AddAppDomainCard({ slug }: { slug: string }) {
 
     return (
         <Card
-            title="Add a domain"
-            description="Use a domain or subdomain you control, for example app.example.com. Each domain belongs to one app."
+            title={t('Add a domain')}
+            description={t(
+                'Use a domain or subdomain you control, for example app.example.com. Each domain belongs to one app.',
+            )}
         >
             <form onSubmit={submit} className="space-y-4">
                 <Input
-                    label="Domain"
+                    label={t('Domain')}
                     placeholder="app.example.com"
                     required
                     value={form.data.name}
@@ -80,7 +95,9 @@ export function AddAppDomainCard({ slug }: { slug: string }) {
                     error={form.errors.name}
                 />
                 <fieldset className="space-y-2">
-                    <legend className="mb-1 label-text">Redirection</legend>
+                    <legend className="mb-1 label-text">
+                        {t('Redirection')}
+                    </legend>
                     {options.map((option) => (
                         <label
                             key={option.value}
@@ -122,7 +139,7 @@ export function AddAppDomainCard({ slug }: { slug: string }) {
                 </fieldset>
                 <Button type="submit" loading={form.processing}>
                     <Plus className="size-4" aria-hidden />
-                    Add domain
+                    {t('Add domain')}
                 </Button>
             </form>
         </Card>
@@ -139,6 +156,7 @@ export function AppDomains({
     domains: DomainRow[];
     server: ServerAddress;
 }) {
+    const { t } = useT();
     const progress = useDomainProgress(domains, ['app']);
 
     return (
@@ -146,16 +164,16 @@ export function AppDomains({
             <ServerAddressNote server={server} />
             {progress.waiting && (
                 <p className="text-sm text-base-content/70" role="status">
-                    Waiting for DNS or the certificate. This page checks by
-                    itself every 5 seconds and updates when something changes;
-                    DNS changes can take a few minutes, sometimes longer.
+                    {t(
+                        'Waiting for DNS or the certificate. This page checks by itself every 5 seconds and updates when something changes; DNS changes can take a few minutes, sometimes longer.',
+                    )}
                 </p>
             )}
             {progress.gaveUp && (
                 <p className="text-sm text-base-content/70" role="status">
-                    Stopped checking automatically after half an hour.
-                    CommyPanel still re-checks every five minutes; press Check
-                    DNS to look again now.
+                    {t(
+                        'Stopped checking automatically after half an hour. CommyPanel still re-checks every five minutes; press Check DNS to look again now.',
+                    )}
                 </p>
             )}
             <AddAppDomainCard slug={slug} />

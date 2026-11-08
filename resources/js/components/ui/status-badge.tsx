@@ -1,3 +1,4 @@
+import { useT } from '@/hooks/use-t';
 import type { AppStatus, DeploymentStatus, DomainStatus } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -22,16 +23,51 @@ const styles: Record<AppStatus | DeploymentStatus | DomainStatus, string> = {
     proxied: 'badge-info',
 };
 
-const labels: Partial<
-    Record<AppStatus | DeploymentStatus | DomainStatus, string>
-> = {
-    setup: 'setting up',
-    active: 'live',
-    rollout: 'rolling out',
-    rolled_back: 'rolled back',
-    verified: 'connected',
-    misconfigured: 'needs attention',
-};
+type Status = AppStatus | DeploymentStatus | DomainStatus;
+
+/** The words for each status; `t` is the component's translate function. */
+function statusLabel(status: Status, t: (key: string) => string): string {
+    switch (status) {
+        case 'setup':
+            return t('setting up');
+        case 'active':
+            return t('live');
+        case 'rollout':
+            return t('rolling out');
+        case 'rolled_back':
+            return t('rolled back');
+        case 'verified':
+            return t('connected');
+        case 'misconfigured':
+            return t('needs attention');
+        case 'new':
+            return t('new');
+        case 'deploying':
+            return t('deploying');
+        case 'running':
+            return t('running');
+        case 'failed':
+            return t('failed');
+        case 'queued':
+            return t('queued');
+        case 'building':
+            return t('building');
+        case 'starting':
+            return t('starting');
+        case 'superseded':
+            return t('superseded');
+        case 'stopped':
+            return t('stopped');
+        case 'deactivated':
+            return t('deactivated');
+        case 'pending':
+            return t('pending');
+        case 'proxied':
+            return t('proxied');
+        default:
+            return status;
+    }
+}
 
 type Props = {
     status: AppStatus | DeploymentStatus | DomainStatus;
@@ -41,6 +77,8 @@ type Props = {
 };
 
 export function StatusBadge({ status, label, className }: Props) {
+    const { t } = useT();
+
     return (
         <span
             className={cn(
@@ -49,7 +87,7 @@ export function StatusBadge({ status, label, className }: Props) {
                 className,
             )}
         >
-            {label ?? labels[status] ?? status}
+            {label ?? statusLabel(status, t)}
         </span>
     );
 }

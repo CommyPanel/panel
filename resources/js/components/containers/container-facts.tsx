@@ -1,4 +1,5 @@
 import { ArrowRight } from 'lucide-react';
+import { useT } from '@/hooks/use-t';
 import type {
     ContainerMount,
     ContainerNetwork,
@@ -14,9 +15,10 @@ type Facts = {
 
 /** What a container is attached to: networks with its address, published ports and volumes. */
 export function ContainerFacts({ networks, ports, mounts }: Facts) {
+    const { t } = useT();
     const rows: { label: string; items: React.ReactNode[] }[] = [
         {
-            label: 'Networks',
+            label: t('Networks'),
             items: networks.map((n) => (
                 <span key={n.name}>
                     <code>{n.name}</code>
@@ -27,7 +29,7 @@ export function ContainerFacts({ networks, ports, mounts }: Facts) {
             )),
         },
         {
-            label: 'Ports',
+            label: t('Ports'),
             items: ports.map((p) => (
                 <span
                     key={`${p.host}-${p.container}`}
@@ -44,14 +46,14 @@ export function ContainerFacts({ networks, ports, mounts }: Facts) {
             )),
         },
         {
-            label: 'Volumes',
+            label: t('Volumes'),
             items: mounts.map((m) => (
                 <span key={m.destination}>
                     <code>{m.destination}</code>
                     <span className="text-base-content/70">
                         {' '}
                         ← volumes/{m.source}
-                        {m.read_only ? ' (read only)' : ''}
+                        {m.read_only ? ` (${t('read only')})` : ''}
                     </span>
                 </span>
             )),
@@ -67,7 +69,9 @@ export function ContainerFacts({ networks, ports, mounts }: Facts) {
                     </dt>
                     <dd className="flex min-w-0 flex-wrap gap-x-3 gap-y-0.5 break-all">
                         {row.items.length === 0 ? (
-                            <span className="text-base-content/60">none</span>
+                            <span className="text-base-content/60">
+                                {t('none')}
+                            </span>
                         ) : (
                             row.items
                         )}

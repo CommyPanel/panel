@@ -38,7 +38,7 @@ class BackupController extends Controller
 
         $audit->record('backup.created', $request->user(), ['name' => $backup['name']]);
 
-        return back()->with('status', 'Backup made.');
+        return back()->with('status', __('Backup made.'));
     }
 
     public function download(Request $request, PanelBackups $backups, AuditLogger $audit, string $name): BinaryFileResponse|RedirectResponse
@@ -64,6 +64,6 @@ class BackupController extends Controller
 
         $audit->record('backup.deleted', $request->user(), ['name' => $name]);
 
-        return back()->with('status', 'Backup deleted.');
+        return back()->with('status', __('Backup deleted.'));
     }
 }

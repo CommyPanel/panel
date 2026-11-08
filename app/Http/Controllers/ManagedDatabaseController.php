@@ -26,7 +26,7 @@ class ManagedDatabaseController extends Controller
 
         $audit->record('database.created', $request->user(), ['server' => $server->slug, 'database' => $database->name]);
 
-        return back()->with('status', "Database {$database->name} created. Link it to an app to give the app its connection details.");
+        return back()->with('status', __('Database :name created. Link it to an app to give the app its connection details.', ['name' => $database->name]));
     }
 
     public function destroy(Request $request, DatabaseServer $server, ManagedDatabase $database, ManageDatabases $databases, AuditLogger $audit): RedirectResponse
@@ -43,7 +43,7 @@ class ManagedDatabaseController extends Controller
 
         $audit->record('database.dropped', $request->user(), ['server' => $server->slug, 'database' => $name]);
 
-        return back()->with('status', "Database {$name} and its data are deleted.");
+        return back()->with('status', __('Database :name and its data are deleted.', ['name' => $name]));
     }
 
     public function password(Request $request, DatabaseServer $server, ManagedDatabase $database, ManageDatabases $databases, AuditLogger $audit): RedirectResponse
@@ -56,7 +56,7 @@ class ManagedDatabaseController extends Controller
 
         $audit->record('database.password_changed', $request->user(), ['server' => $server->slug, 'database' => $database->name, 'apps' => $apps]);
 
-        return back()->with('status', 'The password was changed.'.($apps === [] ? '' : ' Deploy '.implode(', ', $apps).' again so it uses the new one.'));
+        return back()->with('status', $apps === [] ? __('The password was changed.') : __('The password was changed. Deploy :apps again so it uses the new one.', ['apps' => implode(', ', $apps)]));
     }
 
     /**

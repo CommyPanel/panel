@@ -1,5 +1,6 @@
 import { PageHeader } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
+import { useT } from '@/hooks/use-t';
 import AppLayout from '@/layouts/app-layout';
 
 type Props = {
@@ -15,11 +16,15 @@ type Props = {
 };
 
 export default function Index({ groups }: Props) {
+    const { t } = useT();
+
     return (
-        <AppLayout title="Permissions">
+        <AppLayout title={t('Permissions')}>
             <PageHeader
-                title="Permissions"
-                description="Everything a role can allow. The list comes with CommyPanel; to change who may do what, edit roles."
+                title={t('Permissions')}
+                description={t(
+                    'Everything a role can allow. The list comes with CommyPanel; to change who may do what, edit roles.',
+                )}
             />
             {groups.map(({ group, permissions }) => (
                 <Card key={group} title={group} flush>
@@ -27,9 +32,9 @@ export default function Index({ groups }: Props) {
                         <table className="table">
                             <thead>
                                 <tr>
-                                    <th>Permission</th>
-                                    <th>What it allows</th>
-                                    <th>Roles</th>
+                                    <th>{t('Permission')}</th>
+                                    <th>{t('What it allows')}</th>
+                                    <th>{t('Roles')}</th>
                                 </tr>
                             </thead>
                             <tbody>

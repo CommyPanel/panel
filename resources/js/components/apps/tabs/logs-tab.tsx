@@ -12,6 +12,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Select } from '@/components/ui/select';
+import { useT } from '@/hooks/use-t';
 import { cleanLog, splitMatches } from '@/lib/logs';
 import { cn } from '@/lib/utils';
 import type { AppSettings } from '@/types';
@@ -27,6 +28,7 @@ type LogResponse = { live: boolean; logs: string; error?: string };
  * on, and downloadable. Only mounted while the tab is open.
  */
 export function LogsTab({ app }: { app: AppSettings }) {
+    const { t, tn } = useT();
     const [text, setText] = useState('');
     const [live, setLive] = useState<boolean | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -61,7 +63,9 @@ export function LogsTab({ app }: { app: AppSettings }) {
                 if (!response.ok) {
                     throw new Error(
                         body.error ??
-                            `The logs could not be loaded (${response.status}).`,
+                            t('The logs could not be loaded (:status).', {
+                                status: response.status,
+                            }),
                     );
                 }
 
@@ -76,13 +80,13 @@ export function LogsTab({ app }: { app: AppSettings }) {
                 setError(
                     e instanceof Error
                         ? e.message
-                        : 'The logs could not be loaded.',
+                        : t('The logs could not be loaded.'),
                 );
             } finally {
                 setLoading(false);
             }
         },
-        [url, lines],
+        [url, lines, t],
     );
 
     useEffect(() => {
@@ -165,12 +169,13 @@ export function LogsTab({ app }: { app: AppSettings }) {
     if (live === false) {
         return (
             <Card
-                title="Logs"
-                description="The output of the running container."
+                title={t('Logs')}
+                description={t('The output of the running container.')}
             >
                 <p className="text-sm text-base-content/70">
-                    There are no logs to show because the app has no running
-                    container. They appear here once it is running.
+                    {t(
+                        'There are no logs to show because the app has no running container. They appear here once it is running.',
+                    )}
                 </p>
             </Card>
         );
@@ -181,15 +186,17 @@ export function LogsTab({ app }: { app: AppSettings }) {
         // eslint-disable-next-line jsx-a11y/no-static-element-interactions
         <div onKeyDown={onKeyDown}>
             <Card
-                title="Logs"
-                description="What the running container printed, newest at the bottom. Apps can print secrets into their logs, so downloads are recorded in the audit log."
+                title={t('Logs')}
+                description={t(
+                    'What the running container printed, newest at the bottom. Apps can print secrets into their logs, so downloads are recorded in the audit log.',
+                )}
                 actions={
                     <a
                         href={AppLogController.download(app.slug).url}
                         className="btn btn-soft btn-sm"
                     >
                         <Download className="size-4" aria-hidden />
-                        Download
+                        {t('Download')}
                     </a>
                 }
             >
@@ -201,7 +208,7 @@ export function LogsTab({ app }: { app: AppSettings }) {
                             className="mb-1 label-text block px-0!"
                             htmlFor="log-search"
                         >
-                            Search
+                            {t('Search')}
                         </label>
                         <Search
                             className="pointer-events-none absolute bottom-3 left-3 size-4 text-base-content/60"
@@ -212,7 +219,7 @@ export function LogsTab({ app }: { app: AppSettings }) {
                             ref={search}
                             type="search"
                             className="input w-full pl-9"
-                            placeholder="Find in the log (Cmd/Ctrl+F)"
+                            placeholder={t('Find in the log (Cmd/Ctrl+F)')}
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                             onKeyDown={(e) => {
@@ -229,7 +236,7 @@ export function LogsTab({ app }: { app: AppSettings }) {
                         variant="soft"
                         onClick={() => step(-1)}
                         disabled={count === 0}
-                        aria-label="Previous match"
+                        aria-label={t('Previous match')}
                     >
                         <ChevronUp className="size-4" aria-hidden />
                     </Button>
@@ -237,27 +244,37 @@ export function LogsTab({ app }: { app: AppSettings }) {
                         variant="soft"
                         onClick={() => step(1)}
                         disabled={count === 0}
-                        aria-label="Next match"
+                        aria-label={t('Next match')}
                     >
                         <ChevronDown className="size-4" aria-hidden />
                     </Button>
                 </div>
                 <p className="text-sm text-base-content/70" aria-live="polite">
                     {query === ''
-                        ? `${text === '' ? 0 : text.trimEnd().split('\n').length} lines shown.`
+                        ? tn(
+                              'one::count line shown.|other::count lines shown.',
+                              text === ''
+                                  ? 0
+                                  : text.trimEnd().split('\n').length,
+                          )
                         : count === 0
-                          ? 'No matches.'
-                          : `Match ${shown + 1} of ${count}. Enter goes to the next one, Shift+Enter to the previous one.`}
+                          ? t('No matches.')
+                          : t(
+                                'Match :current of :total. Enter goes to the next one, Shift+Enter to the previous one.',
+                                { current: shown + 1, total: count },
+                            )}
                 </p>
 
                 <Select
-                    label="Lines to load"
+                    label={t('Lines to load')}
                     value={lines}
                     onChange={(e) => setLines(Number(e.target.value))}
                 >
                     {LINE_CHOICES.map((n) => (
                         <option key={n} value={n}>
-                            Last {n.toLocaleString()} lines
+                            {t('Last :number lines', {
+                                number: n.toLocaleString(),
+                            })}
                         </option>
                     ))}
                 </Select>
@@ -273,7 +290,9 @@ export function LogsTab({ app }: { app: AppSettings }) {
                                 setFollow(e.target.checked);
                             }}
                         />
-                        Follow (refresh every {REFRESH_MS / 1000} seconds)
+                        {t('Follow (refresh every :seconds seconds)', {
+                            seconds: REFRESH_MS / 1000,
+                        })}
                     </label>
                     <label className="flex cursor-pointer items-center gap-2 text-sm">
                         <input
@@ -282,7 +301,7 @@ export function LogsTab({ app }: { app: AppSettings }) {
                             checked={wrap}
                             onChange={(e) => setWrap(e.target.checked)}
                         />
-                        Wrap long lines
+                        {t('Wrap long lines')}
                     </label>
                     <Button
                         variant="soft"
@@ -291,7 +310,7 @@ export function LogsTab({ app }: { app: AppSettings }) {
                         loading={loading}
                     >
                         <RefreshCw className="size-4" aria-hidden />
-                        Refresh
+                        {t('Refresh')}
                     </Button>
                     <Button
                         variant="soft"
@@ -303,7 +322,7 @@ export function LogsTab({ app }: { app: AppSettings }) {
                         }}
                     >
                         <ArrowDownToLine className="size-4" aria-hidden />
-                        Jump to the end
+                        {t('Jump to the end')}
                     </Button>
                 </div>
 
@@ -312,14 +331,16 @@ export function LogsTab({ app }: { app: AppSettings }) {
                     onScroll={onScroll}
                     tabIndex={0}
                     role="log"
-                    aria-label="Container log"
+                    aria-label={t('Container log')}
                     className="relative max-h-[65vh] min-h-48 overflow-auto rounded-field bg-base-200 p-3 font-mono text-xs"
                 >
                     {live === null ? (
-                        <p className="text-base-content/70">Loading...</p>
+                        <p className="text-base-content/70">
+                            {t('Loading...')}
+                        </p>
                     ) : text === '' ? (
                         <p className="text-base-content/70">
-                            The container has not printed anything yet.
+                            {t('The container has not printed anything yet.')}
                         </p>
                     ) : (
                         <pre

@@ -25,12 +25,12 @@ abstract class AppSettingsRequest extends FormRequest
         $git = $upload ? [] : [
             'git_url' => ['required', 'string', 'max:500', function (string $attribute, mixed $value, Closure $fail) {
                 if (! GitUrl::isValid((string) $value, (bool) config('commypanel.deploy.git_allow_local'))) {
-                    $fail('Use an https:// or ssh Git URL, for example https://github.com/acme/shop.git or git@github.com:acme/shop.git.');
+                    $fail(__('Use an https:// or ssh Git URL, for example https://github.com/acme/shop.git or git@github.com:acme/shop.git.'));
                 }
             }],
             'git_branch' => ['required', 'string', function (string $attribute, mixed $value, Closure $fail) {
                 if (! GitUrl::isValidBranch((string) $value)) {
-                    $fail('That is not a valid branch name.');
+                    $fail(__('That is not a valid branch name.'));
                 }
             }],
         ];

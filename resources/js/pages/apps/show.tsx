@@ -39,6 +39,7 @@ import { LockIcon } from '@/components/ui/lock-icon';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Tabs, tabPanelProps } from '@/components/ui/tabs';
 import type { TabItem } from '@/components/ui/tabs';
+import { useT } from '@/hooks/use-t';
 import AppLayout from '@/layouts/app-layout';
 import { useCan } from '@/lib/permissions';
 import type {
@@ -117,6 +118,7 @@ export default function Show({
     server,
     webhook,
 }: Props) {
+    const { t } = useT();
     const { errors } = usePage().props;
     const can = useCan();
     const [deploying, setDeploying] = useState(false);
@@ -142,7 +144,7 @@ export default function Show({
         if (
             nginxDirty.current &&
             id !== 'nginx' &&
-            !window.confirm('You have unsaved nginx changes. Discard them?')
+            !window.confirm(t('You have unsaved nginx changes. Discard them?'))
         ) {
             return;
         }
@@ -183,24 +185,24 @@ export default function Show({
     const tabs: TabItem<TabId>[] = [
         {
             id: 'deployments',
-            label: 'Deployments',
+            label: t('Deployments'),
             icon: <Layers className="size-4" aria-hidden />,
         },
         {
             id: 'usage',
-            label: 'Usage',
+            label: t('Usage'),
             icon: <Activity className="size-4" aria-hidden />,
         },
         {
             id: 'safe',
-            label: 'Safe deploys',
+            label: t('Safe deploys'),
             icon: <ShieldCheck className="size-4" aria-hidden />,
         },
         ...(canLogs
             ? [
                   {
                       id: 'logs' as const,
-                      label: 'Logs',
+                      label: t('Logs'),
                       icon: <ScrollText className="size-4" aria-hidden />,
                   },
               ]
@@ -209,7 +211,7 @@ export default function Show({
             ? [
                   {
                       id: 'volumes' as const,
-                      label: 'Volumes',
+                      label: t('Volumes'),
                       icon: <HardDrive className="size-4" aria-hidden />,
                       badge: <Count value={app.volumes.length} />,
                   },
@@ -219,7 +221,7 @@ export default function Show({
             ? [
                   {
                       id: 'links' as const,
-                      label: 'Links',
+                      label: t('Links'),
                       icon: <Link2 className="size-4" aria-hidden />,
                   },
               ]
@@ -228,20 +230,20 @@ export default function Show({
             ? [
                   {
                       id: 'terminal' as const,
-                      label: 'Terminal',
+                      label: t('Terminal'),
                       icon: <SquareTerminal className="size-4" aria-hidden />,
                   },
               ]
             : []),
         {
             id: 'domains',
-            label: 'Domains & SSL',
+            label: t('Domains & SSL'),
             icon: <Globe className="size-4" aria-hidden />,
             badge: <Count value={app.domains.length} />,
         },
         {
             id: 'environment',
-            label: 'Environment',
+            label: t('Environment'),
             icon: <Variable className="size-4" aria-hidden />,
             badge: <Count value={env_keys.length} />,
         },
@@ -249,19 +251,19 @@ export default function Show({
             ? [
                   {
                       id: 'nginx' as const,
-                      label: 'Nginx',
+                      label: t('Nginx'),
                       icon: <FileCode className="size-4" aria-hidden />,
                   },
               ]
             : []),
         {
             id: 'settings',
-            label: 'Settings',
+            label: t('Settings'),
             icon: <Settings className="size-4" aria-hidden />,
         },
         {
             id: 'advanced',
-            label: 'Advanced',
+            label: t('Advanced'),
             icon: <SlidersHorizontal className="size-4" aria-hidden />,
         },
     ];
@@ -278,7 +280,7 @@ export default function Show({
                 }
                 description={
                     app.source_type === 'upload'
-                        ? 'Uploaded project'
+                        ? t('Uploaded project')
                         : (app.git_url ?? undefined)
                 }
                 actions={
@@ -291,14 +293,14 @@ export default function Show({
                                 className="btn btn-soft"
                             >
                                 <ExternalLink className="size-4" aria-hidden />
-                                Visit
+                                {t('Visit')}
                             </a>
                         )}
                         <Link
                             href={AppController.index()}
                             className="btn btn-text"
                         >
-                            All apps
+                            {t('All apps')}
                         </Link>
                         {can('apps.control') && <AppPower app={app} />}
                         {can('apps.deploy') && (
@@ -308,7 +310,7 @@ export default function Show({
                                 disabled={app.status === 'deploying'}
                             >
                                 <Rocket className="size-4" aria-hidden />
-                                Deploy
+                                {t('Deploy')}
                             </Button>
                         )}
                     </>
@@ -322,8 +324,12 @@ export default function Show({
                     <div className="flex w-full flex-wrap items-center justify-between gap-3">
                         <span className="flex items-center gap-2">
                             <Split className="size-5 shrink-0" aria-hidden />
-                            A gradual rollout of release #
-                            {deployments[0].number} is under way.
+                            {t(
+                                'A gradual rollout of release #:number is under way.',
+                                {
+                                    number: deployments[0].number,
+                                },
+                            )}
                         </span>
                         <Link
                             href={DeploymentController.show({
@@ -332,7 +338,7 @@ export default function Show({
                             })}
                             className="btn btn-sm btn-primary"
                         >
-                            Open the rollout
+                            {t('Open the rollout')}
                         </Link>
                     </div>
                 </Alert>
@@ -342,8 +348,9 @@ export default function Show({
                 app.status !== 'stopped' && <PendingChanges slug={app.slug} />}
             {app.status === 'stopped' && (
                 <Alert variant="warning">
-                    This app is stopped. Its domains show an error until you
-                    start it again.
+                    {t(
+                        'This app is stopped. Its domains show an error until you start it again.',
+                    )}
                 </Alert>
             )}
 
@@ -351,7 +358,7 @@ export default function Show({
                 tabs={tabs}
                 active={active}
                 onChange={select}
-                label="App sections"
+                label={t('App sections')}
             />
 
             <div {...tabPanelProps(active)} className="outline-none">
@@ -367,7 +374,7 @@ export default function Show({
                     <Suspense
                         fallback={
                             <p className="text-sm text-base-content/70">
-                                Loading...
+                                {t('Loading...')}
                             </p>
                         }
                     >

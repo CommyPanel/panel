@@ -23,11 +23,11 @@ class UpdateController extends Controller
     public function check(UpdateChecker $updates, AuditLogger $audit): RedirectResponse
     {
         if ($updates->forcedOff()) {
-            return back()->withErrors(['update' => 'Update checks are switched off in the server configuration (COMMYPANEL_UPDATE_CHECK).']);
+            return back()->withErrors(['update' => __('Update checks are switched off in the server configuration (COMMYPANEL_UPDATE_CHECK).')]);
         }
 
         if (! $updates->supported()) {
-            return back()->withErrors(['update' => 'This is a development build, so there is no version to compare.']);
+            return back()->withErrors(['update' => __('This is a development build, so there is no version to compare.')]);
         }
 
         $status = $updates->check();
@@ -38,8 +38,8 @@ class UpdateController extends Controller
         }
 
         return back()->with('status', $status->available
-            ? "Version {$status->latest} is available."
-            : 'You are running the latest version.');
+            ? __('Version :latest is available.', ['latest' => $status->latest])
+            : __('You are running the latest version.'));
     }
 
     public function update(Request $request, UpdateChecker $updates, AuditLogger $audit): RedirectResponse
@@ -47,14 +47,14 @@ class UpdateController extends Controller
         $enabled = $request->validate(['enabled' => ['required', 'boolean']])['enabled'];
 
         if ($updates->forcedOff()) {
-            return back()->withErrors(['update' => 'Update checks are switched off in the server configuration (COMMYPANEL_UPDATE_CHECK).']);
+            return back()->withErrors(['update' => __('Update checks are switched off in the server configuration (COMMYPANEL_UPDATE_CHECK).')]);
         }
 
         $updates->setEnabled((bool) $enabled);
         $audit->record($enabled ? 'updates.enabled' : 'updates.disabled');
 
         return back()->with('status', $enabled
-            ? 'CommyPanel will look for new versions when someone signs in.'
-            : 'Automatic update checks are off. You can still check by hand.');
+            ? __('CommyPanel will look for new versions when someone signs in.')
+            : __('Automatic update checks are off. You can still check by hand.'));
     }
 }

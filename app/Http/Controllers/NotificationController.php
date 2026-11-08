@@ -38,8 +38,8 @@ class NotificationController extends Controller
         ]);
 
         return back()->with('status', $data['enabled']
-            ? 'Saved. Deployment results are sent there from now on.'
-            : 'Saved. Messages are off.');
+            ? __('Saved. Deployment results are sent there from now on.')
+            : __('Saved. Messages are off.'));
     }
 
     /**
@@ -58,7 +58,7 @@ class NotificationController extends Controller
             return back()->withErrors(['alerts' => $e->getMessage()]);
         }
 
-        return back()->with('status', 'The message was sent. Check the channel. Nothing was saved yet.');
+        return back()->with('status', __('The message was sent. Check the channel. Nothing was saved yet.'));
     }
 
     public function destroy(Request $request, AlertSettings $settings, AuditLogger $audit): RedirectResponse
@@ -66,7 +66,7 @@ class NotificationController extends Controller
         $settings->clear();
         $audit->record('notifications.removed', $request->user());
 
-        return back()->with('status', 'The address was removed. No messages are sent.');
+        return back()->with('status', __('The address was removed. No messages are sent.'));
     }
 
     /**

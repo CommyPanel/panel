@@ -22,7 +22,7 @@ class DatabaseRemoteController extends Controller
 
         // The first opening restarts the server to switch TLS on: say so, and ask for a yes.
         if (! $server->tls_enabled && ! $request->boolean('acknowledge_restart')) {
-            throw ValidationException::withMessages(['acknowledge_restart' => 'Confirm that the server may restart once.']);
+            throw ValidationException::withMessages(['acknowledge_restart' => __('Confirm that the server may restart once.')]);
         }
 
         try {
@@ -31,7 +31,7 @@ class DatabaseRemoteController extends Controller
             return back()->withErrors(['remote' => $e->getMessage()]);
         }
 
-        return back()->with('status', 'Opening the server to the internet. If it has to start again with TLS this takes a moment.');
+        return back()->with('status', __('Opening the server to the internet. If it has to start again with TLS this takes a moment.'));
     }
 
     public function update(Request $request, DatabaseServer $server, RemoteAccess $access): RedirectResponse
@@ -44,7 +44,7 @@ class DatabaseRemoteController extends Controller
             return back()->withErrors(['remote' => $e->getMessage()]);
         }
 
-        return back()->with('status', 'Remote access changed.');
+        return back()->with('status', __('Remote access changed.'));
     }
 
     public function destroy(Request $request, DatabaseServer $server, RemoteAccess $access): RedirectResponse
@@ -55,7 +55,7 @@ class DatabaseRemoteController extends Controller
             return back()->withErrors(['remote' => $e->getMessage()]);
         }
 
-        return back()->with('status', 'The server is closed to the internet.');
+        return back()->with('status', __('The server is closed to the internet.'));
     }
 
     /** The certificate authority's public certificate, for the client's "trusted CA" setting. */
@@ -86,14 +86,14 @@ class DatabaseRemoteController extends Controller
         if ($request->boolean('never')) {
             // Open without an end: the person has to say they understand, every time.
             if (! $request->boolean('acknowledge')) {
-                throw ValidationException::withMessages(['acknowledge' => 'Confirm that you understand the risk of leaving it open.']);
+                throw ValidationException::withMessages(['acknowledge' => __('Confirm that you understand the risk of leaving it open.')]);
             }
 
             return [$data['allow'], null];
         }
 
         if (! isset($data['duration'])) {
-            throw ValidationException::withMessages(['duration' => 'Choose how long it stays open.']);
+            throw ValidationException::withMessages(['duration' => __('Choose how long it stays open.')]);
         }
 
         return [$data['allow'], (int) $data['duration']];

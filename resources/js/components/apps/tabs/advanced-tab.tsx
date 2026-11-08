@@ -8,9 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { Tooltip } from '@/components/ui/tooltip';
+import { useT } from '@/hooks/use-t';
 import type { AppSettings } from '@/types';
 
 export function AdvancedTab({ app }: { app: AppSettings }) {
+    const { t } = useT();
     const [confirmStop, setConfirmStop] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [busy, setBusy] = useState(false);
@@ -47,11 +49,18 @@ export function AdvancedTab({ app }: { app: AppSettings }) {
         <div className="space-y-6">
             {(running || stopped) && (
                 <Card
-                    title={stopped ? 'App is deactivated' : 'Deactivate app'}
+                    title={
+                        stopped ? t('App is deactivated') : t('Deactivate app')
+                    }
                     description={
                         stopped
-                            ? `Release #${app.deactivated_release ?? '?'} is stopped and its domains do not serve anything. Nothing was deleted.`
-                            : 'Stops the container and takes the domains offline. Releases, domains, certificates and variables are kept, so you can start it again at any time.'
+                            ? t(
+                                  'Release #:number is stopped and its domains do not serve anything. Nothing was deleted.',
+                                  { number: app.deactivated_release ?? '?' },
+                              )
+                            : t(
+                                  'Stops the container and takes the domains offline. Releases, domains, certificates and variables are kept, so you can start it again at any time.',
+                              )
                     }
                     actions={
                         stopped ? (
@@ -62,7 +71,7 @@ export function AdvancedTab({ app }: { app: AppSettings }) {
                                 loading={busy}
                             >
                                 <Play className="size-4" aria-hidden />
-                                Activate
+                                {t('Activate')}
                             </Button>
                         ) : (
                             <Button
@@ -70,7 +79,7 @@ export function AdvancedTab({ app }: { app: AppSettings }) {
                                 onClick={() => setConfirmStop(true)}
                             >
                                 <Power className="size-4" aria-hidden />
-                                Deactivate
+                                {t('Deactivate')}
                             </Button>
                         )
                     }
@@ -78,8 +87,10 @@ export function AdvancedTab({ app }: { app: AppSettings }) {
             )}
 
             <Card
-                title={app.locked ? 'App is locked' : 'Lock app'}
-                description="A locked app cannot be deleted, and neither can its volumes' files with it. Locking is a safety catch against a slip, such as deleting the wrong app: it does not stop deployments, restarts or any other change, and anyone who may change the app can unlock it. Locking and unlocking are recorded in the audit log."
+                title={app.locked ? t('App is locked') : t('Lock app')}
+                description={t(
+                    "A locked app cannot be deleted, and neither can its volumes' files with it. Locking is a safety catch against a slip, such as deleting the wrong app: it does not stop deployments, restarts or any other change, and anyone who may change the app can unlock it. Locking and unlocking are recorded in the audit log.",
+                )}
                 actions={
                     <Button
                         variant={app.locked ? 'soft' : 'primary'}
@@ -91,7 +102,7 @@ export function AdvancedTab({ app }: { app: AppSettings }) {
                         ) : (
                             <Lock className="size-4" aria-hidden />
                         )}
-                        {app.locked ? 'Unlock' : 'Lock'}
+                        {app.locked ? t('Unlock') : t('Lock')}
                     </Button>
                 }
             />
@@ -99,14 +110,18 @@ export function AdvancedTab({ app }: { app: AppSettings }) {
             <Card
                 // The disabled button's tooltip opens above it and must not be cut off by the card.
                 className="overflow-visible"
-                title="Delete app"
-                description="Stops the app and permanently removes its containers, images, domains, certificate, variables, uploaded files and the files in its persistent volumes. This cannot be undone."
+                title={t('Delete app')}
+                description={t(
+                    'Stops the app and permanently removes its containers, images, domains, certificate, variables, uploaded files and the files in its persistent volumes. This cannot be undone.',
+                )}
                 actions={
                     app.locked ? (
                         // aria-disabled, not disabled: the button stays focusable so the reason can be read.
                         <Tooltip
                             side="top"
-                            label="App is locked and cannot be deleted. Unlock it first."
+                            label={t(
+                                'App is locked and cannot be deleted. Unlock it first.',
+                            )}
                         >
                             <Button
                                 variant="error"
@@ -115,7 +130,7 @@ export function AdvancedTab({ app }: { app: AppSettings }) {
                                 onClick={(event) => event.preventDefault()}
                             >
                                 <Trash2 className="size-4" aria-hidden />
-                                Delete app
+                                {t('Delete app')}
                             </Button>
                         </Tooltip>
                     ) : (
@@ -124,7 +139,7 @@ export function AdvancedTab({ app }: { app: AppSettings }) {
                             onClick={() => setConfirmDelete(true)}
                         >
                             <Trash2 className="size-4" aria-hidden />
-                            Delete app
+                            {t('Delete app')}
                         </Button>
                     )
                 }
@@ -132,14 +147,15 @@ export function AdvancedTab({ app }: { app: AppSettings }) {
 
             <ConfirmModal
                 open={confirmStop}
-                title={`Deactivate ${app.name}?`}
-                confirmLabel="Deactivate"
+                title={t('Deactivate :name?', { name: app.name })}
+                confirmLabel={t('Deactivate')}
                 loading={busy}
                 onConfirm={() => post(AppStateController.deactivate(app.slug))}
                 onClose={() => setConfirmStop(false)}
             >
-                The app goes offline right away. You can activate it again from
-                this tab.
+                {t(
+                    'The app goes offline right away. You can activate it again from this tab.',
+                )}
             </ConfirmModal>
             <DeleteAppModal
                 slug={app.slug}

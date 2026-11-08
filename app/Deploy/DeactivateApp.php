@@ -33,14 +33,14 @@ class DeactivateApp
         $live = $app->activeDeployment()->first();
 
         if ($live === null) {
-            throw new DeploymentFailed('This app is not running.');
+            throw new DeploymentFailed(__('This app is not running.'));
         }
 
         if ($live->container_name !== null) {
             try {
                 $this->host->removeContainer($live->container_name);
             } catch (HostOperationFailed $e) {
-                throw new DeploymentFailed("Could not stop the container: {$e->getMessage()}");
+                throw new DeploymentFailed(__('Could not stop the container: :error', ['error' => $e->getMessage()]));
             }
         }
 
@@ -61,7 +61,7 @@ class DeactivateApp
         $stopped = $app->deployments()->where('status', DeploymentStatus::Stopped)->latest('number')->first();
 
         if ($stopped === null) {
-            throw new DeploymentFailed('There is no stopped release to start. Press Deploy to build one.');
+            throw new DeploymentFailed(__('There is no stopped release to start. Press Deploy to build one.'));
         }
 
         $deployment = $this->deployer->rollback($app, $stopped, $by);

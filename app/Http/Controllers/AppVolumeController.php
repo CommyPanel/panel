@@ -28,19 +28,19 @@ class AppVolumeController extends Controller
 
         $audit->record('app.volume_added', $request->user(), ['app' => $app->slug, 'path' => $volume->path, 'name' => $volume->name], $app);
 
-        return back()->with('status', "{$volume->path} will be kept between deployments once you apply the changes.");
+        return back()->with('status', __(':path will be kept between deployments once you apply the changes.', ['path' => $volume->path]));
     }
 
     public function destroy(Request $request, App $app, AppVolume $volume, AuditLogger $audit): RedirectResponse
     {
         if ($volume->isLocked()) {
-            return back()->withErrors(['volume' => 'Volume is locked and cannot be removed. Unlock it first.']);
+            return back()->withErrors(['volume' => __('Volume is locked and cannot be removed. Unlock it first.')]);
         }
 
         $volume->delete();
 
         $audit->record('app.volume_removed', $request->user(), ['app' => $app->slug, 'path' => $volume->path, 'name' => $volume->name], $app);
 
-        return back()->with('status', "{$volume->path} will no longer be mounted once you apply the changes. Its files stay on the server.");
+        return back()->with('status', __(':path will no longer be mounted once you apply the changes. Its files stay on the server.', ['path' => $volume->path]));
     }
 }

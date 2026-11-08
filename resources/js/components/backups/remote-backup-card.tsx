@@ -6,6 +6,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useT } from '@/hooks/use-t';
 import { useConfirmedAction } from '@/hooks/use-confirmed-action';
 import { timeAgo } from '@/lib/format';
 import type { RemoteBackupSettings } from '@/types';
@@ -22,6 +23,7 @@ export function RemoteBackupCard({
     remote: RemoteBackupSettings;
     manage: boolean;
 }) {
+    const { t } = useT();
     const { errors } = usePage().props;
     const confirmed = useConfirmedAction();
     const form = useForm({
@@ -53,7 +55,9 @@ export function RemoteBackupCard({
         void confirmed.run(() => {
             if (
                 !window.confirm(
-                    'Remove these settings? Copies already in the storage stay there.',
+                    t(
+                        'Remove these settings? Copies already in the storage stay there.',
+                    ),
                 )
             ) {
                 return;
@@ -66,25 +70,31 @@ export function RemoteBackupCard({
 
     return (
         <Card
-            title="Copy to another place (S3)"
-            description="A backup on this server's disk is lost with the disk. Each new backup can be copied to any S3-compatible storage: Hetzner Object Storage, Cloudflare R2, Backblaze B2, Wasabi, MinIO or Amazon S3."
+            title={t('Copy to another place (S3)')}
+            description={t(
+                "A backup on this server's disk is lost with the disk. Each new backup can be copied to any S3-compatible storage: Hetzner Object Storage, Cloudflare R2, Backblaze B2, Wasabi, MinIO or Amazon S3.",
+            )}
         >
             {errors.remote && <Alert variant="error">{errors.remote}</Alert>}
             {configured && remote.last_error && (
                 <Alert variant="error">
-                    The last copy failed: {remote.last_error}
+                    {t('The last copy failed: :error', {
+                        error: remote.last_error,
+                    })}
                 </Alert>
             )}
             {configured && remote.enabled && remote.last_ok_at && (
                 <p className="text-sm text-base-content/70">
-                    Last copy made {timeAgo(remote.last_ok_at)}.
+                    {t('Last copy made :when.', {
+                        when: timeAgo(remote.last_ok_at),
+                    })}
                 </p>
             )}
 
             {manage ? (
                 <form onSubmit={save} className="space-y-4">
                     <Input
-                        label="Address of the storage"
+                        label={t('Address of the storage')}
                         placeholder="https://fsn1.your-objectstorage.com"
                         required
                         autoComplete="off"
@@ -94,40 +104,44 @@ export function RemoteBackupCard({
                             form.setData('endpoint', e.target.value)
                         }
                         error={form.errors.endpoint}
-                        hint="The https address your provider gives you, without a folder. For Hetzner, https://fsn1.your-objectstorage.com (or nbg1, hel1)."
+                        hint={t(
+                            'The https address your provider gives you, without a folder. For Hetzner, https://fsn1.your-objectstorage.com (or nbg1, hel1).',
+                        )}
                     />
                     <Input
-                        label="Region"
+                        label={t('Region')}
                         placeholder="fsn1"
                         autoComplete="off"
                         spellCheck={false}
                         value={form.data.region}
                         onChange={(e) => form.setData('region', e.target.value)}
                         error={form.errors.region}
-                        hint="Hetzner: fsn1, nbg1 or hel1. Cloudflare R2: auto. Amazon: such as eu-central-1. Leave empty if unsure (us-east-1)."
+                        hint={t(
+                            'Hetzner: fsn1, nbg1 or hel1. Cloudflare R2: auto. Amazon: such as eu-central-1. Leave empty if unsure (us-east-1).',
+                        )}
                     />
                     <Input
-                        label="Bucket"
+                        label={t('Bucket')}
                         required
                         autoComplete="off"
                         spellCheck={false}
                         value={form.data.bucket}
                         onChange={(e) => form.setData('bucket', e.target.value)}
                         error={form.errors.bucket}
-                        hint="Create it at your provider first."
+                        hint={t('Create it at your provider first.')}
                     />
                     <Input
-                        label="Folder in the bucket (optional)"
+                        label={t('Folder in the bucket (optional)')}
                         placeholder="commypanel/main-server"
                         autoComplete="off"
                         spellCheck={false}
                         value={form.data.prefix}
                         onChange={(e) => form.setData('prefix', e.target.value)}
                         error={form.errors.prefix}
-                        hint="Lets several servers share one bucket."
+                        hint={t('Lets several servers share one bucket.')}
                     />
                     <Input
-                        label="Access key"
+                        label={t('Access key')}
                         required
                         autoComplete="off"
                         spellCheck={false}
@@ -138,13 +152,13 @@ export function RemoteBackupCard({
                         error={form.errors.access_key}
                     />
                     <Input
-                        label="Secret key"
+                        label={t('Secret key')}
                         type="password"
                         autoComplete="new-password"
                         required={!remote.has_secret}
                         placeholder={
                             remote.has_secret
-                                ? 'Saved. Type to replace it.'
+                                ? t('Saved. Type to replace it.')
                                 : ''
                         }
                         value={form.data.secret_key}
@@ -152,10 +166,12 @@ export function RemoteBackupCard({
                             form.setData('secret_key', e.target.value)
                         }
                         error={form.errors.secret_key}
-                        hint="Stored encrypted and never shown again. Use a key that may only write to this bucket."
+                        hint={t(
+                            'Stored encrypted and never shown again. Use a key that may only write to this bucket.',
+                        )}
                     />
                     <Input
-                        label="Copies to keep of each backup"
+                        label={t('Copies to keep of each backup')}
                         type="number"
                         min={1}
                         max={365}
@@ -165,7 +181,9 @@ export function RemoteBackupCard({
                             form.setData('keep', Number(e.target.value))
                         }
                         error={form.errors.keep}
-                        hint="Older copies of the same backup are deleted from the storage. Files that are not CommyPanel backups are never touched."
+                        hint={t(
+                            'Older copies of the same backup are deleted from the storage. Files that are not CommyPanel backups are never touched.',
+                        )}
                     />
                     <label className="flex cursor-pointer items-center gap-3">
                         <input
@@ -177,22 +195,19 @@ export function RemoteBackupCard({
                             }
                         />
                         <span className="text-sm">
-                            Copy new backups to this storage
+                            {t('Copy new backups to this storage')}
                         </span>
                     </label>
                     <p className="text-sm text-base-content/70">
-                        Panel backups, database dumps and volume archives are
-                        copied right after they are made, starting with the next
-                        one. The copy is made from this server, in the
-                        background; it is the one place besides update checks
-                        where the panel contacts the outside by itself, and only
-                        once you switch it on here.
+                        {t(
+                            'Panel backups, database dumps and volume archives are copied right after they are made, starting with the next one. The copy is made from this server, in the background; it is the one place besides update checks where the panel contacts the outside by itself, and only once you switch it on here.',
+                        )}
                     </p>
                     <div className="flex flex-wrap justify-end gap-2">
                         {configured && (
                             <Button variant="ghost" onClick={remove}>
                                 <Trash2 className="size-4" aria-hidden />
-                                Remove
+                                {t('Remove')}
                             </Button>
                         )}
                         <Button
@@ -201,18 +216,21 @@ export function RemoteBackupCard({
                             loading={form.processing}
                         >
                             <CloudUpload className="size-4" aria-hidden />
-                            Test the connection
+                            {t('Test the connection')}
                         </Button>
                         <Button type="submit" loading={form.processing}>
-                            Save
+                            {t('Save')}
                         </Button>
                     </div>
                 </form>
             ) : (
                 <p className="text-sm text-base-content/70">
                     {configured && remote.enabled
-                        ? `Backups are copied to ${remote.bucket} at ${remote.endpoint}.`
-                        : 'Backups are not copied off this server.'}
+                        ? t('Backups are copied to :bucket at :endpoint.', {
+                              bucket: remote.bucket,
+                              endpoint: remote.endpoint,
+                          })
+                        : t('Backups are not copied off this server.')}
                 </p>
             )}
             {confirmed.modal}

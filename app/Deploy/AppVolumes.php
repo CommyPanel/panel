@@ -34,12 +34,12 @@ class AppVolumes
         }
 
         if (strlen($path) > 255 || preg_match('#^/[A-Za-z0-9._/-]+$#', $path) !== 1 || str_contains($path, '..') || str_contains($path, '//')) {
-            throw new InvalidArgumentException('Use an absolute path of letters, digits, dots, dashes and slashes, such as /app/data.');
+            throw new InvalidArgumentException(__('Use an absolute path of letters, digits, dots, dashes and slashes, such as /app/data.'));
         }
 
         foreach (self::RESERVED as $reserved) {
             if ($path === $reserved || str_starts_with($path, $reserved.'/')) {
-                throw new InvalidArgumentException("A volume cannot be mounted under {$reserved}.");
+                throw new InvalidArgumentException(__('A volume cannot be mounted under :reserved.', ['reserved' => $reserved]));
             }
         }
 
@@ -54,11 +54,11 @@ class AppVolumes
         $path = self::cleanPath($path);
 
         if ($app->volumes()->where('path', $path)->exists()) {
-            throw new InvalidArgumentException("{$path} already has a volume.");
+            throw new InvalidArgumentException(__(':path already has a volume.', ['path' => $path]));
         }
 
         if ($app->volumes()->count() >= self::MAX) {
-            throw new InvalidArgumentException('An app can have at most '.self::MAX.' volumes.');
+            throw new InvalidArgumentException(__('An app can have at most :max volumes.', ['max' => self::MAX]));
         }
 
         /** @var AppVolume */

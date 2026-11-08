@@ -25,8 +25,8 @@ class AppWebhookController extends Controller
         $audit->record($renewed ? 'app.webhook_secret_renewed' : 'app.webhook_enabled', null, ['app' => $app->slug], $app);
 
         return back()->with('status', $renewed
-            ? 'New secret created. Update it in your Git host; the old one no longer works.'
-            : 'Deploy on push is on. Add the webhook to your repository.');
+            ? __('New secret created. Update it in your Git host; the old one no longer works.')
+            : __('Deploy on push is on. Add the webhook to your repository.'));
     }
 
     public function destroy(App $app, AuditLogger $audit): RedirectResponse
@@ -36,6 +36,6 @@ class AppWebhookController extends Controller
         $app->forceFill(['webhook_id' => null, 'webhook_secret' => null])->save();
         $audit->record('app.webhook_disabled', null, ['app' => $app->slug], $app);
 
-        return back()->with('status', 'Deploy on push is off. You can remove the webhook from your repository.');
+        return back()->with('status', __('Deploy on push is off. You can remove the webhook from your repository.'));
     }
 }

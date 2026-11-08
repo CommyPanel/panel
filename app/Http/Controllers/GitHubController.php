@@ -46,7 +46,7 @@ class GitHubController extends Controller
             'error' => $error,
             'start' => $pending !== null && $ready && ! $github->connected() ? [
                 'action' => $pending['org'] === null
-                    ? 'https://github.com/settings/apps/new'
+                    ? __('https://github.com/settings/apps/new')
                     : "https://github.com/organizations/{$pending['org']}/settings/apps/new",
                 'state' => $pending['state'],
                 'manifest' => json_encode($github->manifest('https://'.$panel->name()), JSON_UNESCAPED_SLASHES),
@@ -66,11 +66,11 @@ class GitHubController extends Controller
         ]);
 
         if ($github->connected()) {
-            return back()->withErrors(['github' => 'GitHub is already connected. Disconnect it first.']);
+            return back()->withErrors(['github' => __('GitHub is already connected. Disconnect it first.')]);
         }
 
         if ($panel->name() === null || ! $panel->certificateUsable()) {
-            return back()->withErrors(['github' => 'GitHub needs to reach the panel over https. Set the panel\'s domain and wait for its certificate first.']);
+            return back()->withErrors(['github' => __('GitHub needs to reach the panel over https. Set the panel\'s domain and wait for its certificate first.')]);
         }
 
         $request->session()->put(self::PENDING, [
@@ -94,7 +94,7 @@ class GitHubController extends Controller
         $code = $request->query('code');
 
         if ($pending === null || ! is_string($state) || ! is_string($code) || ! hash_equals($pending['state'], $state) || $github->connected()) {
-            return redirect()->route('settings.github')->withErrors(['github' => 'That return from GitHub was not expected, so it was ignored. Start again.']);
+            return redirect()->route('settings.github')->withErrors(['github' => __('That return from GitHub was not expected, so it was ignored. Start again.')]);
         }
 
         try {
@@ -106,7 +106,7 @@ class GitHubController extends Controller
         $audit->record('github.connected', $request->user(), ['app' => $github->toArray()['slug']]);
 
         // Next: install the app on an account, which only the person can do on github.com.
-        return redirect()->route('settings.github')->with('status', 'The app was created. Now install it and choose which repositories it may read.');
+        return redirect()->route('settings.github')->with('status', __('The app was created. Now install it and choose which repositories it may read.'));
     }
 
     /**
@@ -129,7 +129,7 @@ class GitHubController extends Controller
         $github->disconnect();
         $audit->record('github.disconnected', $request->user(), ['app' => $slug]);
 
-        return redirect()->route('settings.github')->with('status', 'Disconnected. Apps that were set up through GitHub cannot fetch their code until you connect again. Delete the app on github.com too, if you no longer want it there.');
+        return redirect()->route('settings.github')->with('status', __('Disconnected. Apps that were set up through GitHub cannot fetch their code until you connect again. Delete the app on github.com too, if you no longer want it there.'));
     }
 
     private function sync(GitHubApp $github, AuditLogger $audit, Request $request): RedirectResponse
@@ -147,8 +147,8 @@ class GitHubController extends Controller
         $audit->record('github.installation_synced', $request->user(), ['installed' => $github->installed(), 'account' => $github->toArray()['account']]);
 
         return redirect()->route('settings.github')->with('status', $github->installed()
-            ? 'Connected. New apps can now pick a repository from GitHub.'
-            : 'The app is not installed on an account yet.');
+            ? __('Connected. New apps can now pick a repository from GitHub.')
+            : __('The app is not installed on an account yet.'));
     }
 
     /**

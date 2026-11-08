@@ -3,12 +3,14 @@ import AppContainerController from '@/actions/App/Http/Controllers/AppContainerC
 import { StateMark, toneOfContainer } from '@/components/server/state-mark';
 import { Alert } from '@/components/ui/alert';
 import { Card } from '@/components/ui/card';
+import { useT } from '@/hooks/use-t';
 import type {
     ContainerMount,
     ContainerNetwork,
     ContainerPort,
     DockerNetwork,
 } from '@/types';
+import { Trans } from '@/lib/trans';
 import { ContainerFacts } from './container-facts';
 import { NetworkList } from './network-list';
 
@@ -42,6 +44,7 @@ function usesSharedNetwork(containers: AppContainer[]): boolean {
  * what they are attached to, and what else is on their networks.
  */
 export function AppContainersCard({ slug }: { slug: string }) {
+    const { t } = useT();
     const [data, setData] = useState<Payload | null>(null);
     const [error, setError] = useState<string | null>(null);
 
@@ -63,7 +66,10 @@ export function AppContainersCard({ slug }: { slug: string }) {
 
             if (!response.ok) {
                 throw new Error(
-                    body.error ?? `The request failed (${response.status}).`,
+                    body.error ??
+                        t('The request failed (:status).', {
+                            status: response.status,
+                        }),
                 );
             }
 
@@ -73,10 +79,10 @@ export function AppContainersCard({ slug }: { slug: string }) {
             setError(
                 e instanceof Error
                     ? e.message
-                    : 'The containers could not be loaded.',
+                    : t('The containers could not be loaded.'),
             );
         }
-    }, [slug]);
+    }, [slug, t]);
 
     useEffect(() => {
         void load();
@@ -84,25 +90,29 @@ export function AppContainersCard({ slug }: { slug: string }) {
 
     return (
         <Card
-            title="Containers and networks"
-            description="What this app runs as, and what it is connected to."
+            title={t('Containers and networks')}
+            description={t(
+                'What this app runs as, and what it is connected to.',
+            )}
         >
             {error && <Alert variant="error">{error}</Alert>}
             {!error && data === null && (
                 <p className="text-sm text-base-content/70" role="status">
-                    Loading...
+                    {t('Loading...')}
                 </p>
             )}
             {data && data.containers.length === 0 && (
                 <p className="text-sm text-base-content/70">
-                    This app has no containers right now.
+                    {t('This app has no containers right now.')}
                 </p>
             )}
             {data && usesSharedNetwork(data.containers) && (
                 <Alert variant="warning">
-                    This app still runs on the old shared network, where other
-                    apps&apos; containers can reach it. Deploy it again to move
-                    it to its own network, <code>commypanel-{slug}</code>.
+                    <Trans
+                        text="This app still runs on the old shared network, where other apps' containers can reach it. Deploy it again to move it to its own network, <code>:network</code>."
+                        components={{ code: <code /> }}
+                        values={{ network: `commypanel-${slug}` }}
+                    />
                 </Alert>
             )}
             {data && data.containers.length > 0 && (
@@ -118,12 +128,14 @@ export function AppContainersCard({ slug }: { slug: string }) {
                                     <code className="text-sm">{c.name}</code>
                                     {c.release !== null && (
                                         <span className="text-xs text-base-content/70">
-                                            release #{c.release}
+                                            {t('release #:number', {
+                                                number: c.release,
+                                            })}
                                         </span>
                                     )}
                                     {c.live && (
                                         <span className="badge-soft badge badge-sm badge-primary">
-                                            live
+                                            {t('live')}
                                         </span>
                                     )}
                                 </div>

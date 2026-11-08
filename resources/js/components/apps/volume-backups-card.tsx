@@ -5,13 +5,18 @@ import AppVolumeBackupController from '@/actions/App/Http/Controllers/AppVolumeB
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useConfirmedAction } from '@/hooks/use-confirmed-action';
+import { useT } from '@/hooks/use-t';
+import { Trans } from '@/lib/trans';
 import { formatBytes, formatDate, timeAgo } from '@/lib/format';
 
 type Backup = { name: string; volume: string; size: number; created: number };
 type Pending = Record<string, { running?: true; failed?: string }>;
 type Overview = { backups: Backup[]; pending: Pending; keep: number };
 
-async function getBackups(url: string): Promise<Overview> {
+async function getBackups(
+    url: string,
+    failed: (status: number) => string,
+): Promise<Overview> {
     const response = await fetch(url, {
         credentials: 'same-origin',
         headers: {
@@ -20,8 +25,7 @@ async function getBackups(url: string): Promise<Overview> {
         },
     });
 
-    if (!response.ok)
-        throw new Error(`The request failed (${response.status}).`);
+    if (!response.ok) throw new Error(failed(response.status));
 
     return (await response.json()) as Overview;
 }
@@ -37,6 +41,7 @@ export function VolumeBackupsCard({
     app: string;
     volumes: string[];
 }) {
+    const { t } = useT();
     const confirmed = useConfirmedAction();
     const [overview, setOverview] = useState<Overview | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -44,13 +49,16 @@ export function VolumeBackupsCard({
     const load = useCallback(async () => {
         try {
             setOverview(
-                await getBackups(AppVolumeBackupController.index(app).url),
+                await getBackups(
+                    AppVolumeBackupController.index(app).url,
+                    (status) => t('The request failed (:status).', { status }),
+                ),
             );
             setError(null);
         } catch (e) {
-            setError(e instanceof Error ? e.message : 'Could not load.');
+            setError(e instanceof Error ? e.message : t('Could not load.'));
         }
-    }, [app]);
+    }, [app, t]);
 
     useEffect(() => {
         void load();
@@ -85,7 +93,12 @@ export function VolumeBackupsCard({
 
     const remove = (file: Backup) =>
         void confirmed.run(() => {
-            if (!window.confirm(`Delete the backup ${file.name}?`)) return;
+            if (
+                !window.confirm(
+                    t('Delete the backup :name?', { name: file.name }),
+                )
+            )
+                return;
 
             router.delete(
                 AppVolumeBackupController.destroy({ app, file: file.name }),
@@ -107,8 +120,11 @@ export function VolumeBackupsCard({
 
     return (
         <Card
-            title="Backups"
-            description={`A volume is saved as one compressed archive on this server. The newest ${overview.keep} of each are kept.`}
+            title={t('Backups')}
+            description={t(
+                'A volume is saved as one compressed archive on this server. The newest :keep of each are kept.',
+                { keep: overview.keep },
+            )}
             flush={overview.backups.length > 0}
             actions={
                 <div className="flex flex-wrap gap-2">
@@ -122,8 +138,8 @@ export function VolumeBackupsCard({
                         >
                             <Archive className="size-4" aria-hidden />
                             {overview.pending[name]?.running
-                                ? `Backing up ${name}…`
-                                : `Back up ${name}`}
+                                ? t('Backing up :name…', { name })
+                                : t('Back up :name', { name })}
                         </Button>
                     ))}
                 </div>
@@ -140,17 +156,18 @@ export function VolumeBackupsCard({
             ))}
             {overview.backups.length === 0 ? (
                 <p className="text-sm text-base-content/70">
-                    No backup yet. Press a Back up button above; a large volume
-                    takes a while.
+                    {t(
+                        'No backup yet. Press a Back up button above; a large volume takes a while.',
+                    )}
                 </p>
             ) : (
                 <div className="overflow-x-auto">
                     <table className="table">
                         <thead>
                             <tr>
-                                <th>Volume</th>
-                                <th>Made</th>
-                                <th className="text-right">Size</th>
+                                <th>{t('Volume')}</th>
+                                <th>{t('Made')}</th>
+                                <th className="text-right">{t('Size')}</th>
                                 <th />
                             </tr>
                         </thead>
@@ -187,7 +204,7 @@ export function VolumeBackupsCard({
                                                 className="size-4"
                                                 aria-hidden
                                             />
-                                            Download
+                                            {t('Download')}
                                         </Button>
                                         <Button
                                             variant="ghost"
@@ -198,7 +215,7 @@ export function VolumeBackupsCard({
                                                 className="size-4"
                                                 aria-hidden
                                             />
-                                            Delete
+                                            {t('Delete')}
                                         </Button>
                                     </td>
                                 </tr>
@@ -208,15 +225,11 @@ export function VolumeBackupsCard({
                 </div>
             )}
             <p className="px-6 pb-4 text-sm text-base-content/70">
-                An archive holds every file of the volume, so downloading one
-                needs your password and is recorded. Links, pipes and other
-                special files are left out. It stays on this server: copy it
-                somewhere else now and then. To put one back, stop the app, then
-                on the server run{' '}
-                <code>
-                    tar -xzpf FILE -C /var/lib/commypanel/volumes/{app}/NAME
-                </code>{' '}
-                as root.
+                <Trans
+                    text="An archive holds every file of the volume, so downloading one needs your password and is recorded. Links, pipes and other special files are left out. It stays on this server: copy it somewhere else now and then. To put one back, stop the app, then on the server run <code>tar -xzpf FILE -C /var/lib/commypanel/volumes/:app/NAME</code> as root."
+                    components={{ code: <code /> }}
+                    values={{ app }}
+                />
             </p>
         </Card>
     );

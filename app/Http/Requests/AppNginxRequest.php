@@ -25,6 +25,6 @@ class AppNginxRequest extends FormRequest
      */
     public function messages(): array
     {
-        return ['custom.max' => 'That is too long. The limit is '.(SaveNginxCustom::MAX_LENGTH / 1000).' thousand characters.'];
+        return ['custom.max' => __('That is too long. The limit is :limit thousand characters.', ['limit' => SaveNginxCustom::MAX_LENGTH / 1000])];
     }
 }

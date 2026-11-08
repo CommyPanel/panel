@@ -98,7 +98,7 @@ class ServerDockerController extends Controller
 
         $audit->record('docker.images_pruned', null, ['reclaimed_bytes' => $reclaimed]);
 
-        return back()->with('status', 'Unused images removed ('.round($reclaimed / 1024 ** 2, 1).' MB freed).');
+        return back()->with('status', __('Unused images removed (:size MB freed).', ['size' => round($reclaimed / 1024 ** 2, 1)]));
     }
 
     /**
@@ -119,7 +119,7 @@ class ServerDockerController extends Controller
 
         $audit->record('docker.restarted', null);
 
-        return back()->with('status', 'Docker was restarted. Apps come back as their containers start.');
+        return back()->with('status', __('Docker was restarted. Apps come back as their containers start.'));
     }
 
     public function logs(HostDriver $host, string $name): JsonResponse

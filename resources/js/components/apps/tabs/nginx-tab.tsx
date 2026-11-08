@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CodeEditor } from '@/components/ui/code-editor';
 import { useConfirmedAction } from '@/hooks/use-confirmed-action';
+import { useT } from '@/hooks/use-t';
 
 type NginxData = {
     custom: string;
@@ -20,8 +21,6 @@ type Props = {
     /** Tells the page whether there are unsaved changes, so it can warn before a tab switch. */
     onDirtyChange?: (dirty: boolean) => void;
 };
-
-const LEAVE_MESSAGE = 'You have unsaved nginx changes. Discard them?';
 
 /** Line endings and trailing blank space do not count as a change. */
 const normalise = (text: string) => text.replace(/\r\n?/g, '\n').trimEnd();
@@ -51,6 +50,7 @@ location = /old-page {
  * throws the changes away and saves nothing.
  */
 export function NginxTab({ slug, onDirtyChange }: Props) {
+    const { t } = useT();
     const [data, setData] = useState<NginxData | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [draft, setDraft] = useState('');
@@ -75,7 +75,9 @@ export function NginxTab({ slug, onDirtyChange }: Props) {
 
             if (!response.ok) {
                 throw new Error(
-                    `The settings could not be loaded (${response.status}).`,
+                    t('The settings could not be loaded (:status).', {
+                        status: response.status,
+                    }),
                 );
             }
 
@@ -87,10 +89,10 @@ export function NginxTab({ slug, onDirtyChange }: Props) {
             setLoadError(
                 e instanceof Error
                     ? e.message
-                    : 'The settings could not be loaded.',
+                    : t('The settings could not be loaded.'),
             );
         }
-    }, [url]);
+    }, [url, t]);
 
     useEffect(() => {
         void load();
@@ -113,7 +115,12 @@ export function NginxTab({ slug, onDirtyChange }: Props) {
         };
         window.addEventListener('beforeunload', beforeUnload);
         const removeInertia = router.on('before', (event) => {
-            if (!sending.current && !window.confirm(LEAVE_MESSAGE)) {
+            if (
+                !sending.current &&
+                !window.confirm(
+                    t('You have unsaved nginx changes. Discard them?'),
+                )
+            ) {
                 event.preventDefault();
             }
         });
@@ -122,7 +129,7 @@ export function NginxTab({ slug, onDirtyChange }: Props) {
             window.removeEventListener('beforeunload', beforeUnload);
             removeInertia();
         };
-    }, [dirty]);
+    }, [dirty, t]);
 
     const save = () => {
         if (!dirty || saving) return;
@@ -144,7 +151,8 @@ export function NginxTab({ slug, onDirtyChange }: Props) {
                     onSuccess: () => void load(),
                     onError: (errors) =>
                         setError(
-                            errors.custom ?? 'The changes could not be saved.',
+                            errors.custom ??
+                                t('The changes could not be saved.'),
                         ),
                     onFinish: () => {
                         sending.current = false;
@@ -167,7 +175,7 @@ export function NginxTab({ slug, onDirtyChange }: Props) {
     if (data === null) {
         return (
             <p className="text-sm text-base-content/70" role="status">
-                Loading...
+                {t('Loading...')}
             </p>
         );
     }
@@ -176,13 +184,17 @@ export function NginxTab({ slug, onDirtyChange }: Props) {
         <div className="grid items-start gap-6 xl:grid-cols-3">
             <div className="min-w-0 space-y-6 xl:col-span-2">
                 <Card
-                    title="Custom nginx directives"
-                    description="Added to this app's generated site, so they stay when you deploy or change domains. Save checks them, lets nginx test the whole configuration and reloads it. Cancel discards your changes."
+                    title={t('Custom nginx directives')}
+                    description={t(
+                        "Added to this app's generated site, so they stay when you deploy or change domains. Save checks them, lets nginx test the whole configuration and reloads it. Cancel discards your changes.",
+                    )}
                 >
                     {!data.active && data.inactive_reason && (
                         <Alert variant="info">
-                            {data.inactive_reason} What you save here is kept
-                            and applied as soon as it does.
+                            {t(
+                                ':reason What you save here is kept and applied as soon as it does.',
+                                { reason: data.inactive_reason },
+                            )}
                         </Alert>
                     )}
                     {error && (
@@ -197,7 +209,7 @@ export function NginxTab({ slug, onDirtyChange }: Props) {
                     )}
 
                     <CodeEditor
-                        label="Custom nginx directives"
+                        label={t('Custom nginx directives')}
                         value={draft}
                         onChange={setDraft}
                         onSave={save}
@@ -206,8 +218,9 @@ export function NginxTab({ slug, onDirtyChange }: Props) {
                         describedBy={error ? errorId : undefined}
                     />
                     <p className="text-xs text-base-content/70">
-                        Tab indents. Press Esc, then Tab, to leave the editor.
-                        Cmd/Ctrl+S saves.
+                        {t(
+                            'Tab indents. Press Esc, then Tab, to leave the editor. Cmd/Ctrl+S saves.',
+                        )}
                     </p>
 
                     <div className="flex flex-wrap items-center gap-2">
@@ -216,18 +229,18 @@ export function NginxTab({ slug, onDirtyChange }: Props) {
                             loading={saving}
                             disabled={!dirty}
                         >
-                            Save and reload nginx
+                            {t('Save and reload nginx')}
                         </Button>
                         <Button
                             variant="ghost"
                             onClick={cancel}
                             disabled={!dirty || saving}
                         >
-                            Cancel
+                            {t('Cancel')}
                         </Button>
                         {dirty && (
                             <span className="text-sm text-base-content/70">
-                                Unsaved changes
+                                {t('Unsaved changes')}
                             </span>
                         )}
                     </div>
@@ -237,40 +250,46 @@ export function NginxTab({ slug, onDirtyChange }: Props) {
 
             <div className="min-w-0 space-y-6">
                 <Card
-                    title="What is allowed"
-                    description="Only safe directives are accepted, so a mistake or a stolen account cannot read files from the server."
+                    title={t('What is allowed')}
+                    description={t(
+                        'Only safe directives are accepted, so a mistake or a stolen account cannot read files from the server.',
+                    )}
                 >
                     <ul className="list-disc space-y-1 pl-5 text-sm">
                         <li>
-                            Limits and timeouts: client_max_body_size,
-                            proxy_read_timeout, keepalive_timeout and similar.
+                            {t(
+                                'Limits and timeouts: client_max_body_size, proxy_read_timeout, keepalive_timeout and similar.',
+                            )}
                         </li>
                         <li>
-                            Compression: gzip, gzip_types and related settings.
+                            {t(
+                                'Compression: gzip, gzip_types and related settings.',
+                            )}
                         </li>
                         <li>
-                            Headers: add_header, expires, proxy_hide_header.
+                            {t(
+                                'Headers: add_header, expires, proxy_hide_header.',
+                            )}
                         </li>
                         <li>
-                            Access: allow and deny (an address or a network).
+                            {t(
+                                'Access: allow and deny (an address or a network).',
+                            )}
                         </li>
                         <li>
-                            location blocks. Inside them you can also use
-                            return, rewrite, if, proxy_set_header and proxy_pass
-                            $commypanel_upstream (the address of this app).
+                            {t(
+                                'location blocks. Inside them you can also use return, rewrite, if, proxy_set_header and proxy_pass $commypanel_upstream (the address of this app).',
+                            )}
                         </li>
                     </ul>
                     <p className="text-sm text-base-content/70">
-                        return, rewrite and if only work inside a location. A
-                        proxy_set_header in a location replaces the generated
-                        ones (Host, X-Real-IP, X-Forwarded-For,
-                        X-Forwarded-Proto) for that location, so repeat the ones
-                        you need. Anything else, such as root, alias, include or
-                        log files, is refused with the line it is on.
+                        {t(
+                            'return, rewrite and if only work inside a location. A proxy_set_header in a location replaces the generated ones (Host, X-Real-IP, X-Forwarded-For, X-Forwarded-Proto) for that location, so repeat the ones you need. Anything else, such as root, alias, include or log files, is refused with the line it is on.',
+                        )}
                     </p>
                     <details className="text-sm">
                         <summary className="cursor-pointer font-medium">
-                            Example
+                            {t('Example')}
                         </summary>
                         <pre className="mt-2 overflow-x-auto rounded-field bg-base-200 p-3 font-mono text-xs">
                             {EXAMPLE}
@@ -279,8 +298,10 @@ export function NginxTab({ slug, onDirtyChange }: Props) {
                 </Card>
 
                 <Card
-                    title="Generated configuration"
-                    description="Read only. This is the site CommyPanel writes, with your directives in place."
+                    title={t('Generated configuration')}
+                    description={t(
+                        'Read only. This is the site CommyPanel writes, with your directives in place.',
+                    )}
                 >
                     {data.problem && (
                         <Alert variant="warning">{data.problem}</Alert>
@@ -288,7 +309,7 @@ export function NginxTab({ slug, onDirtyChange }: Props) {
                     {data.generated ? (
                         <details>
                             <summary className="cursor-pointer text-sm font-medium">
-                                Show the configuration
+                                {t('Show the configuration')}
                             </summary>
                             <pre className="mt-2 max-h-96 overflow-auto rounded-field bg-base-200 p-3 font-mono text-xs">
                                 {data.generated}
@@ -297,8 +318,9 @@ export function NginxTab({ slug, onDirtyChange }: Props) {
                     ) : (
                         !data.problem && (
                             <p className="text-sm text-base-content/70">
-                                There is nothing to show until the app has a
-                                site.
+                                {t(
+                                    'There is nothing to show until the app has a site.',
+                                )}
                             </p>
                         )
                     )}

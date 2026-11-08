@@ -7,6 +7,7 @@ import { StateMark } from '@/components/server/state-mark';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useT } from '@/hooks/use-t';
 import { formatDate } from '@/lib/format';
 
 type Props = {
@@ -27,6 +28,7 @@ type Props = {
 };
 
 export default function Nginx({ error, nginx }: Props) {
+    const { t } = useT();
     const { errors } = usePage().props;
     const [busy, setBusy] = useState<'test' | 'reload' | null>(null);
 
@@ -50,8 +52,9 @@ export default function Nginx({ error, nginx }: Props) {
 
             {nginx && !nginx.available && (
                 <Alert variant="error">
-                    nginx is not installed on this server. Apps cannot be
-                    reached from the internet until it is.
+                    {t(
+                        'nginx is not installed on this server. Apps cannot be reached from the internet until it is.',
+                    )}
                 </Alert>
             )}
 
@@ -59,7 +62,9 @@ export default function Nginx({ error, nginx }: Props) {
                 <>
                     <Card
                         title="nginx"
-                        description="The web server in front of your apps. It keeps running while Docker is down, so the panel stays reachable."
+                        description={t(
+                            'The web server in front of your apps. It keeps running while Docker is down, so the panel stays reachable.',
+                        )}
                         actions={
                             <div className="flex flex-wrap gap-2">
                                 <Button
@@ -74,7 +79,7 @@ export default function Nginx({ error, nginx }: Props) {
                                         className="size-4"
                                         aria-hidden
                                     />
-                                    Test configuration
+                                    {t('Test configuration')}
                                 </Button>
                                 <Button
                                     variant="soft"
@@ -88,7 +93,7 @@ export default function Nginx({ error, nginx }: Props) {
                                     }
                                 >
                                     <RefreshCw className="size-4" aria-hidden />
-                                    Reload
+                                    {t('Reload')}
                                 </Button>
                             </div>
                         }
@@ -96,22 +101,22 @@ export default function Nginx({ error, nginx }: Props) {
                         <dl className="divide-y divide-base-300 text-sm">
                             <div className="flex flex-wrap items-center justify-between gap-2 py-2">
                                 <dt className="text-base-content/70">
-                                    Service
+                                    {t('Service')}
                                 </dt>
                                 <dd>
                                     <StateMark
                                         tone={nginx.running ? 'good' : 'bad'}
                                         label={
                                             nginx.running
-                                                ? 'Running'
-                                                : 'Not running'
+                                                ? t('Running')
+                                                : t('Not running')
                                         }
                                     />
                                 </dd>
                             </div>
                             <div className="flex flex-wrap justify-between gap-2 py-2">
                                 <dt className="text-base-content/70">
-                                    Version
+                                    {t('Version')}
                                 </dt>
                                 <dd className="font-medium">
                                     {nginx.version || '-'}
@@ -119,15 +124,15 @@ export default function Nginx({ error, nginx }: Props) {
                             </div>
                             <div className="flex flex-wrap items-center justify-between gap-2 py-2">
                                 <dt className="text-base-content/70">
-                                    Configuration
+                                    {t('Configuration')}
                                 </dt>
                                 <dd>
                                     <StateMark
                                         tone={nginx.config_ok ? 'good' : 'bad'}
                                         label={
                                             nginx.config_ok
-                                                ? 'Valid'
-                                                : 'Invalid'
+                                                ? t('Valid')
+                                                : t('Invalid')
                                         }
                                     />
                                 </dd>
@@ -143,24 +148,27 @@ export default function Nginx({ error, nginx }: Props) {
                     </Card>
 
                     <Card
-                        title="Sites managed by CommyPanel"
-                        description="One per app with a live release, plus the panel's own domain. Written by the agent and checked with nginx -t before every change."
+                        title={t('Sites managed by CommyPanel')}
+                        description={t(
+                            "One per app with a live release, plus the panel's own domain. Written by the agent and checked with nginx -t before every change.",
+                        )}
                         flush
                     >
                         {nginx.sites.length === 0 ? (
                             <p className="p-5 text-sm text-base-content/70 sm:p-6">
-                                No sites yet. An app gets one when it has a
-                                domain and a live release.
+                                {t(
+                                    'No sites yet. An app gets one when it has a domain and a live release.',
+                                )}
                             </p>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="table">
                                     <thead>
                                         <tr>
-                                            <th>Site</th>
-                                            <th>Domains</th>
+                                            <th>{t('Site')}</th>
+                                            <th>{t('Domains')}</th>
                                             <th>HTTPS</th>
-                                            <th>Updated</th>
+                                            <th>{t('Updated')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -182,7 +190,7 @@ export default function Nginx({ error, nginx }: Props) {
                                                         label={
                                                             site.https
                                                                 ? 'HTTPS'
-                                                                : 'HTTP only'
+                                                                : t('HTTP only')
                                                         }
                                                     />
                                                 </td>

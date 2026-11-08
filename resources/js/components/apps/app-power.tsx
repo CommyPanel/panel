@@ -5,26 +5,17 @@ import AppStateController from '@/actions/App/Http/Controllers/AppStateControlle
 import { Button } from '@/components/ui/button';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
+import { useT } from '@/hooks/use-t';
 import type { AppSettings } from '@/types';
 
 type Action = 'stop' | 'restart';
-
-const CONFIRM: Record<Action, { label: string; text: string }> = {
-    restart: {
-        label: 'Restart',
-        text: 'The container stops and starts again. Visitors get an error for a few seconds while it restarts.',
-    },
-    stop: {
-        label: 'Stop',
-        text: 'The container stops. Its domains stay set up but show an error until you start it again. Nothing is deleted.',
-    },
-};
 
 /**
  * Start, stop and restart for the live release. Only shown while the app has
  * a live release (running or stopped).
  */
 export function AppPower({ app }: { app: AppSettings }) {
+    const { t } = useT();
     const [confirm, setConfirm] = useState<Action | null>(null);
     const [busy, setBusy] = useState(false);
 
@@ -42,11 +33,31 @@ export function AppPower({ app }: { app: AppSettings }) {
             },
         );
 
+    const confirmTexts: Record<
+        Action,
+        { title: string; label: string; text: string }
+    > = {
+        restart: {
+            title: t('Restart :name?', { name: app.name }),
+            label: t('Restart'),
+            text: t(
+                'The container stops and starts again. Visitors get an error for a few seconds while it restarts.',
+            ),
+        },
+        stop: {
+            title: t('Stop :name?', { name: app.name }),
+            label: t('Stop'),
+            text: t(
+                'The container stops. Its domains stay set up but show an error until you start it again. Nothing is deleted.',
+            ),
+        },
+    };
+
     if (app.status === 'stopped') {
         return (
             <Button variant="soft" onClick={() => post('start')} loading={busy}>
                 <Play className="size-4" aria-hidden />
-                Start
+                {t('Start')}
             </Button>
         );
     }
@@ -56,12 +67,12 @@ export function AppPower({ app }: { app: AppSettings }) {
     return (
         <>
             <Dropdown
-                label="Container actions"
+                label={t('Container actions')}
                 triggerClassName="btn-soft"
                 trigger={
                     <>
                         <RotateCw className="size-4" aria-hidden />
-                        Container
+                        {t('Container')}
                         <ChevronDown className="size-4" aria-hidden />
                     </>
                 }
@@ -75,7 +86,7 @@ export function AppPower({ app }: { app: AppSettings }) {
                             }}
                         >
                             <RotateCw className="size-4" aria-hidden />
-                            Restart
+                            {t('Restart')}
                         </DropdownItem>
                         <DropdownItem
                             tone="danger"
@@ -85,20 +96,20 @@ export function AppPower({ app }: { app: AppSettings }) {
                             }}
                         >
                             <Square className="size-4" aria-hidden />
-                            Stop
+                            {t('Stop')}
                         </DropdownItem>
                     </>
                 )}
             </Dropdown>
             <ConfirmModal
                 open={confirm !== null}
-                title={confirm ? `${CONFIRM[confirm].label} ${app.name}?` : ''}
-                confirmLabel={confirm ? CONFIRM[confirm].label : ''}
+                title={confirm ? confirmTexts[confirm].title : ''}
+                confirmLabel={confirm ? confirmTexts[confirm].label : ''}
                 loading={busy}
                 onConfirm={() => confirm && post(confirm)}
                 onClose={() => setConfirm(null)}
             >
-                {confirm && CONFIRM[confirm].text}
+                {confirm && confirmTexts[confirm].text}
             </ConfirmModal>
         </>
     );

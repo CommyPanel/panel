@@ -1,6 +1,7 @@
 import { Link } from '@inertiajs/react';
 import AppController from '@/actions/App/Http/Controllers/AppController';
 import { Alert } from '@/components/ui/alert';
+import { useT } from '@/hooks/use-t';
 import type { DockerNetwork } from '@/types';
 import { appsOn } from './container-facts';
 
@@ -9,6 +10,8 @@ import { appsOn } from './container-facts';
  * reach each other on any port, so a network shared by several apps is called out.
  */
 export function NetworkList({ networks }: { networks: DockerNetwork[] }) {
+    const { t } = useT();
+
     return (
         <div className="space-y-4">
             {networks.map((network) => (
@@ -21,22 +24,22 @@ export function NetworkList({ networks }: { networks: DockerNetwork[] }) {
                             {network.driver}
                             {network.subnet ? ` · ${network.subnet}` : ''}
                             {network.gateway
-                                ? ` · gateway ${network.gateway}`
+                                ? ` · ${t('gateway :address', { address: network.gateway })}`
                                 : ''}
-                            {network.internal ? ' · internal' : ''}
+                            {network.internal ? ` · ${t('internal')}` : ''}
                         </p>
                     </div>
                     {appsOn(network) > 1 && (
                         <Alert variant="info">
-                            {appsOn(network)} apps share this network, so their
-                            containers can reach each other directly. This is
-                            the old shared network: deploy each app again to
-                            give it a network of its own.
+                            {t(
+                                ':count apps share this network, so their containers can reach each other directly. This is the old shared network: deploy each app again to give it a network of its own.',
+                                { count: appsOn(network) },
+                            )}
                         </Alert>
                     )}
                     {network.containers.length === 0 ? (
                         <p className="text-sm text-base-content/70">
-                            Nothing is attached.
+                            {t('Nothing is attached.')}
                         </p>
                     ) : (
                         <ul className="divide-y divide-base-300 rounded-field border border-base-300 text-sm">
@@ -59,7 +62,7 @@ export function NetworkList({ networks }: { networks: DockerNetwork[] }) {
                                         )}
                                         {member.this_app && (
                                             <span className="badge-soft badge badge-sm badge-primary">
-                                                this app
+                                                {t('this app')}
                                             </span>
                                         )}
                                     </span>

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import AppTrafficController from '@/actions/App/Http/Controllers/AppTrafficController';
 import { Card } from '@/components/ui/card';
 import { TimeSeriesChart } from '@/components/usage/time-series-chart';
+import { useT } from '@/hooks/use-t';
 
 type Release = {
     number: number;
@@ -25,6 +26,7 @@ const COLORS = ['var(--chart-1)', 'var(--chart-2)'];
  * rollout or a watch the two releases sit side by side. Only mounted while the tab is open.
  */
 export function AppTrafficCard({ slug }: { slug: string }) {
+    const { t } = useT();
     const [traffic, setTraffic] = useState<Traffic | null>(null);
 
     useEffect(() => {
@@ -64,21 +66,26 @@ export function AppTrafficCard({ slug }: { slug: string }) {
     const times = releases[0]?.series.map((p) => p.t * 1000) ?? [];
     const line = (pick: 'requests' | 'errors') =>
         releases.map((r, index) => ({
-            label: `Release #${r.number}${r.live ? ' (live)' : ''}`,
+            label: r.live
+                ? t('Release #:number (live)', { number: r.number })
+                : t('Release #:number', { number: r.number }),
             color: COLORS[index] ?? COLORS[1],
             values: r.series.map((p) => p[pick]),
         }));
 
     return (
         <Card
-            title="Traffic"
-            description="Requests per 30 seconds, as nginx saw them, for the last half hour. Releases are shown side by side while a release is being watched or rolled out."
+            title={t('Traffic')}
+            description={t(
+                'Requests per 30 seconds, as nginx saw them, for the last half hour. Releases are shown side by side while a release is being watched or rolled out.',
+            )}
         >
             {releases.length === 0 ? (
                 <p className="flex items-center gap-2 text-sm text-base-content/70">
                     <Activity className="size-4" aria-hidden />
-                    No requests yet. Traffic appears here once visitors reach
-                    the app through one of its domains.
+                    {t(
+                        'No requests yet. Traffic appears here once visitors reach the app through one of its domains.',
+                    )}
                 </p>
             ) : (
                 <div className="space-y-5">
@@ -89,19 +96,30 @@ export function AppTrafficCard({ slug }: { slug: string }) {
                                 className="rounded-box border border-base-300 bg-base-100 px-4 py-3"
                             >
                                 <dt className="text-xs text-base-content/70">
-                                    Release #{r.number}
-                                    {r.live ? ' (live)' : ''}
+                                    {r.live
+                                        ? t('Release #:number (live)', {
+                                              number: r.number,
+                                          })
+                                        : t('Release #:number', {
+                                              number: r.number,
+                                          })}
                                 </dt>
                                 <dd className="font-semibold">
-                                    {r.requests.toLocaleString()} requests,{' '}
-                                    {r.error_percent}% errors, slowest 5% under{' '}
-                                    {r.p95_ms.toLocaleString()} ms
+                                    {t(
+                                        ':requests requests, :percent% errors, slowest 5% under :ms ms',
+                                        {
+                                            requests:
+                                                r.requests.toLocaleString(),
+                                            percent: r.error_percent,
+                                            ms: r.p95_ms.toLocaleString(),
+                                        },
+                                    )}
                                 </dd>
                             </div>
                         ))}
                     </dl>
                     <TimeSeriesChart
-                        title="Requests"
+                        title={t('Requests')}
                         times={times}
                         series={line('requests')}
                         format={(v) => `${Math.round(v)}`}
@@ -109,7 +127,7 @@ export function AppTrafficCard({ slug }: { slug: string }) {
                         windowMs={30 * 60 * 1000}
                     />
                     <TimeSeriesChart
-                        title="Errors (5xx)"
+                        title={t('Errors (5xx)')}
                         times={times}
                         series={line('errors')}
                         format={(v) => `${Math.round(v)}`}

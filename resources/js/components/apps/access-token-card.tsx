@@ -6,6 +6,8 @@ import GitTokenController from '@/actions/App/Http/Controllers/GitTokenControlle
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useT } from '@/hooks/use-t';
+import { Trans } from '@/lib/trans';
 import type { AppSettings } from '@/types';
 
 type Props = {
@@ -17,6 +19,7 @@ type Props = {
  * deploy key. It is tested before it is saved and never shown again.
  */
 export function AccessTokenCard({ app }: Props) {
+    const { t } = useT();
     const help = app.token_help;
     const [replacing, setReplacing] = useState(false);
     const [removing, setRemoving] = useState(false);
@@ -44,23 +47,27 @@ export function AccessTokenCard({ app }: Props) {
 
     return (
         <Card
-            title="Access token"
-            description="Instead of a deploy key, give a read-only token. It is tested before it is saved, stored encrypted and never shown again."
+            title={t('Access token')}
+            description={t(
+                'Instead of a deploy key, give a read-only token. It is tested before it is saved, stored encrypted and never shown again.',
+            )}
         >
             {saved ? (
                 <div className="space-y-3">
                     <p className="text-sm">
-                        A token is saved
-                        {app.git_token?.username && (
-                            <>
-                                {' '}
-                                for{' '}
-                                <span className="font-mono">
-                                    {app.git_token.username}
-                                </span>
-                            </>
+                        {app.git_token?.username ? (
+                            <Trans
+                                text="A token is saved for <name>:username</name>. Deployments use it instead of the deploy key."
+                                components={{
+                                    name: <span className="font-mono" />,
+                                }}
+                                values={{ username: app.git_token.username }}
+                            />
+                        ) : (
+                            t(
+                                'A token is saved. Deployments use it instead of the deploy key.',
+                            )
                         )}
-                        . Deployments use it instead of the deploy key.
                     </p>
                     <div className="flex flex-wrap gap-2">
                         <Button
@@ -68,7 +75,7 @@ export function AccessTokenCard({ app }: Props) {
                             size="sm"
                             onClick={() => setReplacing(true)}
                         >
-                            Replace token
+                            {t('Replace token')}
                         </Button>
                         <Button
                             variant="ghost"
@@ -76,7 +83,7 @@ export function AccessTokenCard({ app }: Props) {
                             onClick={remove}
                             loading={removing}
                         >
-                            Remove token
+                            {t('Remove token')}
                         </Button>
                     </div>
                 </div>
@@ -96,14 +103,16 @@ export function AccessTokenCard({ app }: Props) {
                                     target="_blank"
                                     rel="noreferrer noopener"
                                 >
-                                    Create a token on {help.provider}
+                                    {t('Create a token on :provider', {
+                                        provider: help.provider,
+                                    })}
                                 </a>
                             )}
                         </div>
                     )}
                     {help?.username === null && (
                         <Input
-                            label="Username"
+                            label={t('Username')}
                             required
                             autoComplete="off"
                             value={form.data.git_token_username}
@@ -114,11 +123,11 @@ export function AccessTokenCard({ app }: Props) {
                                 )
                             }
                             error={form.errors.git_token_username}
-                            hint="The account the token belongs to."
+                            hint={t('The account the token belongs to.')}
                         />
                     )}
                     <Input
-                        label="Token"
+                        label={t('Token')}
                         type="password"
                         required
                         autoComplete="new-password"
@@ -138,7 +147,7 @@ export function AccessTokenCard({ app }: Props) {
                             disabled={form.data.git_token === ''}
                         >
                             <KeyRound className="size-4" aria-hidden />
-                            Test and save token
+                            {t('Test and save token')}
                         </Button>
                         {replacing && (
                             <Button
@@ -149,7 +158,7 @@ export function AccessTokenCard({ app }: Props) {
                                     setReplacing(false);
                                 }}
                             >
-                                Cancel
+                                {t('Cancel')}
                             </Button>
                         )}
                     </div>

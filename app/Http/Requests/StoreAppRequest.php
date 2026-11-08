@@ -41,18 +41,18 @@ class StoreAppRequest extends FormRequest
                 }
 
                 if (! in_array($value, $known, true)) {
-                    $fail('That repository is not one the GitHub app may read. Give it access on GitHub first.');
+                    $fail(__('That repository is not one the GitHub app may read. Give it access on GitHub first.'));
                 }
             }],
             'git_url' => ['exclude_unless:source,git', 'required', 'string', 'max:500', function (string $attribute, mixed $value, Closure $fail) {
                 if (! GitUrl::isValid((string) $value, (bool) config('commypanel.deploy.git_allow_local'))) {
-                    $fail('Use an https:// or ssh Git URL, for example https://github.com/acme/shop.git or git@github.com:acme/shop.git.');
+                    $fail(__('Use an https:// or ssh Git URL, for example https://github.com/acme/shop.git or git@github.com:acme/shop.git.'));
                 }
             }],
             'github_auto_deploy' => ['exclude_unless:source,github', 'nullable', 'boolean'],
             'git_branch' => ['exclude_unless:source,git,github', 'required', 'string', function (string $attribute, mixed $value, Closure $fail) {
                 if (! GitUrl::isValidBranch((string) $value)) {
-                    $fail('That is not a valid branch name.');
+                    $fail(__('That is not a valid branch name.'));
                 }
             }],
         ];

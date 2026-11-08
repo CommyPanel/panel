@@ -1,5 +1,6 @@
+import { useT } from '@/hooks/use-t';
 import { useTheme } from '@/hooks/use-theme';
-import { THEME_OPTIONS } from '@/lib/theme';
+import { themeOptions } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import { THEME_ICONS } from '@/components/theme-menu';
 
@@ -12,15 +13,16 @@ const SWATCHES = {
 } as const;
 
 export function ThemePicker() {
+    const { t } = useT();
     const [preference, setPreference] = useTheme();
 
     return (
         <div
             role="radiogroup"
-            aria-label="Theme"
+            aria-label={t('Theme')}
             className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
         >
-            {THEME_OPTIONS.map((option) => {
+            {themeOptions(t).map((option) => {
                 const Icon = THEME_ICONS[option.value];
                 const swatches = SWATCHES[option.value];
                 const selected = preference === option.value;

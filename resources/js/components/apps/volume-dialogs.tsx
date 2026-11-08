@@ -4,6 +4,8 @@ import AppVolumeController from '@/actions/App/Http/Controllers/AppVolumeControl
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
+import { useT } from '@/hooks/use-t';
+import { Trans } from '@/lib/trans';
 import type { AppVolume } from '@/types';
 
 /** Where the path is explained for people who do not work with Docker every day. */
@@ -11,34 +13,35 @@ function PathHelp() {
     return (
         <div className="space-y-3 text-sm text-base-content/80">
             <p>
-                Type the folder <strong>inside the app</strong> whose files must
-                survive a new deployment. It has to be the same path your app
-                writes to, for example <code>/app/uploads</code>.
+                <Trans
+                    text="Type the folder <b>inside the app</b> whose files must survive a new deployment. It has to be the same path your app writes to, for example <code>/app/uploads</code>."
+                    components={{ b: <strong />, code: <code /> }}
+                />
             </p>
             <ul className="list-disc space-y-1.5 pl-5">
                 <li>
-                    <strong>Where is &ldquo;/app&rdquo;?</strong> In the images
-                    CommyPanel builds for .NET and Node apps, the app lives in{' '}
-                    <code>/app</code>, so that is its root folder:{' '}
-                    <code>/app/uploads</code> is an <code>uploads</code> folder
-                    next to your app&apos;s own files. If you bring your own
-                    Dockerfile, use the folder its <code>WORKDIR</code> names.
+                    <Trans
+                        text="<b>Where is “/app”?</b> In the images CommyPanel builds for .NET and Node apps, the app lives in <code>/app</code>, so that is its root folder: <code>/app/uploads</code> is an <code>uploads</code> folder next to your app's own files. If you bring your own Dockerfile, use the folder its <code>WORKDIR</code> names."
+                        components={{ b: <strong />, code: <code /> }}
+                    />
                 </li>
                 <li>
-                    <strong>Go apps</strong> are built into a single file called{' '}
-                    <code>/app</code>, so use another folder, such as{' '}
-                    <code>/data</code>.
+                    <Trans
+                        text="<b>Go apps</b> are built into a single file called <code>/app</code>, so use another folder, such as <code>/data</code>."
+                        components={{ b: <strong />, code: <code /> }}
+                    />
                 </li>
                 <li>
-                    <strong>Relative paths</strong> in your code (such as{' '}
-                    <code>uploads/</code>) start from that same root folder. An
-                    absolute path in your code is the safest match.
+                    <Trans
+                        text="<b>Relative paths</b> in your code (such as <code>uploads/</code>) start from that same root folder. An absolute path in your code is the safest match."
+                        components={{ b: <strong />, code: <code /> }}
+                    />
                 </li>
                 <li>
-                    Paths are <strong>case-sensitive</strong>:{' '}
-                    <code>/Uploads/Test</code> and <code>/uploads/test</code>{' '}
-                    are different folders. Use letters, digits, dots, dashes and
-                    slashes.
+                    <Trans
+                        text="Paths are <b>case-sensitive</b>: <code>/Uploads/Test</code> and <code>/uploads/test</code> are different folders. Use letters, digits, dots, dashes and slashes."
+                        components={{ b: <strong />, code: <code /> }}
+                    />
                 </li>
             </ul>
         </div>
@@ -54,6 +57,7 @@ export function AddVolumeModal({
     open: boolean;
     onClose: () => void;
 }) {
+    const { t } = useT();
     const form = useForm({ path: '' });
 
     const close = () => {
@@ -71,10 +75,10 @@ export function AddVolumeModal({
     };
 
     return (
-        <Modal open={open} onClose={close} title="Add a volume" size="md">
+        <Modal open={open} onClose={close} title={t('Add a volume')} size="md">
             <form onSubmit={submit} className="space-y-4">
                 <Input
-                    label="Path in the container"
+                    label={t('Path in the container')}
                     placeholder="/app/uploads"
                     required
                     autoFocus
@@ -87,26 +91,24 @@ export function AddVolumeModal({
                 <PathHelp />
                 <div className="space-y-2 rounded-field border border-base-300 p-3 text-sm text-base-content/80">
                     <p>
-                        <strong>Where the files are kept.</strong> On the
-                        server, in a folder CommyPanel names for you from this
-                        path (<code>/app/uploads</code> becomes{' '}
-                        <code>app-uploads</code>). That name is only a label: it
-                        does not have to match anything in your app.
+                        <Trans
+                            text="<b>Where the files are kept.</b> On the server, in a folder CommyPanel names for you from this path (<code>/app/uploads</code> becomes <code>app-uploads</code>). That name is only a label: it does not have to match anything in your app."
+                            components={{ b: <strong />, code: <code /> }}
+                        />
                     </p>
                     <p>
-                        <strong>When it starts.</strong> The volume is mounted
-                        once you <em>apply the changes</em> (a button appears on
-                        the app). It starts empty, and it hides whatever the
-                        image has at that path, so do not mount over folders
-                        your app ships files in.
+                        <Trans
+                            text="<b>When it starts.</b> The volume is mounted once you <em>apply the changes</em> (a button appears on the app). It starts empty, and it hides whatever the image has at that path, so do not mount over folders your app ships files in."
+                            components={{ b: <strong />, em: <em /> }}
+                        />
                     </p>
                 </div>
                 <div className="flex flex-wrap justify-end gap-2">
                     <Button variant="ghost" onClick={close}>
-                        Cancel
+                        {t('Cancel')}
                     </Button>
                     <Button type="submit" loading={form.processing}>
-                        Add volume
+                        {t('Add volume')}
                     </Button>
                 </div>
             </form>
@@ -123,6 +125,7 @@ export function RemoveVolumeModal({
     volume: AppVolume | null;
     onClose: () => void;
 }) {
+    const { t } = useT();
     const form = useForm({ confirm: '' });
 
     const close = () => {
@@ -148,33 +151,36 @@ export function RemoveVolumeModal({
         <Modal
             open={volume !== null}
             onClose={close}
-            title="Remove this volume?"
+            title={t('Remove this volume?')}
             size="md"
         >
             {volume && (
                 <form onSubmit={submit} className="space-y-4">
                     <p className="text-sm">
-                        <code>{volume.path}</code> will stop being a persistent
-                        volume.
+                        <Trans
+                            text="<code>:path</code> will stop being a persistent volume."
+                            components={{ code: <code /> }}
+                            values={{ path: volume.path }}
+                        />
                     </p>
                     <ul className="list-disc space-y-1.5 pl-5 text-sm">
                         <li>
-                            The running version keeps using it until you{' '}
-                            <strong>apply the changes</strong>. From then on the
-                            path is just an ordinary folder inside the
-                            container, and anything the app writes there is{' '}
-                            <strong>lost at every deployment</strong>.
+                            <Trans
+                                text="The running version keeps using it until you <b>apply the changes</b>. From then on the path is just an ordinary folder inside the container, and anything the app writes there is <b2>lost at every deployment</b2>."
+                                components={{ b: <strong />, b2: <strong /> }}
+                            />
                         </li>
                         <li>
-                            The files are <strong>not deleted</strong>. They
-                            stay on the server, and the volume stays in the list
-                            as &ldquo;not attached&rdquo;. Once a deployment
-                            without it is running you can delete the files with
-                            &ldquo;Delete data&rdquo;.
+                            <Trans
+                                text="The files are <b>not deleted</b>. They stay on the server, and the volume stays in the list as “not attached”. Once a deployment without it is running you can delete the files with “Delete data”."
+                                components={{ b: <strong /> }}
+                            />
                         </li>
                     </ul>
                     <Input
-                        label={`Type ${volume.path} to confirm`}
+                        label={t('Type :path to confirm', {
+                            path: volume.path,
+                        })}
                         autoComplete="off"
                         autoFocus
                         spellCheck={false}
@@ -185,14 +191,14 @@ export function RemoveVolumeModal({
                     />
                     <div className="flex flex-wrap justify-end gap-2">
                         <Button variant="ghost" onClick={close}>
-                            Cancel
+                            {t('Cancel')}
                         </Button>
                         <Button
                             type="submit"
                             variant="error"
                             disabled={form.data.confirm !== volume.path}
                         >
-                            Remove volume
+                            {t('Remove volume')}
                         </Button>
                     </div>
                 </form>
@@ -208,66 +214,116 @@ export function AboutVolumesModal({
     open: boolean;
     onClose: () => void;
 }) {
+    const { t } = useT();
+
     return (
-        <Modal open={open} onClose={onClose} title="How volumes work" size="lg">
+        <Modal
+            open={open}
+            onClose={onClose}
+            title={t('How volumes work')}
+            size="lg"
+        >
             <div className="space-y-4 text-sm text-base-content/80">
                 <p>
-                    Everything an app writes inside its container is thrown away
-                    when the next deployment replaces the container. A{' '}
-                    <strong>persistent volume</strong> is a folder that is kept
-                    on the server and handed to every container of the app, so
-                    its files (uploads, a SQLite database) survive.
+                    <Trans
+                        text="Everything an app writes inside its container is thrown away when the next deployment replaces the container. A <b>persistent volume</b> is a folder that is kept on the server and handed to every container of the app, so its files (uploads, a SQLite database) survive."
+                        components={{ b: <strong /> }}
+                    />
                 </p>
                 <ul className="list-disc space-y-2 pl-5">
                     <li>
-                        <strong>Two names.</strong> The <em>path</em> is where
-                        the app sees the folder and is the one that must match
-                        your app. The <em>folder</em> is where the files live on
-                        the server, made up by CommyPanel, and does not have to
-                        match anything.
+                        <Trans
+                            text="<b>Two names.</b> The <em>path</em> is where the app sees the folder and is the one that must match your app. The <em>folder</em> is where the files live on the server, made up by CommyPanel, and does not have to match anything."
+                            components={{
+                                b: <strong />,
+                                em: <em />,
+                                code: <code />,
+                            }}
+                        />
                     </li>
                     <li>
-                        <strong>New deployments.</strong> Adding or removing a
-                        volume takes effect when you apply the changes or
-                        deploy, for the app and for its release command.
+                        <Trans
+                            text="<b>New deployments.</b> Adding or removing a volume takes effect when you apply the changes or deploy, for the app and for its release command."
+                            components={{
+                                b: <strong />,
+                                em: <em />,
+                                code: <code />,
+                            }}
+                        />
                     </li>
                     <li>
-                        <strong>While switching.</strong> The old and the new
-                        container share a volume during a deployment, so make
-                        sure two versions can use the same files for a moment.
+                        <Trans
+                            text="<b>While switching.</b> The old and the new container share a volume during a deployment, so make sure two versions can use the same files for a moment."
+                            components={{
+                                b: <strong />,
+                                em: <em />,
+                                code: <code />,
+                            }}
+                        />
                     </li>
                     <li>
-                        <strong>Rollbacks.</strong> A rollback does not roll
-                        back volume data: the files stay as the running version
-                        left them.
+                        <Trans
+                            text="<b>Rollbacks.</b> A rollback does not roll back volume data: the files stay as the running version left them."
+                            components={{
+                                b: <strong />,
+                                em: <em />,
+                                code: <code />,
+                            }}
+                        />
                     </li>
                     <li>
-                        <strong>Hidden files.</strong> Whatever the image has at
-                        that path is hidden by the volume, which starts empty.
+                        <Trans
+                            text="<b>Hidden files.</b> Whatever the image has at that path is hidden by the volume, which starts empty."
+                            components={{
+                                b: <strong />,
+                                em: <em />,
+                                code: <code />,
+                            }}
+                        />
                     </li>
                     <li>
-                        <strong>Removing.</strong> Removing a volume stops
-                        mounting it but keeps its files on the server. Deleting
-                        the app deletes them.
+                        <Trans
+                            text="<b>Removing.</b> Removing a volume stops mounting it but keeps its files on the server. Deleting the app deletes them."
+                            components={{
+                                b: <strong />,
+                                em: <em />,
+                                code: <code />,
+                            }}
+                        />
                     </li>
                     <li>
-                        <strong>Locking.</strong> A locked volume cannot be
-                        removed, and the app cannot be deleted while it is
-                        locked.
+                        <Trans
+                            text="<b>Locking.</b> A locked volume cannot be removed, and the app cannot be deleted while it is locked."
+                            components={{
+                                b: <strong />,
+                                em: <em />,
+                                code: <code />,
+                            }}
+                        />
                     </li>
                     <li>
-                        <strong>Limits.</strong> Up to 8 volumes per app.{' '}
-                        <code>/proc</code>, <code>/sys</code> and{' '}
-                        <code>/dev</code> cannot be used.
+                        <Trans
+                            text="<b>Limits.</b> Up to 8 volumes per app. <code>/proc</code>, <code>/sys</code> and <code>/dev</code> cannot be used."
+                            components={{
+                                b: <strong />,
+                                em: <em />,
+                                code: <code />,
+                            }}
+                        />
                     </li>
                     <li>
-                        <strong>Who can write.</strong> The folder is writable
-                        for whichever user the app runs as, and cannot be
-                        reached from anywhere else on the server.
+                        <Trans
+                            text="<b>Who can write.</b> The folder is writable for whichever user the app runs as, and cannot be reached from anywhere else on the server."
+                            components={{
+                                b: <strong />,
+                                em: <em />,
+                                code: <code />,
+                            }}
+                        />
                     </li>
                 </ul>
                 <div className="flex justify-end">
-                    <Button onClick={onClose}>Got it</Button>
+                    <Button onClick={onClose}>{t('Got it')}</Button>
                 </div>
             </div>
         </Modal>

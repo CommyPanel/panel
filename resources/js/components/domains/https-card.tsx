@@ -7,11 +7,14 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useT } from '@/hooks/use-t';
+import { Trans } from '@/lib/trans';
 import type { HttpsSettings } from '@/types';
 
 type Props = { https: HttpsSettings };
 
 export function HttpsCard({ https }: Props) {
+    const { t } = useT();
     const form = useForm({ agree: false, email: https.email ?? '' });
 
     const submit = (event: FormEvent) => {
@@ -34,14 +37,16 @@ export function HttpsCard({ https }: Props) {
 
     return (
         <Card
-            title="Automatic HTTPS"
-            description="CommyPanel gets free certificates from Let's Encrypt for your connected domains and renews them before they expire."
+            title={t('Automatic HTTPS')}
+            description={t(
+                "CommyPanel gets free certificates from Let's Encrypt for your connected domains and renews them before they expire.",
+            )}
         >
             {https.staging && (
                 <Alert variant="warning">
-                    Test mode: certificates come from Let's Encrypt's staging
-                    service, so browsers will warn about them. Set
-                    ACME_STAGING=false on your production server.
+                    {t(
+                        "Test mode: certificates come from Let's Encrypt's staging service, so browsers will warn about them. Set ACME_STAGING=false on your production server.",
+                    )}
                 </Alert>
             )}
 
@@ -50,8 +55,14 @@ export function HttpsCard({ https }: Props) {
                     <Alert variant="success">
                         <span className="flex items-center gap-2">
                             <Lock className="size-4 shrink-0" aria-hidden />
-                            Automatic HTTPS is on
-                            {https.email ? ` (contact: ${https.email})` : ''}.
+                            {https.email
+                                ? t(
+                                      'Automatic HTTPS is on (contact: :email).',
+                                      {
+                                          email: https.email,
+                                      },
+                                  )
+                                : t('Automatic HTTPS is on.')}
                         </span>
                     </Alert>
                     <Button
@@ -59,19 +70,21 @@ export function HttpsCard({ https }: Props) {
                         onClick={turnOff}
                         loading={turningOff}
                     >
-                        Turn off
+                        {t('Turn off')}
                     </Button>
                 </div>
             ) : (
                 <form onSubmit={submit} className="space-y-4">
                     <Input
-                        label="Contact email (optional)"
+                        label={t('Contact email (optional)')}
                         type="email"
                         placeholder="you@example.com"
                         value={form.data.email}
                         onChange={(e) => form.setData('email', e.target.value)}
                         error={form.errors.email}
-                        hint="Sent to Let's Encrypt so they can reach you about your account."
+                        hint={t(
+                            "Sent to Let's Encrypt so they can reach you about your account.",
+                        )}
                     />
                     <label className="flex items-start gap-3 text-sm">
                         <input
@@ -83,16 +96,19 @@ export function HttpsCard({ https }: Props) {
                             }
                         />
                         <span>
-                            I agree to the{' '}
-                            <a
-                                href="https://letsencrypt.org/repository/"
-                                target="_blank"
-                                rel="noreferrer"
-                                className="link link-primary"
-                            >
-                                Let's Encrypt Subscriber Agreement
-                            </a>
-                            .
+                            <Trans
+                                text="I agree to the <link>Let's Encrypt Subscriber Agreement</link>."
+                                components={{
+                                    link: (
+                                        <a
+                                            href="https://letsencrypt.org/repository/"
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="link link-primary"
+                                        />
+                                    ),
+                                }}
+                            />
                         </span>
                     </label>
                     <Button
@@ -100,7 +116,7 @@ export function HttpsCard({ https }: Props) {
                         loading={form.processing}
                         disabled={!form.data.agree}
                     >
-                        Turn on automatic HTTPS
+                        {t('Turn on automatic HTTPS')}
                     </Button>
                 </form>
             )}

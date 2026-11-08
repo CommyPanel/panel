@@ -43,8 +43,8 @@ class ServerNginxController extends Controller
         }
 
         return $result->ok
-            ? back()->with('status', 'The nginx configuration is valid.')
-            : back()->withErrors(['nginx' => 'The nginx configuration has a problem: '.$result->output]);
+            ? back()->with('status', __('The nginx configuration is valid.'))
+            : back()->withErrors(['nginx' => __('The nginx configuration has a problem: :output', ['output' => $result->output])]);
     }
 
     public function reload(HostDriver $host, AuditLogger $audit): RedirectResponse
@@ -57,6 +57,6 @@ class ServerNginxController extends Controller
 
         $audit->record('nginx.reloaded');
 
-        return back()->with('status', 'nginx was reloaded. Connections in progress were not dropped.');
+        return back()->with('status', __('nginx was reloaded. Connections in progress were not dropped.'));
     }
 }

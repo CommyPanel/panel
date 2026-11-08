@@ -39,7 +39,7 @@ class PanelBackups
         $dir = $this->directory();
 
         if (! is_dir($dir) && ! @mkdir($dir, 0700, true) && ! is_dir($dir)) {
-            throw new BackupFailed("The backup folder {$dir} could not be created.");
+            throw new BackupFailed(__('The backup folder :dir could not be created.', ['dir' => $dir]));
         }
 
         $suffix = $label === '' ? '' : '-'.preg_replace('/[^a-z]/', '', strtolower($label));
@@ -91,7 +91,7 @@ class PanelBackups
     public function path(string $name): string
     {
         if (preg_match(self::NAME, $name) !== 1 || ! is_file($this->directory().'/'.$name)) {
-            throw new BackupFailed('There is no such backup.');
+            throw new BackupFailed(__('There is no such backup.'));
         }
 
         return $this->directory().'/'.$name;
@@ -139,11 +139,11 @@ class PanelBackups
         $live = $this->snapshotter->livePath();
 
         if ($live === null) {
-            throw new BackupFailed('The panel database is not a file, so there is nothing to restore into.');
+            throw new BackupFailed(__('The panel database is not a file, so there is nothing to restore into.'));
         }
 
         if (! is_file($file) || ! is_readable($file)) {
-            throw new BackupFailed("The backup {$file} cannot be read.");
+            throw new BackupFailed(__('The backup :file cannot be read.', ['file' => $file]));
         }
 
         $incoming = dirname($live).'/.restore-'.bin2hex(random_bytes(4)).'.sqlite';

@@ -117,7 +117,7 @@ class AppSetupController extends Controller
         $app->forceFill(['source_verified_at' => now()])->save();
         $audit->record('app.source_uploaded', null, ['app' => $app->slug, 'files' => $count], $app);
 
-        return back()->with('status', "Project uploaded ({$count} files).");
+        return back()->with('status', __('Project uploaded (:count files).', ['count' => $count]));
     }
 
     public function continue(App $app): RedirectResponse
@@ -126,8 +126,8 @@ class AppSetupController extends Controller
 
         if ($app->source_verified_at === null) {
             return back()->withErrors(['source' => $app->source_type === SourceType::Git
-                ? 'Verify access to the repository first.'
-                : 'Upload your project first.']);
+                ? __('Verify access to the repository first.')
+                : __('Upload your project first.')]);
         }
 
         $app->forceFill(['setup_step' => SetupStep::Settings])->save();
@@ -177,7 +177,7 @@ class AppSetupController extends Controller
         $deployment = $deployer->deploy($app->refresh(), $request->user());
 
         return redirect()->route('apps.deployments.show', [$app, $deployment->number])
-            ->with('status', 'App created. The first deployment is starting.');
+            ->with('status', __('App created. The first deployment is starting.'));
     }
 
     public function cancel(App $app, DestroyApp $destroy, AuditLogger $audit): RedirectResponse
@@ -194,6 +194,6 @@ class AppSetupController extends Controller
 
         $audit->record('app.setup_cancelled', null, ['app' => $slug]);
 
-        return redirect()->route('apps.index')->with('status', 'Setup cancelled.');
+        return redirect()->route('apps.index')->with('status', __('Setup cancelled.'));
     }
 }

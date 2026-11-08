@@ -47,11 +47,11 @@ class DatabaseTools
         $server = $database->server;
 
         if (! $server->isRunning()) {
-            throw new DatabaseException('The database server is not running. Start it first.');
+            throw new DatabaseException(__('The database server is not running. Start it first.'));
         }
 
         if ($database->restore_status !== null) {
-            throw new DatabaseException('A backup is being loaded into this database, or loading it failed. Open it when that is settled.');
+            throw new DatabaseException(__('A backup is being loaded into this database, or loading it failed. Open it when that is settled.'));
         }
 
         try {
@@ -64,7 +64,7 @@ class DatabaseTools
                 $this->publicBase($request),
             );
         } catch (HostOperationFailed $e) {
-            throw new DatabaseException('Could not start '.self::toolName($database).': '.$e->getMessage(), 0, $e);
+            throw new DatabaseException(__('Could not start :tool: :error', ['tool' => self::toolName($database), 'error' => $e->getMessage()]), 0, $e);
         }
     }
 
@@ -98,13 +98,13 @@ class DatabaseTools
     public function openUrl(ManagedDatabase $database, string $session, Request $request): string
     {
         if ($this->status($database, $session)?->isReady() !== true) {
-            throw new DatabaseException('The tool is not ready, or has closed. Open the database again.');
+            throw new DatabaseException(__('The tool is not ready, or has closed. Open the database again.'));
         }
 
         try {
             $ticket = $this->host->databaseToolTicket($session);
         } catch (HostOperationFailed $e) {
-            throw new DatabaseException('The tool could not be opened: '.$e->getMessage(), 0, $e);
+            throw new DatabaseException(__('The tool could not be opened: :error', ['error' => $e->getMessage()]), 0, $e);
         }
 
         return $this->publicBase($request).'/open?t='.rawurlencode($ticket);

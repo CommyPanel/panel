@@ -7,6 +7,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { useT } from '@/hooks/use-t';
 import AppLayout from '@/layouts/app-layout';
 import { useCan } from '@/lib/permissions';
 
@@ -22,6 +23,7 @@ type Row = {
 type Props = { roles: Row[]; total_permissions: number };
 
 export default function Index({ roles, total_permissions }: Props) {
+    const { t } = useT();
     const can = useCan();
     const { errors } = usePage().props;
     const [deleting, setDeleting] = useState<Row | null>(null);
@@ -40,10 +42,12 @@ export default function Index({ roles, total_permissions }: Props) {
     };
 
     return (
-        <AppLayout title="Roles">
+        <AppLayout title={t('Roles')}>
             <PageHeader
-                title="Roles"
-                description="A role is a set of permissions. Give a role to a user to decide what they may do."
+                title={t('Roles')}
+                description={t(
+                    'A role is a set of permissions. Give a role to a user to decide what they may do.',
+                )}
                 actions={
                     can('roles.manage') && (
                         <Link
@@ -51,7 +55,7 @@ export default function Index({ roles, total_permissions }: Props) {
                             className="btn btn-primary"
                         >
                             <Plus className="size-4" aria-hidden />
-                            New role
+                            {t('New role')}
                         </Link>
                     )
                 }
@@ -64,9 +68,9 @@ export default function Index({ roles, total_permissions }: Props) {
                     <table className="table">
                         <thead>
                             <tr>
-                                <th>Role</th>
-                                <th>Permissions</th>
-                                <th>Users</th>
+                                <th>{t('Role')}</th>
+                                <th>{t('Permissions')}</th>
+                                <th>{t('Users')}</th>
                                 <th />
                             </tr>
                         </thead>
@@ -78,19 +82,23 @@ export default function Index({ roles, total_permissions }: Props) {
                                         {role.locked && (
                                             <span
                                                 className="ml-2 inline-flex items-center gap-1 text-xs font-normal text-base-content/60"
-                                                title="Always has every permission, so it cannot be edited or deleted."
+                                                title={t(
+                                                    'Always has every permission, so it cannot be edited or deleted.',
+                                                )}
                                             >
                                                 <Lock
                                                     className="size-3.5"
                                                     aria-hidden
                                                 />
-                                                built in
+                                                {t('built in')}
                                             </span>
                                         )}
                                     </td>
                                     <td>
-                                        {role.permissions} of{' '}
-                                        {total_permissions}
+                                        {t(':count of :total', {
+                                            count: role.permissions,
+                                            total: total_permissions,
+                                        })}
                                     </td>
                                     <td>{role.users}</td>
                                     <td className="text-right whitespace-nowrap">
@@ -107,18 +115,25 @@ export default function Index({ roles, total_permissions }: Props) {
                                                             className="size-4"
                                                             aria-hidden
                                                         />
-                                                        Edit
+                                                        {t('Edit')}
                                                     </Link>
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        aria-label={`Delete ${role.name}`}
+                                                        aria-label={t(
+                                                            'Delete :name',
+                                                            {
+                                                                name: role.name,
+                                                            },
+                                                        )}
                                                         disabled={
                                                             role.users > 0
                                                         }
                                                         title={
                                                             role.users > 0
-                                                                ? 'Give its users another role first'
+                                                                ? t(
+                                                                      'Give its users another role first',
+                                                                  )
                                                                 : undefined
                                                         }
                                                         onClick={() =>
@@ -142,14 +157,17 @@ export default function Index({ roles, total_permissions }: Props) {
 
             <ConfirmModal
                 open={deleting !== null}
-                title={`Delete the role ${deleting?.name ?? ''}?`}
-                confirmLabel="Delete role"
+                title={t('Delete the role :name?', {
+                    name: deleting?.name ?? '',
+                })}
+                confirmLabel={t('Delete role')}
                 loading={busy}
                 onConfirm={remove}
                 onClose={() => setDeleting(null)}
             >
-                No one has this role, so nobody loses access. This cannot be
-                undone.
+                {t(
+                    'No one has this role, so nobody loses access. This cannot be undone.',
+                )}
             </ConfirmModal>
         </AppLayout>
     );

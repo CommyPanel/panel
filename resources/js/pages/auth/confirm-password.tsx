@@ -2,10 +2,12 @@ import { useForm } from '@inertiajs/react';
 import type { FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useT } from '@/hooks/use-t';
 import AuthLayout from '@/layouts/auth-layout';
 import { fortify } from '@/lib/fortify';
 
 export default function ConfirmPassword() {
+    const { t } = useT();
     const form = useForm({ password: '' });
 
     const submit = (event: FormEvent) => {
@@ -17,12 +19,14 @@ export default function ConfirmPassword() {
 
     return (
         <AuthLayout
-            title="Confirm your password"
-            description="This area is sensitive. Please confirm your password to continue."
+            title={t('Confirm your password')}
+            description={t(
+                'This area is sensitive. Please confirm your password to continue.',
+            )}
         >
             <form onSubmit={submit} className="space-y-4">
                 <Input
-                    label="Password"
+                    label={t('Password')}
                     type="password"
                     autoComplete="current-password"
                     autoFocus
@@ -36,7 +40,7 @@ export default function ConfirmPassword() {
                     className="w-full"
                     loading={form.processing}
                 >
-                    Confirm
+                    {t('Confirm')}
                 </Button>
             </form>
         </AuthLayout>

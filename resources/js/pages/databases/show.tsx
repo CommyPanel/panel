@@ -31,9 +31,11 @@ import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { TypedConfirmModal } from '@/components/ui/typed-confirm-modal';
 import { formatBytes, formatDate, timeAgo } from '@/lib/format';
 import { useConfirmedAction } from '@/hooks/use-confirmed-action';
+import { useT } from '@/hooks/use-t';
 import AppLayout from '@/layouts/app-layout';
 import { useCan } from '@/lib/permissions';
 import { jsonHeaders } from '@/lib/post-json';
+import { Trans } from '@/lib/trans';
 import type {
     DatabaseBackupFile,
     DatabaseCredentials,
@@ -63,6 +65,7 @@ export default function Show({
     remote_ports,
     my_ip,
 }: Props) {
+    const { t } = useT();
     const can = useCan();
     const { errors } = usePage().props;
     const confirmed = useConfirmedAction();
@@ -132,8 +135,8 @@ export default function Show({
                 if (!response.ok) {
                     throw new Error(
                         response.status === 423
-                            ? 'Confirm your password and try again.'
-                            : 'The connection could not be loaded.',
+                            ? t('Confirm your password and try again.')
+                            : t('The connection could not be loaded.'),
                     );
                 }
 
@@ -142,7 +145,7 @@ export default function Show({
                 setCredentialsError(
                     e instanceof Error
                         ? e.message
-                        : 'The connection could not be loaded.',
+                        : t('The connection could not be loaded.'),
                 );
             }
         });
@@ -266,7 +269,15 @@ export default function Show({
             <PageHeader
                 title={server.name}
                 badge={<DatabaseStatusBadge status={server.status} />}
-                description={`${server.engine_label} ${server.version}. Apps that are linked to one of its databases reach it as ${server.host} on port ${server.port}.`}
+                description={t(
+                    ':engine :version. Apps that are linked to one of its databases reach it as :host on port :port.',
+                    {
+                        engine: server.engine_label,
+                        version: server.version,
+                        host: server.host,
+                        port: server.port,
+                    },
+                )}
                 actions={
                     <>
                         <Link
@@ -274,7 +285,7 @@ export default function Show({
                             className="btn btn-soft"
                         >
                             <ArrowLeft className="size-4" aria-hidden />
-                            All servers
+                            {t('All servers')}
                         </Link>
                         {manage && running && (
                             <>
@@ -290,7 +301,7 @@ export default function Show({
                                     }
                                 >
                                     <RotateCw className="size-4" aria-hidden />
-                                    Restart
+                                    {t('Restart')}
                                 </Button>
                                 <Button
                                     variant="warning"
@@ -304,7 +315,7 @@ export default function Show({
                                     }
                                 >
                                     <Square className="size-4" aria-hidden />
-                                    Stop
+                                    {t('Stop')}
                                 </Button>
                             </>
                         )}
@@ -320,7 +331,7 @@ export default function Show({
                                 }
                             >
                                 <Play className="size-4" aria-hidden />
-                                Start
+                                {t('Start')}
                             </Button>
                         )}
                     </>
@@ -336,8 +347,9 @@ export default function Show({
 
             {server.status === 'provisioning' && (
                 <Alert variant="info">
-                    The server is starting. The first start downloads the image,
-                    which can take a few minutes. This page updates by itself.
+                    {t(
+                        'The server is starting. The first start downloads the image, which can take a few minutes. This page updates by itself.',
+                    )}
                 </Alert>
             )}
 
@@ -345,8 +357,11 @@ export default function Show({
                 <Alert variant="error">
                     <span className="flex flex-wrap items-center justify-between gap-3">
                         <span>
-                            The server could not start
-                            {server.error ? `: ${server.error}` : '.'}
+                            {server.error
+                                ? t('The server could not start: :error', {
+                                      error: server.error,
+                                  })
+                                : t('The server could not start.')}
                         </span>
                         {manage && (
                             <Button
@@ -362,7 +377,7 @@ export default function Show({
                                 }
                             >
                                 <RefreshCw className="size-4" aria-hidden />
-                                Try again
+                                {t('Try again')}
                             </Button>
                         )}
                     </span>
@@ -370,14 +385,16 @@ export default function Show({
             )}
 
             <Card
-                title="Databases"
-                description="Each database has one user that can use it and nothing else on this server."
+                title={t('Databases')}
+                description={t(
+                    'Each database has one user that can use it and nothing else on this server.',
+                )}
                 actions={
                     manage &&
                     running && (
                         <Button size="sm" onClick={() => setAdding(true)}>
                             <Plus className="size-4" aria-hidden />
-                            Add database
+                            {t('Add database')}
                         </Button>
                     )
                 }
@@ -386,16 +403,20 @@ export default function Show({
                 {databases.length === 0 ? (
                     <p className="text-sm text-base-content/70">
                         {running
-                            ? 'No databases yet. Add one, then link it to an app on that app’s Links tab.'
-                            : 'Databases can be added once the server is running.'}
+                            ? t(
+                                  'No databases yet. Add one, then link it to an app on that app’s Links tab.',
+                              )
+                            : t(
+                                  'Databases can be added once the server is running.',
+                              )}
                     </p>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="table">
                             <thead>
                                 <tr>
-                                    <th>Database</th>
-                                    <th>Used by</th>
+                                    <th>{t('Database')}</th>
+                                    <th>{t('Used by')}</th>
                                     <th />
                                 </tr>
                             </thead>
@@ -407,14 +428,14 @@ export default function Show({
                                             {database.restore?.status ===
                                                 'restoring' && (
                                                 <span className="badge-soft ml-2 badge badge-info">
-                                                    Restoring…
+                                                    {t('Restoring…')}
                                                 </span>
                                             )}
                                             {database.restore?.status ===
                                                 'failed' && (
                                                 <>
                                                     <span className="badge-soft ml-2 badge badge-error">
-                                                        Restore failed
+                                                        {t('Restore failed')}
                                                     </span>
                                                     <p className="mt-1 max-w-sm text-sm break-words text-base-content/70">
                                                         {database.restore.error}
@@ -425,7 +446,7 @@ export default function Show({
                                         <td>
                                             {database.apps.length === 0 ? (
                                                 <span className="text-base-content/70">
-                                                    No app
+                                                    {t('No app')}
                                                 </span>
                                             ) : (
                                                 database.apps.map((app, i) => (
@@ -454,7 +475,7 @@ export default function Show({
                                                             className="size-4"
                                                             aria-hidden
                                                         />
-                                                        Connection
+                                                        {t('Connection')}
                                                     </Button>
                                                 )}
                                                 {can('databases.tools') &&
@@ -473,7 +494,12 @@ export default function Show({
                                                             target="_blank"
                                                             rel="noopener"
                                                             className="btn btn-soft btn-sm"
-                                                            title={`Opens ${server.tool} in a new tab, logged in to this database only. It closes by itself after 15 minutes without activity.`}
+                                                            title={t(
+                                                                'Opens :tool in a new tab, logged in to this database only. It closes by itself after 15 minutes without activity.',
+                                                                {
+                                                                    tool: server.tool,
+                                                                },
+                                                            )}
                                                         >
                                                             <ExternalLink
                                                                 className="size-4"
@@ -496,7 +522,7 @@ export default function Show({
                                                                 className="size-4"
                                                                 aria-hidden
                                                             />
-                                                            Back up
+                                                            {t('Back up')}
                                                         </Button>
                                                         <Button
                                                             variant="ghost"
@@ -511,7 +537,7 @@ export default function Show({
                                                                 className="size-4"
                                                                 aria-hidden
                                                             />
-                                                            New password
+                                                            {t('New password')}
                                                         </Button>
                                                         <Button
                                                             variant="ghost"
@@ -526,7 +552,7 @@ export default function Show({
                                                                 className="size-4"
                                                                 aria-hidden
                                                             />
-                                                            Delete
+                                                            {t('Delete')}
                                                         </Button>
                                                     </>
                                                 )}
@@ -552,23 +578,27 @@ export default function Show({
             )}
 
             <Card
-                title="Backups"
-                description={`Every database is dumped to a file each night at 04:00, and the newest ${keep} of each are kept on this server. A dump is plain SQL that recreates the database.`}
+                title={t('Backups')}
+                description={t(
+                    'Every database is dumped to a file each night at 04:00, and the newest :keep of each are kept on this server. A dump is plain SQL that recreates the database.',
+                    { keep },
+                )}
                 flush={backups.length > 0}
             >
                 {backups.length === 0 ? (
                     <p className="text-sm text-base-content/70">
-                        No backup yet. The first is made tonight, or press Back
-                        up next to a database.
+                        {t(
+                            'No backup yet. The first is made tonight, or press Back up next to a database.',
+                        )}
                     </p>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="table">
                             <thead>
                                 <tr>
-                                    <th>Database</th>
-                                    <th>Made</th>
-                                    <th className="text-right">Size</th>
+                                    <th>{t('Database')}</th>
+                                    <th>{t('Made')}</th>
+                                    <th className="text-right">{t('Size')}</th>
                                     <th />
                                 </tr>
                             </thead>
@@ -607,7 +637,7 @@ export default function Show({
                                                                 className="size-4"
                                                                 aria-hidden
                                                             />
-                                                            Restore
+                                                            {t('Restore')}
                                                         </Button>
                                                     )}
                                                     <Button
@@ -621,7 +651,7 @@ export default function Show({
                                                             className="size-4"
                                                             aria-hidden
                                                         />
-                                                        Download
+                                                        {t('Download')}
                                                     </Button>
                                                     <Button
                                                         variant="ghost"
@@ -636,7 +666,7 @@ export default function Show({
                                                             className="size-4"
                                                             aria-hidden
                                                         />
-                                                        Delete
+                                                        {t('Delete')}
                                                     </Button>
                                                 </>
                                             )}
@@ -648,26 +678,27 @@ export default function Show({
                     </div>
                 )}
                 <p className="text-sm text-base-content/70">
-                    Dumps stay on this server, so copy them somewhere else now
-                    and then: a backup on the same disk is lost with it. A dump
-                    holds the data itself, so downloading one needs your
-                    password and is recorded. To load one back, press{' '}
-                    <strong>Restore</strong>: it goes into a new database, and
-                    nothing that exists is changed.
+                    <Trans
+                        text="Dumps stay on this server, so copy them somewhere else now and then: a backup on the same disk is lost with it. A dump holds the data itself, so downloading one needs your password and is recorded. To load one back, press <b>Restore</b>: it goes into a new database, and nothing that exists is changed."
+                        components={{ b: <strong /> }}
+                    />
                 </p>
             </Card>
 
             {manage && (
                 <Card
-                    title="Delete this server"
-                    description={`Removes the server and permanently deletes every database on it (${server.databases_count}) with all their data. This cannot be undone, and it is refused while an app still uses one of its databases.`}
+                    title={t('Delete this server')}
+                    description={t(
+                        'Removes the server and permanently deletes every database on it (:count) with all their data. This cannot be undone, and it is refused while an app still uses one of its databases.',
+                        { count: server.databases_count },
+                    )}
                     actions={
                         <Button
                             variant="error"
                             onClick={() => setDeleting(true)}
                         >
                             <Trash2 className="size-4" aria-hidden />
-                            Delete server
+                            {t('Delete server')}
                         </Button>
                     }
                 />
@@ -692,58 +723,71 @@ export default function Show({
 
             <ConfirmModal
                 open={removingBackup !== null}
-                title="Delete this backup?"
-                confirmLabel="Delete backup"
+                title={t('Delete this backup?')}
+                confirmLabel={t('Delete backup')}
                 onConfirm={deleteBackup}
                 onClose={() => setRemovingBackup(null)}
             >
-                <code className="break-all">{removingBackup?.name}</code> is
-                deleted. This cannot be undone.
+                <Trans
+                    text="<code>:name</code> is deleted. This cannot be undone."
+                    components={{ code: <code className="break-all" /> }}
+                    values={{ name: removingBackup?.name ?? '' }}
+                />
             </ConfirmModal>
             <ConfirmModal
                 open={rotating !== null}
-                title="Change the password?"
-                confirmLabel="Change password"
+                title={t('Change the password?')}
+                confirmLabel={t('Change password')}
                 loading={busy}
                 onConfirm={rotate}
                 onClose={() => setRotating(null)}
             >
-                A new password is set for <code>{rotating?.username}</code>.
-                Apps linked to this database keep using the old one, and stop
-                working, until they are deployed again.
+                <Trans
+                    text="A new password is set for <code>:user</code>. Apps linked to this database keep using the old one, and stop working, until they are deployed again."
+                    components={{ code: <code /> }}
+                    values={{ user: rotating?.username ?? '' }}
+                />
             </ConfirmModal>
             <TypedConfirmModal
                 open={dropping !== null}
-                title="Delete this database?"
+                title={t('Delete this database?')}
                 expected={dropping?.name ?? ''}
-                confirmLabel="Delete database"
+                confirmLabel={t('Delete database')}
                 loading={busy}
                 error={errors.confirm}
                 onConfirm={drop}
                 onClose={() => setDropping(null)}
             >
                 <p>
-                    <code>{dropping?.name}</code> and all its data are deleted,
-                    together with its user. This cannot be undone.
+                    <Trans
+                        text="<code>:name</code> and all its data are deleted, together with its user. This cannot be undone."
+                        components={{ code: <code /> }}
+                        values={{ name: dropping?.name ?? '' }}
+                    />
                 </p>
                 <p className="text-base-content/70">
-                    If an app is linked to it, remove the link first.
+                    {t('If an app is linked to it, remove the link first.')}
                 </p>
             </TypedConfirmModal>
             <TypedConfirmModal
                 open={deleting}
-                title="Delete this server?"
+                title={t('Delete this server?')}
                 expected={server.slug}
-                confirmLabel="Delete server"
+                confirmLabel={t('Delete server')}
                 loading={busy}
                 error={errors.confirm}
                 onConfirm={deleteServer}
                 onClose={() => setDeleting(false)}
             >
                 <p>
-                    <strong>{server.name}</strong> is removed, and so is the
-                    data of all {server.databases_count} of its databases. This
-                    cannot be undone.
+                    <Trans
+                        text="<b>:name</b> is removed, and so is the data of all :count of its databases. This cannot be undone."
+                        components={{ b: <strong /> }}
+                        values={{
+                            name: server.name,
+                            count: server.databases_count,
+                        }}
+                    />
                 </p>
             </TypedConfirmModal>
             {confirmed.modal}

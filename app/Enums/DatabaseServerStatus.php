@@ -12,10 +12,10 @@ enum DatabaseServerStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::Provisioning => 'Starting up',
-            self::Running => 'Running',
-            self::Stopped => 'Stopped',
-            self::Failed => 'Failed',
+            self::Provisioning => __('Starting up'),
+            self::Running => __('Running'),
+            self::Stopped => __('Stopped'),
+            self::Failed => __('Failed'),
         };
     }
 }

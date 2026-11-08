@@ -25,13 +25,13 @@ class DestroyApp
     public static function assertUnlocked(App $app): void
     {
         if ($app->isLocked()) {
-            throw new LockedException('App is locked and cannot be deleted. Unlock it first.');
+            throw new LockedException(__('App is locked and cannot be deleted. Unlock it first.'));
         }
 
         $locked = $app->volumes()->whereNotNull('locked_at')->orderBy('id')->pluck('path');
 
         if ($locked->isNotEmpty()) {
-            throw new LockedException('Volume '.$locked->first().' is locked, and deleting the app would delete its files. Unlock the volume first.');
+            throw new LockedException(__('Volume :path is locked, and deleting the app would delete its files. Unlock the volume first.', ['path' => $locked->first()]));
         }
     }
 

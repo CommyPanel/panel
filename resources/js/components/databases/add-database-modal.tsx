@@ -4,6 +4,8 @@ import ManagedDatabaseController from '@/actions/App/Http/Controllers/ManagedDat
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
+import { useT } from '@/hooks/use-t';
+import { Trans } from '@/lib/trans';
 
 export function AddDatabaseModal({
     slug,
@@ -14,6 +16,7 @@ export function AddDatabaseModal({
     open: boolean;
     onClose: () => void;
 }) {
+    const { t } = useT();
     const form = useForm({ name: '' });
 
     const close = () => {
@@ -31,11 +34,11 @@ export function AddDatabaseModal({
     };
 
     return (
-        <Modal open={open} onClose={close} title="Add a database">
+        <Modal open={open} onClose={close} title={t('Add a database')}>
             <form onSubmit={submit} className="space-y-4">
                 <Input
-                    label="Database name"
-                    placeholder="shop"
+                    label={t('Database name')}
+                    placeholder={t('shop')}
                     required
                     autoFocus
                     autoComplete="off"
@@ -43,28 +46,34 @@ export function AddDatabaseModal({
                     value={form.data.name}
                     onChange={(e) => form.setData('name', e.target.value)}
                     error={form.errors.name}
-                    hint="Lowercase letters, digits and underscores, starting with a letter."
+                    hint={t(
+                        'Lowercase letters, digits and underscores, starting with a letter.',
+                    )}
                 />
                 <ul className="list-disc space-y-1.5 pl-5 text-sm text-base-content/80">
                     <li>
-                        A user with the same name is created. It can use this
-                        database and nothing else on the server.
+                        {t(
+                            'A user with the same name is created. It can use this database and nothing else on the server.',
+                        )}
                     </li>
                     <li>
-                        A long random password is generated and kept encrypted.
-                        You can show it later, after confirming your password.
+                        {t(
+                            'A long random password is generated and kept encrypted. You can show it later, after confirming your password.',
+                        )}
                     </li>
                     <li>
-                        To use the database, link it to an app on that
-                        app&apos;s <strong>Links</strong> tab.
+                        <Trans
+                            text="To use the database, link it to an app on that app's <b>Links</b> tab."
+                            components={{ b: <strong /> }}
+                        />
                     </li>
                 </ul>
                 <div className="flex flex-wrap justify-end gap-2">
                     <Button variant="ghost" onClick={close}>
-                        Cancel
+                        {t('Cancel')}
                     </Button>
                     <Button type="submit" loading={form.processing}>
-                        Add database
+                        {t('Add database')}
                     </Button>
                 </div>
             </form>

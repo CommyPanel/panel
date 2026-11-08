@@ -67,7 +67,7 @@ class AppLinkController extends Controller
 
         $audit->record('app.database_linked', $request->user(), ['app' => $app->slug, 'database' => $database->name, 'server' => $database->server->slug, 'prefix' => $link->env_prefix], $app);
 
-        return back()->with('status', "{$app->name} can reach {$database->name} once you apply the changes. The connection is added as {$link->env_prefix}_URL and related variables.");
+        return back()->with('status', __(':app can reach :database once you apply the changes. The connection is added as :variable and related variables.', ['app' => $app->name, 'database' => $database->name, 'variable' => $link->env_prefix.'_URL']));
     }
 
     public function storeApp(Request $request, App $app, AppLinks $links, AuditLogger $audit): RedirectResponse
@@ -87,7 +87,7 @@ class AppLinkController extends Controller
 
         $audit->record('app.app_linked', $request->user(), ['app' => $app->slug, 'target' => $target->slug, 'prefix' => $link->env_prefix], $app);
 
-        return back()->with('status', "{$app->name} can reach {$target->name} once you apply the changes, at http://{$target->slug}:{$target->container_port}. {$target->name} needs a new deployment to be reachable by that name.");
+        return back()->with('status', __(':app can reach :target once you apply the changes, at :address. :target needs a new deployment to be reachable by that name.', ['app' => $app->name, 'target' => $target->name, 'address' => 'http://'.$target->slug.':'.$target->container_port]));
     }
 
     public function destroyDatabase(Request $request, App $app, AppDatabaseLink $databaseLink, AppLinks $links, AuditLogger $audit): RedirectResponse
@@ -97,7 +97,7 @@ class AppLinkController extends Controller
 
         $audit->record('app.database_unlinked', $request->user(), ['app' => $app->slug, 'database' => $name], $app);
 
-        return back()->with('status', "{$app->name} no longer reaches {$name} once you apply the changes.");
+        return back()->with('status', __(':app no longer reaches :target once you apply the changes.', ['app' => $app->name, 'target' => $name]));
     }
 
     public function destroyApp(Request $request, App $app, AppLink $appLink, AppLinks $links, AuditLogger $audit): RedirectResponse
@@ -107,6 +107,6 @@ class AppLinkController extends Controller
 
         $audit->record('app.app_unlinked', $request->user(), ['app' => $app->slug, 'target' => $target], $app);
 
-        return back()->with('status', "{$app->name} no longer reaches {$target} once you apply the changes.");
+        return back()->with('status', __(':app no longer reaches :target once you apply the changes.', ['app' => $app->name, 'target' => $target]));
     }
 }

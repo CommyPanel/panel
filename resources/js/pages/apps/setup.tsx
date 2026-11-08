@@ -13,6 +13,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useT } from '@/hooks/use-t';
 import AppLayout from '@/layouts/app-layout';
 import { postJson } from '@/lib/post-json';
 import type { AppSetup, ServerAddress, SourceAccess } from '@/types';
@@ -26,11 +27,15 @@ type Props = {
 };
 
 export default function Setup({ app, provider, server, limits }: Props) {
+    const { t } = useT();
+
     return (
-        <AppLayout title={`Set up ${app.name}`}>
+        <AppLayout title={t('Set up :name', { name: app.name })}>
             <PageHeader
-                title={`Set up ${app.name}`}
-                description="A few steps, then CommyPanel builds and starts your app."
+                title={t('Set up :name', { name: app.name })}
+                description={t(
+                    'A few steps, then CommyPanel builds and starts your app.',
+                )}
             />
             <SetupSteps current={app.setup_step} source={app.source_type} />
             {app.setup_step === 'source' ? (
@@ -49,6 +54,7 @@ export default function Setup({ app, provider, server, limits }: Props) {
 }
 
 function Footer({ app, canContinue }: { app: AppSetup; canContinue: boolean }) {
+    const { t } = useT();
     const [busy, setBusy] = useState(false);
     const { errors } = usePage().props;
 
@@ -70,17 +76,17 @@ function Footer({ app, canContinue }: { app: AppSetup; canContinue: boolean }) {
                         )
                     }
                 >
-                    Continue
+                    {t('Continue')}
                 </Button>
                 <Button
                     variant="ghost"
                     onClick={() => {
-                        if (confirm('Cancel setup and delete this draft?')) {
+                        if (confirm(t('Cancel setup and delete this draft?'))) {
                             router.delete(AppSetupController.cancel(app.slug));
                         }
                     }}
                 >
-                    Cancel setup
+                    {t('Cancel setup')}
                 </Button>
             </div>
         </div>
@@ -94,6 +100,7 @@ function GitStep({
     app: AppSetup;
     provider: Provider | null;
 }) {
+    const { t } = useT();
     const { errors } = usePage().props;
     const [branch, setBranch] = useState(app.git_branch);
     const [access, setAccess] = useState<SourceAccess | null>(null);
@@ -148,17 +155,19 @@ function GitStep({
     return (
         <div className="space-y-6">
             <Card
-                title="2. Can CommyPanel read your repository?"
-                description="We test it from this server, so what you see is what the deployment will get."
+                title={t('2. Can CommyPanel read your repository?')}
+                description={t(
+                    'We test it from this server, so what you see is what the deployment will get.',
+                )}
             >
                 <dl className="grid gap-1 text-sm sm:grid-cols-[8rem_1fr]">
-                    <dt className="text-base-content/70">Repository</dt>
+                    <dt className="text-base-content/70">{t('Repository')}</dt>
                     <dd className="min-w-0 font-mono break-all">
                         {app.git_url}
                     </dd>
                 </dl>
                 <Input
-                    label="Branch"
+                    label={t('Branch')}
                     value={branch}
                     onChange={(e) => setBranch(e.target.value)}
                 />
@@ -168,12 +177,12 @@ function GitStep({
                         loading={checking}
                         variant={access?.ready ? 'soft' : 'primary'}
                     >
-                        {access ? 'Check again' : 'Check access'}
+                        {access ? t('Check again') : t('Check access')}
                     </Button>
                 </div>
                 {failed && (
                     <Alert variant="error">
-                        The check could not run. Try again.
+                        {t('The check could not run. Try again.')}
                     </Alert>
                 )}
                 {access && (
@@ -189,22 +198,25 @@ function GitStep({
                 {!access && app.source_verified && (
                     <Alert variant="success">
                         <CheckCircle2 className="size-5" aria-hidden />
-                        <span>Access was verified earlier.</span>
+                        <span>{t('Access was verified earlier.')}</span>
                     </Alert>
                 )}
             </Card>
 
             {needsKey && !app.source_verified && (
                 <p className="text-sm text-base-content/70">
-                    A private repository needs a deploy key or an access token.
-                    Use whichever is easier for you.
+                    {t(
+                        'A private repository needs a deploy key or an access token. Use whichever is easier for you.',
+                    )}
                 </p>
             )}
 
             {needsKey && !app.source_verified && (
                 <Card
-                    title="Deploy key"
-                    description="A private repository needs a read-only key. It is created here and never leaves this server."
+                    title={t('Deploy key')}
+                    description={t(
+                        'A private repository needs a read-only key. It is created here and never leaves this server.',
+                    )}
                 >
                     {errors.deploy_key && (
                         <Alert variant="error">{errors.deploy_key}</Alert>
@@ -217,7 +229,7 @@ function GitStep({
                                 variant="soft"
                             >
                                 <KeyRound className="size-4" aria-hidden />
-                                Generate deploy key
+                                {t('Generate deploy key')}
                             </Button>
                         </div>
                     ) : (
@@ -225,20 +237,24 @@ function GitStep({
                             <textarea
                                 readOnly
                                 rows={3}
-                                aria-label="Public deploy key"
+                                aria-label={t('Public deploy key')}
                                 className="textarea w-full font-mono text-xs"
                                 value={app.deploy_key_public}
                                 onFocus={(e) => e.currentTarget.select()}
                             />
                             <div>
                                 <Button variant="soft" size="sm" onClick={copy}>
-                                    {copied ? 'Copied' : 'Copy public key'}
+                                    {copied
+                                        ? t('Copied')
+                                        : t('Copy public key')}
                                 </Button>
                             </div>
                             {provider && provider.steps.length > 0 && (
                                 <div className="space-y-2 text-sm">
                                     <p className="font-medium">
-                                        Add it on {provider.name}:
+                                        {t('Add it on :provider:', {
+                                            provider: provider.name,
+                                        })}
                                     </p>
                                     <ol className="list-decimal space-y-1 pl-5">
                                         {provider.steps.map((step) => (
@@ -252,11 +268,13 @@ function GitStep({
                                             target="_blank"
                                             rel="noreferrer noopener"
                                         >
-                                            Open {provider.name} key settings
+                                            {t('Open :provider key settings', {
+                                                provider: provider.name,
+                                            })}
                                         </a>
                                     )}
                                     <p className="text-base-content/70">
-                                        Then press “Check access” above.
+                                        {t('Then press “Check access” above.')}
                                     </p>
                                 </div>
                             )}
@@ -275,6 +293,7 @@ function GitStep({
 }
 
 function UploadStep({ app, maxMb }: { app: AppSetup; maxMb: number }) {
+    const { t } = useT();
     const input = useRef<HTMLInputElement>(null);
     const form = useForm<{ archive: File | null }>({ archive: null });
 
@@ -294,8 +313,11 @@ function UploadStep({ app, maxMb }: { app: AppSetup; maxMb: number }) {
     return (
         <div className="space-y-6">
             <Card
-                title="2. Upload your project"
-                description={`A .zip or .tar.gz up to ${maxMb} MB. A single top-level folder is unpacked for you; .git folders are skipped.`}
+                title={t('2. Upload your project')}
+                description={t(
+                    'A .zip or .tar.gz up to :size MB. A single top-level folder is unpacked for you; .git folders are skipped.',
+                    { size: maxMb },
+                )}
             >
                 <form onSubmit={submit} className="space-y-4">
                     <div className="w-full">
@@ -303,7 +325,7 @@ function UploadStep({ app, maxMb }: { app: AppSetup; maxMb: number }) {
                             htmlFor="archive"
                             className="mb-1 label-text block px-0!"
                         >
-                            Project archive
+                            {t('Project archive')}
                         </label>
                         <input
                             ref={input}
@@ -338,14 +360,14 @@ function UploadStep({ app, maxMb }: { app: AppSetup; maxMb: number }) {
                             loading={form.processing}
                         >
                             <Upload className="size-4" aria-hidden />
-                            {app.has_upload ? 'Replace upload' : 'Upload'}
+                            {app.has_upload ? t('Replace upload') : t('Upload')}
                         </Button>
                     </div>
                 </form>
                 {app.has_upload && app.source_verified && (
                     <Alert variant="success">
                         <CheckCircle2 className="size-5" aria-hidden />
-                        <span>Your project is uploaded and ready.</span>
+                        <span>{t('Your project is uploaded and ready.')}</span>
                     </Alert>
                 )}
             </Card>
@@ -355,6 +377,7 @@ function UploadStep({ app, maxMb }: { app: AppSetup; maxMb: number }) {
 }
 
 function SettingsStep({ app }: { app: AppSetup }) {
+    const { t } = useT();
     const form = useForm({
         container_port: String(app.container_port),
         health_path: app.health_path,
@@ -372,15 +395,17 @@ function SettingsStep({ app }: { app: AppSetup }) {
     return (
         <form onSubmit={submit} className="space-y-6">
             <Card
-                title="3. Settings"
-                description="You can change all of this later. Variables are encrypted and shown only by name."
+                title={t('3. Settings')}
+                description={t(
+                    'You can change all of this later. Variables are encrypted and shown only by name.',
+                )}
             >
                 <div className="w-full">
                     <label
                         htmlFor="env"
                         className="mb-1 label-text block px-0!"
                     >
-                        Environment variables
+                        {t('Environment variables')}
                     </label>
                     <textarea
                         id="env"
@@ -395,8 +420,9 @@ function SettingsStep({ app }: { app: AppSetup }) {
                         autoComplete="off"
                     />
                     <span className="mt-1 block text-sm text-base-content/60">
-                        Paste a .env file. One KEY=value per line; PORT is set
-                        for you.
+                        {t(
+                            'Paste a .env file. One KEY=value per line; PORT is set for you.',
+                        )}
                     </span>
                     {form.errors.env && (
                         <span className="block text-sm text-error">
@@ -405,7 +431,7 @@ function SettingsStep({ app }: { app: AppSetup }) {
                     )}
                 </div>
                 <Input
-                    label="App port"
+                    label={t('App port')}
                     type="number"
                     min={1}
                     max={65535}
@@ -415,17 +441,21 @@ function SettingsStep({ app }: { app: AppSetup }) {
                         form.setData('container_port', e.target.value)
                     }
                     error={form.errors.container_port}
-                    hint="The port your app listens on inside the container. It is also passed as PORT."
+                    hint={t(
+                        'The port your app listens on inside the container. It is also passed as PORT.',
+                    )}
                 />
                 <Input
-                    label="Health check path"
+                    label={t('Health check path')}
                     required
                     value={form.data.health_path}
                     onChange={(e) =>
                         form.setData('health_path', e.target.value)
                     }
                     error={form.errors.health_path}
-                    hint="A new version goes live once this path answers (anything below HTTP 500)."
+                    hint={t(
+                        'A new version goes live once this path answers (anything below HTTP 500).',
+                    )}
                 />
                 <ReleaseCommandInput
                     value={form.data.release_command}
@@ -433,10 +463,10 @@ function SettingsStep({ app }: { app: AppSetup }) {
                     error={form.errors.release_command}
                 />
                 <Input
-                    label="Memory limit (MB)"
+                    label={t('Memory limit (MB)')}
                     type="number"
                     min={16}
-                    placeholder="Default"
+                    placeholder={t('Default')}
                     value={form.data.memory_limit_mb}
                     onChange={(e) =>
                         form.setData('memory_limit_mb', e.target.value)
@@ -444,11 +474,11 @@ function SettingsStep({ app }: { app: AppSetup }) {
                     error={form.errors.memory_limit_mb}
                 />
                 <Input
-                    label="CPU limit (cores)"
+                    label={t('CPU limit (cores)')}
                     type="number"
                     min={0.05}
                     step={0.05}
-                    placeholder="Default"
+                    placeholder={t('Default')}
                     value={form.data.cpu_limit}
                     onChange={(e) => form.setData('cpu_limit', e.target.value)}
                     error={form.errors.cpu_limit}
@@ -456,7 +486,7 @@ function SettingsStep({ app }: { app: AppSetup }) {
             </Card>
             <div className="flex flex-wrap gap-2">
                 <Button type="submit" loading={form.processing}>
-                    Continue
+                    {t('Continue')}
                 </Button>
                 <Button
                     variant="ghost"
@@ -464,7 +494,7 @@ function SettingsStep({ app }: { app: AppSetup }) {
                         router.post(AppSetupController.back(app.slug))
                     }
                 >
-                    Back
+                    {t('Back')}
                 </Button>
             </div>
         </form>
@@ -472,19 +502,22 @@ function SettingsStep({ app }: { app: AppSetup }) {
 }
 
 function DomainStep({ app, server }: { app: AppSetup; server: ServerAddress }) {
+    const { t } = useT();
     const [busy, setBusy] = useState(false);
     const hasDomains = app.domains.length > 0;
 
     return (
         <div className="space-y-6">
             <Card
-                title="4. Domain"
-                description="Optional: point a domain at this app. You can also do it after the first deployment; the app is reachable only through its domains."
+                title={t('4. Domain')}
+                description={t(
+                    'Optional: point a domain at this app. You can also do it after the first deployment; the app is reachable only through its domains.',
+                )}
             >
                 <p className="text-sm text-base-content/70">
-                    Add a domain below, create the DNS records it shows, and
-                    CommyPanel connects it and gets a certificate once DNS has
-                    updated. You do not have to wait for that to deploy.
+                    {t(
+                        'Add a domain below, create the DNS records it shows, and CommyPanel connects it and gets a certificate once DNS has updated. You do not have to wait for that to deploy.',
+                    )}
                 </p>
             </Card>
             <AppDomains slug={app.slug} domains={app.domains} server={server} />
@@ -502,7 +535,7 @@ function DomainStep({ app, server }: { app: AppSetup; server: ServerAddress }) {
                         )
                     }
                 >
-                    {hasDomains ? 'Create and deploy' : 'Skip and deploy'}
+                    {hasDomains ? t('Create and deploy') : t('Skip and deploy')}
                 </Button>
                 <Button
                     variant="ghost"
@@ -510,7 +543,7 @@ function DomainStep({ app, server }: { app: AppSetup; server: ServerAddress }) {
                         router.post(AppSetupController.back(app.slug))
                     }
                 >
-                    Back
+                    {t('Back')}
                 </Button>
             </div>
         </div>

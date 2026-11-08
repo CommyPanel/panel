@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
 import { Card } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { useT } from '@/hooks/use-t';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -62,6 +63,8 @@ function Stat({
 }
 
 function Availability({ label, ok }: { label: string; ok: boolean }) {
+    const { t } = useT();
+
     return (
         <li className="flex items-center justify-between py-3">
             <span>{label}</span>
@@ -71,50 +74,52 @@ function Availability({ label, ok }: { label: string; ok: boolean }) {
                     ok ? 'badge-success' : 'badge-error',
                 )}
             >
-                {ok ? 'available' : 'not available'}
+                {ok ? t('available') : t('not available')}
             </span>
         </li>
     );
 }
 
 export default function Dashboard({ stats, server, recent }: Props) {
+    const { t } = useT();
+
     return (
-        <AppLayout title="Dashboard">
+        <AppLayout title={t('Dashboard')}>
             <PageHeader
-                title="Dashboard"
-                description="What is running on this server."
+                title={t('Dashboard')}
+                description={t('What is running on this server.')}
                 actions={
                     <Link
                         href={AppController.create()}
                         className="btn btn-primary"
                     >
                         <Plus className="size-4" aria-hidden />
-                        New app
+                        {t('New app')}
                     </Link>
                 }
             />
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <Stat
-                    label="Apps"
+                    label={t('Apps')}
                     value={stats.apps}
                     icon={Boxes}
                     tone="bg-primary/10 text-primary"
                 />
                 <Stat
-                    label="Running"
+                    label={t('Running')}
                     value={stats.running}
                     icon={CheckCircle2}
                     tone="bg-success/15 text-success"
                 />
                 <Stat
-                    label="Deploying"
+                    label={t('Deploying')}
                     value={stats.deploying}
                     icon={Loader}
                     tone="bg-info/15 text-info"
                 />
                 <Stat
-                    label="Failed"
+                    label={t('Failed')}
                     value={stats.failed}
                     icon={XCircle}
                     tone="bg-error/15 text-error"
@@ -122,7 +127,7 @@ export default function Dashboard({ stats, server, recent }: Props) {
             </div>
 
             <div className="grid items-start gap-6 xl:grid-cols-3">
-                <Card title="Server">
+                <Card title={t('Server')}>
                     {server.error !== null ? (
                         <Alert variant="warning">{server.error}</Alert>
                     ) : (
@@ -130,7 +135,7 @@ export default function Dashboard({ stats, server, recent }: Props) {
                             <Availability label="Docker" ok={server.docker} />
                             <Availability label="nginx" ok={server.nginx} />
                             <li className="flex items-center justify-between py-3">
-                                <span>Free disk space</span>
+                                <span>{t('Free disk space')}</span>
                                 <span className="font-medium">
                                     {server.disk_free_gb} GB
                                 </span>
@@ -140,20 +145,20 @@ export default function Dashboard({ stats, server, recent }: Props) {
                 </Card>
 
                 <div className="min-w-0 xl:col-span-2">
-                    <Card title="Recent deployments" flush>
+                    <Card title={t('Recent deployments')} flush>
                         {recent.length === 0 ? (
                             <p className="p-5 text-sm text-base-content/70 sm:p-6">
-                                Nothing has been deployed yet.
+                                {t('Nothing has been deployed yet.')}
                             </p>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="table">
                                     <thead>
                                         <tr>
-                                            <th>App</th>
-                                            <th>Release</th>
-                                            <th>Status</th>
-                                            <th>Started</th>
+                                            <th>{t('App')}</th>
+                                            <th>{t('Release')}</th>
+                                            <th>{t('Status')}</th>
+                                            <th>{t('Started')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>

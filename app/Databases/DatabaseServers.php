@@ -26,7 +26,7 @@ class DatabaseServers
     public function create(string $name, DatabaseEngine $engine, string $version): DatabaseServer
     {
         if (! in_array($version, $engine->versions(), true)) {
-            throw new DatabaseException("{$engine->label()} {$version} is not one of the versions offered.");
+            throw new DatabaseException(__(':engine_label :version is not one of the versions offered.', ['engine_label' => $engine->label(), 'version' => $version]));
         }
 
         $server = DatabaseServer::query()->create([
@@ -52,7 +52,7 @@ class DatabaseServers
     public function retry(DatabaseServer $server): void
     {
         if ($server->status !== DatabaseServerStatus::Failed) {
-            throw new DatabaseException('Only a server that failed to start can be started again this way.');
+            throw new DatabaseException(__('Only a server that failed to start can be started again this way.'));
         }
 
         $server->forceFill(['status' => DatabaseServerStatus::Provisioning, 'error' => null])->save();
@@ -65,7 +65,7 @@ class DatabaseServers
     public function start(DatabaseServer $server): void
     {
         $this->requireInstalled($server);
-        $this->attempt(fn () => $this->host->startContainer($server->containerName()), 'start');
+        $this->attempt(fn () => $this->host->startContainer($server->containerName()), __('Could not start the database server: :reason'));
         $server->forceFill(['status' => DatabaseServerStatus::Running])->save();
     }
 
@@ -75,7 +75,7 @@ class DatabaseServers
     public function stop(DatabaseServer $server): void
     {
         $this->requireInstalled($server);
-        $this->attempt(fn () => $this->host->stopContainer($server->containerName()), 'stop');
+        $this->attempt(fn () => $this->host->stopContainer($server->containerName()), __('Could not stop the database server: :reason'));
         $server->forceFill(['status' => DatabaseServerStatus::Stopped])->save();
     }
 
@@ -85,7 +85,7 @@ class DatabaseServers
     public function restart(DatabaseServer $server): void
     {
         $this->requireInstalled($server);
-        $this->attempt(fn () => $this->host->restartContainer($server->containerName()), 'restart');
+        $this->attempt(fn () => $this->host->restartContainer($server->containerName()), __('Could not restart the database server: :reason'));
         $server->forceFill(['status' => DatabaseServerStatus::Running])->save();
     }
 
@@ -102,12 +102,12 @@ class DatabaseServers
         if ($linked->isNotEmpty()) {
             $apps = $linked->flatMap(fn ($db) => $db->links->map(fn ($l) => $l->app->name))->unique()->implode(', ');
 
-            throw new DatabaseException("Apps still use this server's databases ({$apps}). Remove their links first.");
+            throw new DatabaseException(__('Apps still use this server\'s databases (:apps). Remove their links first.', ['apps' => $apps]));
         }
 
         // The public port goes first: nothing may stay open on a server that is being deleted.
-        $this->attempt(fn () => $this->host->closeDatabaseRemote($server->slug), 'close the public port of');
-        $this->attempt(fn () => $this->host->removeContainer($server->containerName()), 'remove');
+        $this->attempt(fn () => $this->host->closeDatabaseRemote($server->slug), __('Could not close the public port of the database server: :reason'));
+        $this->attempt(fn () => $this->host->removeContainer($server->containerName()), __('Could not remove the database server: :reason'));
 
         try {
             $this->host->removeNetwork($server->networkName());
@@ -116,7 +116,7 @@ class DatabaseServers
         }
 
         // The data goes last: if that fails the server stays listed and can be deleted again.
-        $this->attempt(fn () => $this->host->removeDatabaseData($server->slug), 'delete the files of');
+        $this->attempt(fn () => $this->host->removeDatabaseData($server->slug), __('Could not delete the files of the database server: :reason'));
 
         // Its dumps go with it: they belong to databases that no longer exist.
         $this->backups->deleteAll($server);
@@ -129,19 +129,22 @@ class DatabaseServers
     private function requireInstalled(DatabaseServer $server): void
     {
         if (in_array($server->status, [DatabaseServerStatus::Provisioning, DatabaseServerStatus::Failed], true)) {
-            throw new DatabaseException('The server is not installed yet.');
+            throw new DatabaseException(__('The server is not installed yet.'));
         }
     }
 
     /**
      * @throws DatabaseException
      */
-    private function attempt(callable $action, string $verb): void
+    /**
+     * @param  string  $failure  the sentence to show if it fails, with `:reason` for what the host said
+     */
+    private function attempt(callable $action, string $failure): void
     {
         try {
             $action();
         } catch (HostOperationFailed $e) {
-            throw new DatabaseException("Could not {$verb} the database server: {$e->getMessage()}", 0, $e);
+            throw new DatabaseException(strtr($failure, [':reason' => $e->getMessage()]), 0, $e);
         }
     }
 }

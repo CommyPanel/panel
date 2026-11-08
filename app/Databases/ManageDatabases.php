@@ -24,16 +24,16 @@ class ManageDatabases
         $name = DatabaseNames::database($name);
 
         if (! $server->isRunning()) {
-            throw new DatabaseException('The server is not running. Start it first.');
+            throw new DatabaseException(__('The server is not running. Start it first.'));
         }
 
         if ($server->databases()->where('name', $name)->exists()) {
-            throw new DatabaseException("There is already a database called {$name} on this server.");
+            throw new DatabaseException(__('There is already a database called :name on this server.', ['name' => $name]));
         }
 
         $password = Str::random(32);
 
-        $this->attempt(fn () => $this->host->createDatabase($server->target(), $name, $name, $password), 'create the database');
+        $this->attempt(fn () => $this->host->createDatabase($server->target(), $name, $name, $password), __('Could not create the database: :reason'));
 
         /** @var ManagedDatabase */
         return $server->databases()->create(['name' => $name, 'username' => $name, 'password' => $password]);
@@ -48,18 +48,18 @@ class ManageDatabases
         $apps = $this->appsUsing($database);
 
         if ($database->restore_status === RestoreDatabase::RESTORING) {
-            throw new DatabaseException('A backup is still being loaded into this database. Wait for it to finish.');
+            throw new DatabaseException(__('A backup is still being loaded into this database. Wait for it to finish.'));
         }
 
         if ($apps !== []) {
-            throw new DatabaseException('Apps still use this database ('.implode(', ', $apps).'). Remove their links first.');
+            throw new DatabaseException(__('Apps still use this database (:apps). Remove their links first.', ['apps' => implode(', ', $apps)]));
         }
 
         if (! $server->isRunning()) {
-            throw new DatabaseException('The server is not running. Start it first.');
+            throw new DatabaseException(__('The server is not running. Start it first.'));
         }
 
-        $this->attempt(fn () => $this->host->dropDatabase($server->target(), $database->name, $database->username), 'drop the database');
+        $this->attempt(fn () => $this->host->dropDatabase($server->target(), $database->name, $database->username), __('Could not drop the database: :reason'));
 
         $database->delete();
     }
@@ -77,12 +77,12 @@ class ManageDatabases
         $server = $database->server;
 
         if (! $server->isRunning()) {
-            throw new DatabaseException('The server is not running. Start it first.');
+            throw new DatabaseException(__('The server is not running. Start it first.'));
         }
 
         $password = Str::random(32);
 
-        $this->attempt(fn () => $this->host->setDatabasePassword($server->target(), $database->username, $password), 'change the password');
+        $this->attempt(fn () => $this->host->setDatabasePassword($server->target(), $database->username, $password), __('Could not change the password: :reason'));
 
         $database->forceFill(['password' => $password])->save();
 
@@ -100,12 +100,15 @@ class ManageDatabases
     /**
      * @throws DatabaseException
      */
-    private function attempt(callable $action, string $what): void
+    /**
+     * @param  string  $failure  the sentence to show if it fails, with `:reason` for what the host said
+     */
+    private function attempt(callable $action, string $failure): void
     {
         try {
             $action();
         } catch (HostOperationFailed $e) {
-            throw new DatabaseException("Could not {$what}: {$e->getMessage()}", 0, $e);
+            throw new DatabaseException(strtr($failure, [':reason' => $e->getMessage()]), 0, $e);
         }
     }
 }

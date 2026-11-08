@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { Modal } from '@/components/ui/modal';
+import { useT } from '@/hooks/use-t';
 import { cn } from '@/lib/utils';
 import type { DeploymentDetail, SafeDeployInfo, SafeStat } from '@/types';
 
@@ -38,14 +39,18 @@ function useNow(ms = 5000): number {
     return now;
 }
 
-function minutesLeft(iso: string | null, now: number): string {
+function minutesLeft(
+    iso: string | null,
+    now: number,
+    t: (key: string, params?: Record<string, number>) => string,
+): string {
     if (!iso) return '';
 
     const seconds = Math.max(0, Math.round((Date.parse(iso) - now) / 1000));
 
-    if (seconds < 60) return `${seconds} s`;
+    if (seconds < 60) return t(':seconds s', { seconds });
 
-    return `${Math.ceil(seconds / 60)} min`;
+    return t(':minutes min', { minutes: Math.ceil(seconds / 60) });
 }
 
 function clock(iso: string | null): string {
@@ -90,10 +95,11 @@ function Comparison({
     traffic: NonNullable<Traffic>;
     previous: number | null;
 }) {
+    const { t } = useT();
     const rows: [string, (s: SafeStat) => string][] = [
-        ['Requests', (s) => fmt(s.requests)],
-        ['Errors (5xx)', (s) => `${s.error_percent}%`],
-        ['Slowest 5%', (s) => `${fmt(s.p95_ms)} ms`],
+        [t('Requests'), (s) => fmt(s.requests)],
+        [t('Errors (5xx)'), (s) => `${s.error_percent}%`],
+        [t('Slowest 5%'), (s) => `${fmt(s.p95_ms)} ms`],
     ];
 
     return (
@@ -104,10 +110,14 @@ function Comparison({
                         <tr>
                             <th />
                             <th className="tracking-normal normal-case">
-                                This release
+                                {t('This release')}
                             </th>
                             <th className="tracking-normal normal-case">
-                                {previous ? `Release #${previous}` : 'Before'}
+                                {previous
+                                    ? t('Release #:number', {
+                                          number: previous,
+                                      })
+                                    : t('Before')}
                             </th>
                         </tr>
                     </thead>
@@ -147,6 +157,7 @@ export function RetryModal({
     slug: string;
     number: number;
 }) {
+    const { t } = useT();
     const [watch, setWatch] = useState(true);
     const [busy, setBusy] = useState(false);
 
@@ -167,26 +178,24 @@ export function RetryModal({
         <Modal
             open={open}
             onClose={onClose}
-            title={`Go live again with release #${number}?`}
+            title={t('Go live again with release #:number?', { number })}
             footer={
                 <>
                     <Button variant="ghost" onClick={onClose}>
-                        Cancel
+                        {t('Cancel')}
                     </Button>
                     <Button onClick={go} loading={busy}>
                         <Play className="size-4" aria-hidden />
-                        Go live again
+                        {t('Go live again')}
                     </Button>
                 </>
             }
         >
             <div className="space-y-4 text-sm">
                 <p>
-                    This release did clearly worse than the one before it, so
-                    CommyPanel moved the traffic back. If you want to try it
-                    again, it is started from the image that is already built
-                    (nothing is built) and takes all the traffic like a normal
-                    deployment, with no downtime.
+                    {t(
+                        'This release did clearly worse than the one before it, so CommyPanel moved the traffic back. If you want to try it again, it is started from the image that is already built (nothing is built) and takes all the traffic like a normal deployment, with no downtime.',
+                    )}
                 </p>
                 <label className="flex cursor-pointer items-start gap-3 rounded-field border border-base-300 p-3">
                     <input
@@ -197,12 +206,14 @@ export function RetryModal({
                     />
                     <span>
                         <span className="font-medium">
-                            Watch it again, and roll back by itself if it does
-                            worse
+                            {t(
+                                'Watch it again, and roll back by itself if it does worse',
+                            )}
                         </span>
                         <span className="block text-base-content/70">
-                            Untick this if you know why it failed and want it to
-                            stay live whatever the requests say.
+                            {t(
+                                'Untick this if you know why it failed and want it to stay live whatever the requests say.',
+                            )}
                         </span>
                     </span>
                 </label>
@@ -219,6 +230,7 @@ export function RolledBackNotice({
     slug: string;
     deployment: DeploymentDetail;
 }) {
+    const { t } = useT();
     const [asking, setAsking] = useState(false);
 
     return (
@@ -228,19 +240,26 @@ export function RolledBackNotice({
                     <Undo2 className="mt-0.5 size-5 shrink-0" aria-hidden />
                     <div>
                         <p className="font-medium">
-                            This release was rolled back
+                            {t('This release was rolled back')}
                         </p>
                         <p className="text-sm">
-                            {deployment.error ??
-                                'It did clearly worse than the release before it.'}{' '}
-                            All traffic is on the previous release.
+                            {t(
+                                ':reason All traffic is on the previous release.',
+                                {
+                                    reason:
+                                        deployment.error ??
+                                        t(
+                                            'It did clearly worse than the release before it.',
+                                        ),
+                                },
+                            )}
                         </p>
                     </div>
                 </div>
                 {deployment.can_retry && (
                     <Button size="sm" onClick={() => setAsking(true)}>
                         <Play className="size-4" aria-hidden />
-                        Go live again
+                        {t('Go live again')}
                     </Button>
                 )}
             </div>
@@ -266,6 +285,7 @@ export function WatchPanel({
     traffic: Traffic;
     previous: number | null;
 }) {
+    const { t } = useT();
     const now = useNow();
     const [asking, setAsking] = useState(false);
     const watch = deployment.watch;
@@ -274,7 +294,7 @@ export function WatchPanel({
     if (!watch || watch.state === 'rolled_back') return null;
 
     const watching = watch.state === 'watching';
-    const left = minutesLeft(watch.until, now);
+    const left = minutesLeft(watch.until, now, t);
 
     const endWatch = () =>
         router.post(
@@ -288,11 +308,14 @@ export function WatchPanel({
 
     return (
         <Card
-            title={watching ? 'Watching this release' : 'The watch'}
+            title={watching ? t('Watching this release') : t('The watch')}
             description={
                 watching
-                    ? `Until ${clock(watch.until)} (${left} left). The previous version keeps running, so traffic can go straight back to it.`
-                    : 'The watch is over.'
+                    ? t(
+                          'Until :time (:left left). The previous version keeps running, so traffic can go straight back to it.',
+                          { time: clock(watch.until), left },
+                      )
+                    : t('The watch is over.')
             }
         >
             <div className="space-y-4">
@@ -309,8 +332,10 @@ export function WatchPanel({
                     </div>
                     <p className="text-sm">
                         {watching
-                            ? 'If it does clearly worse than the release before it, CommyPanel rolls back by itself.'
-                            : (watch.note ?? 'It held up.')}
+                            ? t(
+                                  'If it does clearly worse than the release before it, CommyPanel rolls back by itself.',
+                              )
+                            : (watch.note ?? t('It held up.'))}
                     </p>
                 </div>
                 {watching && traffic && (
@@ -323,19 +348,20 @@ export function WatchPanel({
                         onClick={() => setAsking(true)}
                     >
                         <SquareX className="size-4" aria-hidden />
-                        End the watch now
+                        {t('End the watch now')}
                     </Button>
                 )}
             </div>
             <ConfirmModal
                 open={asking}
-                title="End the watch now?"
-                confirmLabel="End the watch"
+                title={t('End the watch now?')}
+                confirmLabel={t('End the watch')}
                 onConfirm={endWatch}
                 onClose={() => setAsking(false)}
             >
-                The new release is accepted and the previous version is stopped.
-                Going back is then a normal rollback, not an instant switch.
+                {t(
+                    'The new release is accepted and the previous version is stopped. Going back is then a normal rollback, not an instant switch.',
+                )}
             </ConfirmModal>
         </Card>
     );
@@ -347,6 +373,7 @@ function Stepper({
 }: {
     rollout: NonNullable<SafeDeployInfo['rollout']>;
 }) {
+    const { t } = useT();
     const nodes = [...rollout.steps, 100];
     const finished = rollout.state === 'promoted';
     const failed =
@@ -355,7 +382,7 @@ function Stepper({
     return (
         <ol
             className="flex flex-wrap items-center gap-2"
-            aria-label="Rollout steps"
+            aria-label={t('Rollout steps')}
         >
             {nodes.map((percent, index) => {
                 const last = index === nodes.length - 1;
@@ -421,6 +448,7 @@ export function RolloutPanel({
     rollout: NonNullable<SafeDeployInfo['rollout']>;
     traffic: Traffic;
 }) {
+    const { t } = useT();
     const now = useNow();
     const [ask, setAsk] = useState<'promote' | 'abort' | null>(null);
     const active = rollout.state === 'running' || rollout.state === 'waiting';
@@ -431,25 +459,63 @@ export function RolloutPanel({
             { preserveScroll: true, onFinish: () => setAsk(null) },
         );
 
+    const stepParams = {
+        step: Math.min(rollout.step, rollout.steps.length),
+        total: rollout.steps.length,
+        percent: rollout.percent,
+    };
+
     const messages: Record<string, ReactNode> = {
-        running: `Holding at ${rollout.percent}% until ${clock(rollout.step_ends_at)} (${minutesLeft(rollout.step_ends_at, now)} left). ${rollout.auto ? 'It moves on by itself while the requests look healthy.' : 'Then it waits for you.'}`,
-        waiting: rollout.note ?? 'It is waiting for you.',
-        promoted: rollout.note ?? 'Everyone has the new release.',
-        aborted:
+        running: rollout.auto
+            ? t(
+                  'Holding at :percent% until :time (:left left). It moves on by itself while the requests look healthy.',
+                  {
+                      percent: rollout.percent,
+                      time: clock(rollout.step_ends_at),
+                      left: minutesLeft(rollout.step_ends_at, now, t),
+                  },
+              )
+            : t(
+                  'Holding at :percent% until :time (:left left). Then it waits for you.',
+                  {
+                      percent: rollout.percent,
+                      time: clock(rollout.step_ends_at),
+                      left: minutesLeft(rollout.step_ends_at, now, t),
+                  },
+              ),
+        waiting: rollout.note ?? t('It is waiting for you.'),
+        promoted: rollout.note ?? t('Everyone has the new release.'),
+        aborted: t(
             'The rollout was aborted. All traffic is on the previous release.',
-        rolled_back: `${rollout.note ?? 'The release did worse.'} The share was taken away and the release stopped.`,
+        ),
+        rolled_back: t(
+            ':reason The share was taken away and the release stopped.',
+            { reason: rollout.note ?? t('The release did worse.') },
+        ),
     };
 
     return (
         <Card
-            title="Gradual rollout"
-            description={`Step ${Math.min(rollout.step, rollout.steps.length)} of ${rollout.steps.length}, ${rollout.percent}% of visitors${rollout.state === 'promoted' ? ' (finished)' : ''}`}
+            title={t('Gradual rollout')}
+            description={
+                rollout.state === 'promoted'
+                    ? t(
+                          'Step :step of :total, :percent% of visitors (finished)',
+                          stepParams,
+                      )
+                    : t(
+                          'Step :step of :total, :percent% of visitors',
+                          stepParams,
+                      )
+            }
         >
             <div className="space-y-5">
                 <Stepper rollout={rollout} />
                 {rollout.state === 'waiting' ? (
                     <Alert variant="warning">
-                        <span className="font-medium">Waiting for you. </span>
+                        <span className="font-medium">
+                            {t('Waiting for you.')}{' '}
+                        </span>
                         {messages.waiting}
                     </Alert>
                 ) : (
@@ -477,8 +543,10 @@ export function RolloutPanel({
                         <Button size="sm" onClick={() => post('advance')}>
                             <ArrowRight className="size-4" aria-hidden />
                             {rollout.step >= rollout.steps.length
-                                ? 'Give everyone this release'
-                                : `Move on to ${rollout.steps[rollout.step]}%`}
+                                ? t('Give everyone this release')
+                                : t('Move on to :percent%', {
+                                      percent: rollout.steps[rollout.step],
+                                  })}
                         </Button>
                         {rollout.step < rollout.steps.length && (
                             <Button
@@ -486,7 +554,7 @@ export function RolloutPanel({
                                 size="sm"
                                 onClick={() => setAsk('promote')}
                             >
-                                Give everyone now
+                                {t('Give everyone now')}
                             </Button>
                         )}
                         <Button
@@ -495,32 +563,32 @@ export function RolloutPanel({
                             onClick={() => setAsk('abort')}
                         >
                             <SquareX className="size-4" aria-hidden />
-                            Abort
+                            {t('Abort')}
                         </Button>
                     </div>
                 )}
             </div>
             <ConfirmModal
                 open={ask === 'promote'}
-                title="Give everyone this release now?"
-                confirmLabel="Give everyone this release"
+                title={t('Give everyone this release now?')}
+                confirmLabel={t('Give everyone this release')}
                 onConfirm={() => post('promote')}
                 onClose={() => setAsk(null)}
             >
-                Skips the steps that are left: all visitors get the new release
-                and the previous version is stopped. Going back is then a normal
-                rollback.
+                {t(
+                    'Skips the steps that are left: all visitors get the new release and the previous version is stopped. Going back is then a normal rollback.',
+                )}
             </ConfirmModal>
             <ConfirmModal
                 open={ask === 'abort'}
-                title="Abort the rollout?"
-                confirmLabel="Abort"
+                title={t('Abort the rollout?')}
+                confirmLabel={t('Abort')}
                 onConfirm={() => post('abort')}
                 onClose={() => setAsk(null)}
             >
-                The new release loses its share of the visitors and is stopped.
-                All traffic stays on the previous release. You can deploy again
-                whenever you like.
+                {t(
+                    'The new release loses its share of the visitors and is stopped. All traffic stays on the previous release. You can deploy again whenever you like.',
+                )}
             </ConfirmModal>
         </Card>
     );

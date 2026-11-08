@@ -16,10 +16,10 @@ enum DomainStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::Pending => 'pending',
-            self::Verified => 'connected',
-            self::Misconfigured => 'needs attention',
-            self::Proxied => 'proxied',
+            self::Pending => __('pending'),
+            self::Verified => __('connected'),
+            self::Misconfigured => __('needs attention'),
+            self::Proxied => __('proxied'),
         };
     }
 }

@@ -8,6 +8,8 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useConfirmedAction } from '@/hooks/use-confirmed-action';
+import { useT } from '@/hooks/use-t';
+import type { Params } from '@/lib/i18n';
 import { jsonHeaders } from '@/lib/post-json';
 import type { AppSettings } from '@/types';
 
@@ -23,7 +25,10 @@ const THEME = {
     selectionBackground: '#44403c',
 };
 
-async function requestTicket(slug: string): Promise<Ticket> {
+async function requestTicket(
+    slug: string,
+    t: (key: string, params?: Params) => string,
+): Promise<Ticket> {
     const response = await fetch(AppTerminalController.ticket(slug).url, {
         method: 'POST',
         credentials: 'same-origin',
@@ -38,13 +43,13 @@ async function requestTicket(slug: string): Promise<Ticket> {
     };
 
     if (response.status === 423) {
-        throw new Error('Confirm your password and try again.');
+        throw new Error(t('Confirm your password and try again.'));
     }
     if (response.status === 429) {
-        throw new Error('Too many attempts. Wait a minute and try again.');
+        throw new Error(t('Too many attempts. Wait a minute and try again.'));
     }
     if (!response.ok || !body.ticket || !body.path) {
-        throw new Error(body.error ?? 'The terminal could not be opened.');
+        throw new Error(body.error ?? t('The terminal could not be opened.'));
     }
 
     return body as Ticket;
@@ -57,6 +62,7 @@ async function requestTicket(slug: string): Promise<Ticket> {
  * session. Only mounted while the tab is open.
  */
 export function TerminalTab({ app }: { app: AppSettings }) {
+    const { t } = useT();
     const confirmed = useConfirmedAction();
     const host = useRef<HTMLDivElement>(null);
     const term = useRef<Terminal | null>(null);
@@ -103,13 +109,13 @@ export function TerminalTab({ app }: { app: AppSettings }) {
         let ticket: Ticket;
 
         try {
-            ticket = await requestTicket(app.slug);
+            ticket = await requestTicket(app.slug, t);
         } catch (e) {
             setStatus('idle');
             setMessage(
                 e instanceof Error
                     ? e.message
-                    : 'The terminal could not be opened.',
+                    : t('The terminal could not be opened.'),
             );
 
             return;
@@ -154,9 +160,11 @@ export function TerminalTab({ app }: { app: AppSettings }) {
                     };
 
                     if (control.type === 'error') {
-                        setMessage(control.message ?? 'The terminal failed.');
+                        setMessage(
+                            control.message ?? t('The terminal failed.'),
+                        );
                     } else if (control.type === 'exit') {
-                        setMessage('The shell exited.');
+                        setMessage(t('The shell exited.'));
                     }
                 } catch {
                     // Not for us.
@@ -173,10 +181,14 @@ export function TerminalTab({ app }: { app: AppSettings }) {
                 (m) =>
                     m ??
                     (event.reason
-                        ? `The session ended: ${event.reason}.`
+                        ? t('The session ended: :reason.', {
+                              reason: event.reason,
+                          })
                         : event.code === 1006 || event.code === 1015
-                          ? 'The connection could not be made, or was lost. The ticket may have expired; open the terminal again.'
-                          : 'The session ended.'),
+                          ? t(
+                                'The connection could not be made, or was lost. The ticket may have expired; open the terminal again.',
+                            )
+                          : t('The session ended.')),
             );
         };
 
@@ -199,11 +211,13 @@ export function TerminalTab({ app }: { app: AppSettings }) {
     if (!running) {
         return (
             <Card
-                title="Terminal"
-                description="A shell inside the running container."
+                title={t('Terminal')}
+                description={t('A shell inside the running container.')}
             >
                 <p className="text-sm text-base-content/70">
-                    A terminal needs a running container. Start the app first.
+                    {t(
+                        'A terminal needs a running container. Start the app first.',
+                    )}
                 </p>
             </Card>
         );
@@ -214,20 +228,22 @@ export function TerminalTab({ app }: { app: AppSettings }) {
     return (
         <div className="space-y-6">
             <Card
-                title="Terminal"
-                description="A shell inside the running container, as the user the app runs as and with its environment variables."
+                title={t('Terminal')}
+                description={t(
+                    'A shell inside the running container, as the user the app runs as and with its environment variables.',
+                )}
                 actions={
                     active ? (
                         <Button variant="soft" size="sm" onClick={disconnect}>
                             <Plug className="size-4" aria-hidden />
-                            Disconnect
+                            {t('Disconnect')}
                         </Button>
                     ) : (
                         <Button size="sm" onClick={open}>
                             <PlugZap className="size-4" aria-hidden />
                             {status === 'closed'
-                                ? 'Open again'
-                                : 'Open terminal'}
+                                ? t('Open again')
+                                : t('Open terminal')}
                         </Button>
                     )
                 }
@@ -241,14 +257,15 @@ export function TerminalTab({ app }: { app: AppSettings }) {
                 {status === 'idle' && !message && (
                     <p className="flex items-center gap-2 text-sm text-base-content/70">
                         <TerminalSquare className="size-4" aria-hidden />
-                        Press Open terminal to start a session. You may be asked
-                        for your password.
+                        {t(
+                            'Press Open terminal to start a session. You may be asked for your password.',
+                        )}
                     </p>
                 )}
 
                 <div
                     ref={host}
-                    aria-label="Terminal"
+                    aria-label={t('Terminal')}
                     className={
                         status === 'idle'
                             ? 'hidden'
@@ -259,17 +276,19 @@ export function TerminalTab({ app }: { app: AppSettings }) {
 
                 <ul className="list-disc space-y-1 pl-5 text-sm text-base-content/70">
                     <li>
-                        Opening a terminal is recorded in the audit log; what
-                        you type is not.
+                        {t(
+                            'Opening a terminal is recorded in the audit log; what you type is not.',
+                        )}
                     </li>
                     <li>
-                        Changes you make inside the container are lost at the
-                        next deployment, except in persistent volumes.
+                        {t(
+                            'Changes you make inside the container are lost at the next deployment, except in persistent volumes.',
+                        )}
                     </li>
                     <li>
-                        A session ends after 15 minutes without input or output,
-                        or after 2 hours. Some images have no shell; then the
-                        terminal says so.
+                        {t(
+                            'A session ends after 15 minutes without input or output, or after 2 hours. Some images have no shell; then the terminal says so.',
+                        )}
                     </li>
                 </ul>
             </Card>

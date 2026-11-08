@@ -2,6 +2,7 @@ import AppUsageController from '@/actions/App/Http/Controllers/AppUsageControlle
 import { TimeSeriesChart } from '@/components/usage/time-series-chart';
 import { Alert } from '@/components/ui/alert';
 import { Card } from '@/components/ui/card';
+import { useT } from '@/hooks/use-t';
 import { formatBytes } from '@/lib/format';
 import {
     formatPercent,
@@ -43,6 +44,7 @@ export function AppUsageCard({
     slug: string;
     stopped: boolean;
 }) {
+    const { t } = useT();
     const { first, latest, error } = useUsagePoll<AppUsage>(
         AppUsageController.show(slug).url,
     );
@@ -52,27 +54,29 @@ export function AppUsageCard({
 
     return (
         <Card
-            title="Resource usage"
-            description="The running container, live. CPU is a share of one core: 100% is one full core."
+            title={t('Resource usage')}
+            description={t(
+                'The running container, live. CPU is a share of one core: 100% is one full core.',
+            )}
         >
             {error && (
                 <Alert variant="warning">
-                    Usage could not be read: {error}
-                    {latest && ' Showing the last reading.'}
+                    {t('Usage could not be read: :error', { error })}
+                    {latest && ` ${t('Showing the last reading.')}`}
                 </Alert>
             )}
             {stopped && (
                 <p className="text-sm text-base-content/70">
-                    The app is stopped, so there is nothing to measure.
+                    {t('The app is stopped, so there is nothing to measure.')}
                 </p>
             )}
             <div className="grid gap-6 lg:grid-cols-3">
                 <TimeSeriesChart
-                    title="CPU"
+                    title={t('CPU')}
                     times={times}
                     series={[
                         {
-                            label: 'CPU',
+                            label: t('CPU'),
                             color: COLOR_1,
                             values: column(series, 'cpu'),
                         },
@@ -83,13 +87,15 @@ export function AppUsageCard({
                 <TimeSeriesChart
                     title={
                         limit
-                            ? `Memory (limit ${formatBytes(limit)})`
-                            : 'Memory'
+                            ? t('Memory (limit :limit)', {
+                                  limit: formatBytes(limit),
+                              })
+                            : t('Memory')
                     }
                     times={times}
                     series={[
                         {
-                            label: 'Memory used',
+                            label: t('Memory used'),
                             color: COLOR_1,
                             values: column(series, 'mem'),
                         },
@@ -98,16 +104,16 @@ export function AppUsageCard({
                     yMax={limit || undefined}
                 />
                 <TimeSeriesChart
-                    title="Network"
+                    title={t('Network')}
                     times={times}
                     series={[
                         {
-                            label: 'Received',
+                            label: t('Received'),
                             color: COLOR_1,
                             values: column(series, 'rx'),
                         },
                         {
-                            label: 'Sent',
+                            label: t('Sent'),
                             color: COLOR_2,
                             values: column(series, 'tx'),
                         },

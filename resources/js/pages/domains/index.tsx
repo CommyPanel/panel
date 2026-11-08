@@ -15,6 +15,7 @@ import { Card } from '@/components/ui/card';
 import { Tabs, tabPanelProps } from '@/components/ui/tabs';
 import type { TabItem } from '@/components/ui/tabs';
 import { useDomainProgress } from '@/hooks/use-domain-progress';
+import { useT } from '@/hooks/use-t';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate, timeAgo } from '@/lib/format';
 import type {
@@ -50,15 +51,19 @@ function DomainsTable({
     domains: DomainRow[];
     panel: PanelSummary;
 }) {
+    const { t } = useT();
+
     if (domains.length === 0 && panel.domain === null) {
         return (
             <Card
-                title="No domains yet"
-                description="Open an app and add its domain on its Domains & SSL tab. It will show up here with its DNS status."
+                title={t('No domains yet')}
+                description={t(
+                    'Open an app and add its domain on its Domains & SSL tab. It will show up here with its DNS status.',
+                )}
             >
                 <div>
                     <Link href={AppController.index()} className="btn btn-soft">
-                        Go to apps
+                        {t('Go to apps')}
                     </Link>
                 </div>
             </Card>
@@ -71,11 +76,11 @@ function DomainsTable({
                 <table className="table">
                     <thead>
                         <tr>
-                            <th>Domain</th>
-                            <th>DNS</th>
-                            <th>HTTPS</th>
-                            <th>App</th>
-                            <th>Last checked</th>
+                            <th>{t('Domain')}</th>
+                            <th>{t('DNS')}</th>
+                            <th>{t('HTTPS')}</th>
+                            <th>{t('App')}</th>
+                            <th>{t('Last checked')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -127,7 +132,9 @@ function DomainsTable({
                                     </Link>
                                     {domain.redirect_to && (
                                         <p className="text-xs text-base-content/60">
-                                            redirects to {domain.redirect_to}
+                                            {t('redirects to :target', {
+                                                target: domain.redirect_to,
+                                            })}
                                         </p>
                                     )}
                                 </td>
@@ -149,7 +156,7 @@ function DomainsTable({
                                         </Link>
                                     ) : (
                                         <span className="text-base-content/60">
-                                            Not assigned
+                                            {t('Not assigned')}
                                         </span>
                                     )}
                                 </td>
@@ -169,29 +176,31 @@ function DomainsTable({
 }
 
 function PanelCard({ panel }: { panel: PanelSummary }) {
+    const { t } = useT();
+
     return (
         <Card
-            title="Panel domain"
-            description="The address CommyPanel itself is served on."
+            title={t('Panel domain')}
+            description={t('The address CommyPanel itself is served on.')}
             actions={
                 <Link
                     href={WelcomeController.show()}
                     className="btn btn-soft btn-sm"
                 >
-                    {panel.domain ? 'Change' : 'Set up'}
+                    {panel.domain ? t('Change') : t('Set up')}
                 </Link>
             }
         >
             {panel.domain ? (
                 <dl className="divide-y divide-base-300 text-sm">
                     <div className="flex justify-between gap-4 py-2">
-                        <dt className="text-base-content/70">Domain</dt>
+                        <dt className="text-base-content/70">{t('Domain')}</dt>
                         <dd className="font-medium break-all">
                             {panel.domain}
                         </dd>
                     </div>
                     <div className="flex justify-between gap-4 py-2">
-                        <dt className="text-base-content/70">HTTPS</dt>
+                        <dt className="text-base-content/70">{t('HTTPS')}</dt>
                         <dd>
                             <DomainTlsMark
                                 tls={
@@ -209,7 +218,7 @@ function PanelCard({ panel }: { panel: PanelSummary }) {
                     {panel.expires_at && (
                         <div className="flex justify-between gap-4 py-2">
                             <dt className="text-base-content/70">
-                                Valid until
+                                {t('Valid until')}
                             </dt>
                             <dd className="font-medium">
                                 {formatDate(panel.expires_at)}
@@ -219,9 +228,9 @@ function PanelCard({ panel }: { panel: PanelSummary }) {
                 </dl>
             ) : (
                 <p className="text-sm text-base-content/70">
-                    The panel is reachable on this server's address only. Give
-                    it its own domain to serve it on port 443 with a
-                    certificate.
+                    {t(
+                        "The panel is reachable on this server's address only. Give it its own domain to serve it on port 443 with a certificate.",
+                    )}
                 </p>
             )}
         </Card>
@@ -229,6 +238,7 @@ function PanelCard({ panel }: { panel: PanelSummary }) {
 }
 
 export default function Index({ server, https, panel, domains }: Props) {
+    const { t } = useT();
     useDomainProgress(domains, ['domains', 'panel']);
 
     const [tab, setTab] = useState<TabId>(initialTab);
@@ -248,7 +258,7 @@ export default function Index({ server, https, panel, domains }: Props) {
     const tabs: TabItem<TabId>[] = [
         {
             id: 'domains',
-            label: 'Domains',
+            label: t('Domains'),
             icon: <Globe className="size-4" aria-hidden />,
             badge: (
                 <span className="badge-soft badge-neutral badge badge-sm">
@@ -258,28 +268,30 @@ export default function Index({ server, https, panel, domains }: Props) {
         },
         {
             id: 'https',
-            label: 'HTTPS',
+            label: t('HTTPS'),
             icon: <Lock className="size-4" aria-hidden />,
         },
         {
             id: 'server',
-            label: 'Server address',
+            label: t('Server address'),
             icon: <Server className="size-4" aria-hidden />,
         },
     ];
 
     return (
-        <AppLayout title="Domains">
+        <AppLayout title={t('Domains')}>
             <PageHeader
-                title="Domains"
-                description="Every domain on this server. Add a domain from the app it belongs to."
+                title={t('Domains')}
+                description={t(
+                    'Every domain on this server. Add a domain from the app it belongs to.',
+                )}
             />
 
             <Tabs
                 tabs={tabs}
                 active={tab}
                 onChange={select}
-                label="Domain sections"
+                label={t('Domain sections')}
             />
 
             <div {...tabPanelProps(tab)} className="outline-none">
@@ -296,18 +308,15 @@ export default function Index({ server, https, panel, domains }: Props) {
                     <div className="grid items-start gap-6 xl:grid-cols-2">
                         <ServerAddressCard server={server} />
                         <Card
-                            title="Why this matters"
-                            description="Domains are connected by checking that their DNS records point at the addresses saved here."
+                            title={t('Why this matters')}
+                            description={t(
+                                'Domains are connected by checking that their DNS records point at the addresses saved here.',
+                            )}
                         >
                             <p className="text-sm text-base-content/70">
-                                CommyPanel finds this server's public address by
-                                itself, by reading it from the server's own
-                                network connection. Only a server behind a
-                                router or load balancer (as on some clouds) is
-                                looked up through api.ipify.org instead, and
-                                that can be switched off. If the wrong address
-                                was found, correct it here or wherever the
-                                address is shown.
+                                {t(
+                                    "CommyPanel finds this server's public address by itself, by reading it from the server's own network connection. Only a server behind a router or load balancer (as on some clouds) is looked up through api.ipify.org instead, and that can be switched off. If the wrong address was found, correct it here or wherever the address is shown.",
+                                )}
                             </p>
                         </Card>
                     </div>

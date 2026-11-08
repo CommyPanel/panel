@@ -45,13 +45,13 @@ class AppVolumeBackupController extends Controller
         $key = BackupVolumeJob::pendingKey($app->slug, $name);
 
         if (Cache::get($key) === true) {
-            return back()->withErrors(['volume' => 'A backup of this volume is already running.']);
+            return back()->withErrors(['volume' => __('A backup of this volume is already running.')]);
         }
 
         Cache::put($key, true, now()->addHours(2));
         BackupVolumeJob::dispatch($app->id, $name);
 
-        return back()->with('status', "Backing up {$name}. It appears in the list when it is done.");
+        return back()->with('status', __('Backing up :name. It appears in the list when it is done.', ['name' => $name]));
     }
 
     public function download(Request $request, App $app, VolumeBackups $backups, AuditLogger $audit, string $file): BinaryFileResponse|RedirectResponse
@@ -77,6 +77,6 @@ class AppVolumeBackupController extends Controller
 
         $audit->record('volume.backup_deleted', $request->user(), ['app' => $app->slug, 'file' => $file]);
 
-        return back()->with('status', 'Backup deleted.');
+        return back()->with('status', __('Backup deleted.'));
     }
 }

@@ -1,6 +1,7 @@
 import { Table2 } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent } from 'react';
+import { useT } from '@/hooks/use-t';
 import { cn } from '@/lib/utils';
 
 export type ChartSeries = {
@@ -92,9 +93,10 @@ export function TimeSeriesChart({
     yMax,
     yFloor = 0,
     height = 150,
-    emptyText = 'Waiting for the first readings.',
+    emptyText,
     windowMs = DEFAULT_WINDOW_MS,
 }: Props) {
+    const { t } = useT();
     const [wrap, width] = useWidth<HTMLElement>();
     const [hover, setHover] = useState<number | null>(null);
     const [table, setTable] = useState(false);
@@ -152,7 +154,7 @@ export function TimeSeriesChart({
     const summary = `${title}: ${series
         .map(
             (s) =>
-                `${s.label} ${count > 0 ? format(s.values[last]) : 'no data'}`,
+                `${s.label} ${count > 0 ? format(s.values[last]) : t('no data')}`,
         )
         .join(', ')}`;
 
@@ -179,8 +181,8 @@ export function TimeSeriesChart({
                         className="btn btn-circle btn-text btn-xs"
                         aria-pressed={table}
                         aria-controls={tableId}
-                        aria-label={`${title}: ${table ? 'show chart' : 'show as table'}`}
-                        title={table ? 'Show chart' : 'Show as table'}
+                        aria-label={`${title}: ${table ? t('show chart') : t('show as table')}`}
+                        title={table ? t('Show chart') : t('Show as table')}
                         onClick={() => setTable((v) => !v)}
                     >
                         <Table2 className="size-4" aria-hidden />
@@ -211,11 +213,11 @@ export function TimeSeriesChart({
                     <div className="max-h-48 overflow-auto rounded-field border border-base-300">
                         <table className="table table-xs">
                             <caption className="sr-only">
-                                {title}, newest first
+                                {t(':title, newest first', { title })}
                             </caption>
                             <thead>
                                 <tr>
-                                    <th scope="col">Time</th>
+                                    <th scope="col">{t('Time')}</th>
                                     {series.map((s) => (
                                         <th scope="col" key={s.label}>
                                             {s.label}
@@ -225,12 +227,12 @@ export function TimeSeriesChart({
                             </thead>
                             <tbody>
                                 {times
-                                    .map((t, i) => ({ t, i }))
+                                    .map((time, i) => ({ time, i }))
                                     .slice(-TABLE_ROWS)
                                     .reverse()
-                                    .map(({ t, i }) => (
-                                        <tr key={t}>
-                                            <td>{clock(t)}</td>
+                                    .map(({ time, i }) => (
+                                        <tr key={time}>
+                                            <td>{clock(time)}</td>
                                             {series.map((s) => (
                                                 <td key={s.label}>
                                                     {format(s.values[i])}
@@ -247,13 +249,14 @@ export function TimeSeriesChart({
                         style={{ height }}
                         tabIndex={0}
                         role="group"
-                        aria-label={`${summary}. Use the arrow keys to read earlier values.`}
+                        aria-label={`${summary}. ${t('Use the arrow keys to read earlier values.')}`}
                         onKeyDown={keyDown}
                         onBlur={() => setHover(null)}
                     >
                         {count === 0 ? (
                             <p className="flex h-full items-center justify-center text-sm text-base-content/70">
-                                {emptyText}
+                                {emptyText ??
+                                    t('Waiting for the first readings.')}
                             </p>
                         ) : (
                             width > 0 && (
@@ -289,11 +292,14 @@ export function TimeSeriesChart({
                                         y={height - 4}
                                         className="fill-base-content/60 text-[11px]"
                                     >
-                                        {Math.max(
-                                            1,
-                                            Math.round((end - start) / 60000),
-                                        )}{' '}
-                                        min ago
+                                        {t(':minutes min ago', {
+                                            minutes: Math.max(
+                                                1,
+                                                Math.round(
+                                                    (end - start) / 60000,
+                                                ),
+                                            ),
+                                        })}
                                     </text>
                                     <text
                                         x={MARGIN.left + plotW}
@@ -301,7 +307,7 @@ export function TimeSeriesChart({
                                         textAnchor="end"
                                         className="fill-base-content/60 text-[11px]"
                                     >
-                                        now
+                                        {t('now')}
                                     </text>
 
                                     {series.map((s) => (

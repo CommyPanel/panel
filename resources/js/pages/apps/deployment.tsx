@@ -12,6 +12,7 @@ import {
 } from '@/components/apps/safe-deploy-panels';
 import { Card } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { useT } from '@/hooks/use-t';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/format';
 import type { DeploymentDetail, SafeDeployInfo } from '@/types';
@@ -27,13 +28,8 @@ const POLL_MS = 1000;
 // A rollout or a watch changes every few seconds, not every second.
 const SLOW_POLL_MS = 5000;
 
-function waitingText(status: DeploymentDetail['status']): string {
-    return status === 'queued'
-        ? 'Waiting for a worker to pick this up...'
-        : 'Working. Output appears here as soon as there is some...';
-}
-
 export default function Deployment({ app, deployment, safe }: Props) {
+    const { t } = useT();
     const logRef = useRef<HTMLPreElement>(null);
 
     // Still being made, or live and being watched: keep the page up to date.
@@ -67,17 +63,22 @@ export default function Deployment({ app, deployment, safe }: Props) {
         if (nearBottom) log.scrollTop = log.scrollHeight;
     }, [deployment.log]);
 
+    const waitingText =
+        deployment.status === 'queued'
+            ? t('Waiting for a worker to pick this up...')
+            : t('Working. Output appears here as soon as there is some...');
+
     const rows: [string, string][] = [
-        ['Started', formatDate(deployment.created_at)],
-        ['Finished', formatDate(deployment.finished_at)],
-        ['Commit', deployment.commit ?? '-'],
+        [t('Started'), formatDate(deployment.created_at)],
+        [t('Finished'), formatDate(deployment.finished_at)],
+        [t('Commit'), deployment.commit ?? '-'],
         [
-            'Type',
+            t('Type'),
             deployment.is_rollback
-                ? 'Rollback'
+                ? t('Rollback')
                 : deployment.is_apply
-                  ? 'Apply changes'
-                  : 'Deploy',
+                  ? t('Apply changes')
+                  : t('Deploy'),
         ],
     ];
 
@@ -92,7 +93,7 @@ export default function Deployment({ app, deployment, safe }: Props) {
                         className="btn btn-text"
                     >
                         <ArrowLeft className="size-4" aria-hidden />
-                        Back to app
+                        {t('Back to app')}
                     </Link>
                 }
             />
@@ -106,13 +107,13 @@ export default function Deployment({ app, deployment, safe }: Props) {
 
             <div className="grid items-start gap-6 xl:grid-cols-3">
                 <div className="min-w-0 xl:col-span-2">
-                    <Card title="Log">
+                    <Card title={t('Log')}>
                         <pre
                             ref={logRef}
                             aria-live="polite"
                             className="max-h-[36rem] min-h-48 w-full overflow-auto rounded-field border border-base-300 bg-base-200 p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap"
                         >
-                            {deployment.log || waitingText(deployment.status)}
+                            {deployment.log || waitingText}
                         </pre>
                     </Card>
                 </div>
@@ -132,7 +133,7 @@ export default function Deployment({ app, deployment, safe }: Props) {
                             previous={safe.traffic?.previous_number ?? null}
                         />
                     )}
-                    <Card title="Progress">
+                    <Card title={t('Progress')}>
                         <DeploymentStages
                             stage={deployment.stage}
                             status={deployment.status}
@@ -142,7 +143,7 @@ export default function Deployment({ app, deployment, safe }: Props) {
                             hasReleaseCommand={deployment.has_release_command}
                         />
                     </Card>
-                    <Card title="Details">
+                    <Card title={t('Details')}>
                         <dl className="divide-y divide-base-300 text-sm">
                             {rows.map(([label, value]) => (
                                 <div

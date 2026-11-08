@@ -6,6 +6,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useT } from '@/hooks/use-t';
 import AppLayout from '@/layouts/app-layout';
 
 type Permission = {
@@ -26,6 +27,7 @@ type Props = {
 };
 
 export default function Form({ role, groups }: Props) {
+    const { t, tn } = useT();
     const editing = role !== null;
     const form = useForm<{ name: string; permissions: string[] }>({
         name: role?.name ?? '',
@@ -53,19 +55,30 @@ export default function Form({ role, groups }: Props) {
     };
 
     return (
-        <AppLayout title={editing ? `Edit ${role.name}` : 'New role'}>
+        <AppLayout
+            title={
+                editing ? t('Edit :name', { name: role.name }) : t('New role')
+            }
+        >
             <PageHeader
-                title={editing ? `Edit ${role.name}` : 'New role'}
+                title={
+                    editing
+                        ? t('Edit :name', { name: role.name })
+                        : t('New role')
+                }
                 description={
                     editing && role.users > 0
-                        ? `${role.users} ${role.users === 1 ? 'user has' : 'users have'} this role; changes apply to them at once.`
-                        : 'Choose what people with this role may do.'
+                        ? tn(
+                              'one::count user has this role; changes apply to them at once.|other::count users have this role; changes apply to them at once.',
+                              role.users,
+                          )
+                        : t('Choose what people with this role may do.')
                 }
             />
             <form onSubmit={submit} className="space-y-6">
-                <Card title="Name">
+                <Card title={t('Name')}>
                     <Input
-                        label="Role name"
+                        label={t('Role name')}
                         required
                         value={form.data.name}
                         onChange={(e) => form.setData('name', e.target.value)}
@@ -98,7 +111,7 @@ export default function Form({ role, groups }: Props) {
                                             toggleGroup(permissions, !all)
                                         }
                                     >
-                                        {all ? 'Clear all' : 'Select all'}
+                                        {all ? t('Clear all') : t('Select all')}
                                     </Button>
                                 )
                             }
@@ -133,9 +146,9 @@ export default function Form({ role, groups }: Props) {
                                                 </span>
                                                 {!permission.grantable && (
                                                     <span className="block text-xs text-base-content/60">
-                                                        You do not have this
-                                                        permission yourself, so
-                                                        you cannot grant it.
+                                                        {t(
+                                                            'You do not have this permission yourself, so you cannot grant it.',
+                                                        )}
                                                     </span>
                                                 )}
                                             </span>
@@ -149,13 +162,13 @@ export default function Form({ role, groups }: Props) {
 
                 <div className="flex gap-2">
                     <Button type="submit" loading={form.processing}>
-                        {editing ? 'Save role' : 'Create role'}
+                        {editing ? t('Save role') : t('Create role')}
                     </Button>
                     <Link
                         href={RoleController.index()}
                         className="btn btn-text"
                     >
-                        Cancel
+                        {t('Cancel')}
                     </Link>
                 </div>
             </form>

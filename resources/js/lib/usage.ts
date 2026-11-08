@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatBytes } from '@/lib/format';
+import { t } from '@/lib/i18n';
 
 /** One reading of CPU (%), memory (bytes) and network (bytes per second). */
 export type UsagePoint = {
@@ -118,7 +119,10 @@ export function useUsagePoll<T extends { interval_ms: number }>(
 
                 if (!response.ok) {
                     throw new Error(
-                        body.error ?? `Request failed (${response.status})`,
+                        body.error ??
+                            t('Request failed (:status)', {
+                                status: response.status,
+                            }),
                     );
                 }
 
@@ -137,7 +141,7 @@ export function useUsagePoll<T extends { interval_ms: number }>(
                     error:
                         error instanceof Error
                             ? error.message
-                            : 'Could not read usage.',
+                            : t('Could not read usage.'),
                 }));
             }
 

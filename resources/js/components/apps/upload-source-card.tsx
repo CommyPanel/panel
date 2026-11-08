@@ -5,9 +5,11 @@ import type { FormEvent } from 'react';
 import AppSourceController from '@/actions/App/Http/Controllers/AppSourceController';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useT } from '@/hooks/use-t';
 
 /** Replace the project of an app created from an upload. */
 export function UploadSourceCard({ slug }: { slug: string }) {
+    const { t } = useT();
     const input = useRef<HTMLInputElement>(null);
     const form = useForm<{ archive: File | null }>({ archive: null });
 
@@ -26,8 +28,10 @@ export function UploadSourceCard({ slug }: { slug: string }) {
 
     return (
         <Card
-            title="Project files"
-            description="This app runs the project you uploaded. Upload a .zip or .tar.gz to replace it, then press Deploy."
+            title={t('Project files')}
+            description={t(
+                'This app runs the project you uploaded. Upload a .zip or .tar.gz to replace it, then press Deploy.',
+            )}
         >
             <form onSubmit={submit} className="space-y-4">
                 <div className="w-full">
@@ -35,7 +39,7 @@ export function UploadSourceCard({ slug }: { slug: string }) {
                         htmlFor="archive"
                         className="mb-1 label-text block px-0!"
                     >
-                        New project archive
+                        {t('New project archive')}
                     </label>
                     <input
                         ref={input}
@@ -66,7 +70,7 @@ export function UploadSourceCard({ slug }: { slug: string }) {
                     loading={form.processing}
                 >
                     <Upload className="size-4" aria-hidden />
-                    Upload
+                    {t('Upload')}
                 </Button>
             </form>
         </Card>

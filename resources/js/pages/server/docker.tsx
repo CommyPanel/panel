@@ -13,6 +13,7 @@ import { Card } from '@/components/ui/card';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { Modal } from '@/components/ui/modal';
 import { useConfirmedAction } from '@/hooks/use-confirmed-action';
+import { useT } from '@/hooks/use-t';
 import { formatBytes, formatDate, timeAgo } from '@/lib/format';
 import { useCan } from '@/lib/permissions';
 import type {
@@ -76,6 +77,7 @@ function DockerDown({
     error: string | null;
     diagnosis: Diagnosis | null;
 }) {
+    const { t } = useT();
     const can = useCan();
     const confirmed = useConfirmedAction();
     const [asking, setAsking] = useState(false);
@@ -99,12 +101,14 @@ function DockerDown({
 
     return (
         <Card
-            title="Docker is not running"
-            description="Apps cannot be built, started or reached until Docker is back. The panel and nginx keep working."
+            title={t('Docker is not running')}
+            description={t(
+                'Apps cannot be built, started or reached until Docker is back. The panel and nginx keep working.',
+            )}
         >
             {error && (
                 <p className="text-sm">
-                    <span className="text-base-content/70">Error: </span>
+                    <span className="text-base-content/70">{t('Error:')} </span>
                     <span className="font-mono break-all">{error}</span>
                 </p>
             )}
@@ -119,7 +123,7 @@ function DockerDown({
                     {diagnosis.journal && (
                         <div className="space-y-1">
                             <p className="text-sm font-medium">
-                                Latest Docker log lines
+                                {t('Latest Docker log lines')}
                             </p>
                             <pre className="max-h-80 overflow-auto rounded-box bg-base-200 p-3 font-mono text-xs whitespace-pre-wrap">
                                 {diagnosis.journal}
@@ -136,21 +140,21 @@ function DockerDown({
                         loading={restarting}
                     >
                         <RotateCw className="size-4" aria-hidden />
-                        Restart Docker
+                        {t('Restart Docker')}
                     </Button>
                 </div>
             )}
             <ConfirmModal
                 open={asking}
-                title="Restart Docker?"
-                confirmLabel="Restart Docker"
+                title={t('Restart Docker?')}
+                confirmLabel={t('Restart Docker')}
                 loading={restarting}
                 onConfirm={restart}
                 onClose={() => setAsking(false)}
             >
-                Every container stops and starts again, so all apps are
-                unavailable for a moment. If Docker keeps failing, the log lines
-                above usually say why.
+                {t(
+                    'Every container stops and starts again, so all apps are unavailable for a moment. If Docker keeps failing, the log lines above usually say why.',
+                )}
             </ConfirmModal>
             {confirmed.modal}
         </Card>
@@ -173,6 +177,7 @@ function LogsModal({
     name: string | null;
     onClose: () => void;
 }) {
+    const { t } = useT();
     const [logs, setLogs] = useState<{ name: string; text: string } | null>(
         null,
     );
@@ -203,7 +208,7 @@ function LogsModal({
                 if (current) {
                     setProblem({
                         name,
-                        message: e.message || 'Could not load the logs.',
+                        message: e.message || t('Could not load the logs.'),
                     });
                 }
             });
@@ -211,23 +216,24 @@ function LogsModal({
         return () => {
             current = false;
         };
-    }, [name]);
+    }, [name, t]);
 
     return (
         <Modal
             open={name !== null}
             onClose={onClose}
-            title={name ? `Logs of ${name}` : 'Logs'}
+            title={name ? t('Logs of :name', { name }) : t('Logs')}
             size="lg"
         >
             {problem && problem.name === name ? (
                 <Alert variant="error">{problem.message}</Alert>
             ) : logs && logs.name === name ? (
                 <pre className="max-h-96 overflow-auto rounded-field border border-base-300 p-3 text-xs">
-                    {logs.text || 'The container has not printed anything yet.'}
+                    {logs.text ||
+                        t('The container has not printed anything yet.')}
                 </pre>
             ) : (
-                <p className="text-sm text-base-content/70">Loading…</p>
+                <p className="text-sm text-base-content/70">{t('Loading…')}</p>
             )}
         </Modal>
     );
@@ -241,6 +247,7 @@ export default function Docker({
     networks,
     images,
 }: Props) {
+    const { t } = useT();
     const { errors } = usePage().props;
     const [logsFor, setLogsFor] = useState<string | null>(null);
     const [pruning, setPruning] = useState(false);
@@ -268,61 +275,75 @@ export default function Docker({
                 <>
                     <Card
                         title="Docker"
-                        description={`Engine ${docker.server_version}, API ${docker.api_version}, ${docker.os}/${docker.arch}`}
+                        description={t('Engine :version, API :api, :os/:arch', {
+                            version: docker.server_version,
+                            api: docker.api_version,
+                            os: docker.os,
+                            arch: docker.arch,
+                        })}
                     >
                         <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                             <Stat
-                                label="Running"
-                                value={`${docker.running} of ${docker.containers}`}
+                                label={t('Running')}
+                                value={t(':running of :total', {
+                                    running: docker.running,
+                                    total: docker.containers,
+                                })}
                             />
                             <Stat
-                                label="Stopped"
+                                label={t('Stopped')}
                                 value={String(docker.stopped)}
                             />
                             <Stat
-                                label="Images"
+                                label={t('Images')}
                                 value={String(docker.images)}
                             />
                             <Stat
-                                label="Storage driver"
+                                label={t('Storage driver')}
                                 value={docker.storage_driver}
                             />
                             <Stat
-                                label="Cgroup driver"
+                                label={t('Cgroup driver')}
                                 value={docker.cgroup_driver}
                             />
-                            <Stat label="CPUs" value={String(docker.cpus)} />
                             <Stat
-                                label="Memory"
+                                label={t('CPUs')}
+                                value={String(docker.cpus)}
+                            />
+                            <Stat
+                                label={t('Memory')}
                                 value={formatBytes(docker.mem_total)}
                             />
                             <Stat
-                                label="Kernel"
+                                label={t('Kernel')}
                                 value={docker.kernel_version}
                             />
                         </dl>
                     </Card>
 
                     <Card
-                        title="Containers"
-                        description="The containers CommyPanel started for your apps."
+                        title={t('Containers')}
+                        description={t(
+                            'The containers CommyPanel started for your apps.',
+                        )}
                         flush
                     >
                         {containers.length === 0 ? (
                             <p className="p-5 text-sm text-base-content/70 sm:p-6">
-                                No containers yet. Deploy an app and it shows up
-                                here.
+                                {t(
+                                    'No containers yet. Deploy an app and it shows up here.',
+                                )}
                             </p>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="table">
                                     <thead>
                                         <tr>
-                                            <th>State</th>
-                                            <th>Container</th>
-                                            <th>App</th>
-                                            <th>Image</th>
-                                            <th>Since</th>
+                                            <th>{t('State')}</th>
+                                            <th>{t('Container')}</th>
+                                            <th>{t('App')}</th>
+                                            <th>{t('Image')}</th>
+                                            <th>{t('Since')}</th>
                                             <th />
                                         </tr>
                                     </thead>
@@ -398,7 +419,7 @@ export default function Docker({
                                                             className="size-4"
                                                             aria-hidden
                                                         />
-                                                        Logs
+                                                        {t('Logs')}
                                                     </Button>
                                                 </td>
                                             </tr>
@@ -410,13 +431,16 @@ export default function Docker({
                     </Card>
 
                     <Card
-                        title="Networks"
-                        description="The Docker networks CommyPanel created and what is attached to them."
+                        title={t('Networks')}
+                        description={t(
+                            'The Docker networks CommyPanel created and what is attached to them.',
+                        )}
                     >
                         {networks.length === 0 ? (
                             <p className="text-sm text-base-content/70">
-                                No networks yet. One is created with the first
-                                app.
+                                {t(
+                                    'No networks yet. One is created with the first app.',
+                                )}
                             </p>
                         ) : (
                             <NetworkList networks={networks} />
@@ -424,8 +448,10 @@ export default function Docker({
                     </Card>
 
                     <Card
-                        title="Images"
-                        description="Images built from your apps. Old releases keep theirs so you can roll back."
+                        title={t('Images')}
+                        description={t(
+                            'Images built from your apps. Old releases keep theirs so you can roll back.',
+                        )}
                         actions={
                             <Button
                                 variant="soft"
@@ -434,23 +460,23 @@ export default function Docker({
                                 loading={pruning}
                             >
                                 <Trash className="size-4" aria-hidden />
-                                Remove unused images
+                                {t('Remove unused images')}
                             </Button>
                         }
                         flush
                     >
                         {images.length === 0 ? (
                             <p className="p-5 text-sm text-base-content/70 sm:p-6">
-                                No images yet.
+                                {t('No images yet.')}
                             </p>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="table">
                                     <thead>
                                         <tr>
-                                            <th>Image</th>
-                                            <th>Size</th>
-                                            <th>Built</th>
+                                            <th>{t('Image')}</th>
+                                            <th>{t('Size')}</th>
+                                            <th>{t('Built')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>

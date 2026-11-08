@@ -7,6 +7,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { useT } from '@/hooks/use-t';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/format';
 import { useCan } from '@/lib/permissions';
@@ -25,6 +26,7 @@ type Row = {
 };
 
 export default function Index({ users }: { users: Row[] }) {
+    const { t } = useT();
     const can = useCan();
     const { errors } = usePage().props;
     const [deleting, setDeleting] = useState<Row | null>(null);
@@ -43,10 +45,12 @@ export default function Index({ users }: { users: Row[] }) {
     };
 
     return (
-        <AppLayout title="Users">
+        <AppLayout title={t('Users')}>
             <PageHeader
-                title="Users"
-                description="Everyone who can sign in to this panel, and the role that decides what they may do."
+                title={t('Users')}
+                description={t(
+                    'Everyone who can sign in to this panel, and the role that decides what they may do.',
+                )}
                 actions={
                     can('users.create') && (
                         <Link
@@ -54,7 +58,7 @@ export default function Index({ users }: { users: Row[] }) {
                             className="btn btn-primary"
                         >
                             <Plus className="size-4" aria-hidden />
-                            New user
+                            {t('New user')}
                         </Link>
                     )
                 }
@@ -67,10 +71,10 @@ export default function Index({ users }: { users: Row[] }) {
                     <table className="table">
                         <thead>
                             <tr>
-                                <th>User</th>
-                                <th>Role</th>
-                                <th>Two-factor</th>
-                                <th>Added</th>
+                                <th>{t('User')}</th>
+                                <th>{t('Role')}</th>
+                                <th>{t('Two-factor')}</th>
+                                <th>{t('Added')}</th>
                                 <th />
                             </tr>
                         </thead>
@@ -82,7 +86,7 @@ export default function Index({ users }: { users: Row[] }) {
                                             {user.name}
                                             {user.is_you && (
                                                 <span className="ml-2 text-xs font-normal text-base-content/60">
-                                                    (you)
+                                                    {t('(you)')}
                                                 </span>
                                             )}
                                         </div>
@@ -94,13 +98,15 @@ export default function Index({ users }: { users: Row[] }) {
                                         {user.is_super ? (
                                             <span
                                                 className="badge-soft badge badge-primary"
-                                                title="Can do everything. Cannot be changed or deleted here; use admin:reset on the server to recover it."
+                                                title={t(
+                                                    'Can do everything. Cannot be changed or deleted here; use admin:reset on the server to recover it.',
+                                                )}
                                             >
                                                 <ShieldCheck
                                                     className="size-3.5"
                                                     aria-hidden
                                                 />
-                                                Super user
+                                                {t('Super user')}
                                             </span>
                                         ) : user.role ? (
                                             <span className="badge-soft badge-neutral badge">
@@ -108,12 +114,12 @@ export default function Index({ users }: { users: Row[] }) {
                                             </span>
                                         ) : (
                                             <span className="text-sm text-base-content/60">
-                                                No role
+                                                {t('No role')}
                                             </span>
                                         )}
                                     </td>
                                     <td className="text-sm whitespace-nowrap">
-                                        {user.two_factor ? 'On' : 'Off'}
+                                        {user.two_factor ? t('On') : t('Off')}
                                     </td>
                                     <td className="whitespace-nowrap">
                                         {formatDate(user.created_at)}
@@ -122,13 +128,13 @@ export default function Index({ users }: { users: Row[] }) {
                                         {user.is_super ? (
                                             <span
                                                 className="inline-flex items-center gap-1 text-xs text-base-content/60"
-                                                title="Protected"
+                                                title={t('Protected')}
                                             >
                                                 <Lock
                                                     className="size-3.5"
                                                     aria-hidden
                                                 />
-                                                Protected
+                                                {t('Protected')}
                                             </span>
                                         ) : (
                                             <div className="flex justify-end gap-1">
@@ -144,7 +150,7 @@ export default function Index({ users }: { users: Row[] }) {
                                                                 className="size-4"
                                                                 aria-hidden
                                                             />
-                                                            Edit
+                                                            {t('Edit')}
                                                         </Link>
                                                     )}
                                                 {user.can_delete &&
@@ -152,7 +158,12 @@ export default function Index({ users }: { users: Row[] }) {
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
-                                                            aria-label={`Delete ${user.name}`}
+                                                            aria-label={t(
+                                                                'Delete :name',
+                                                                {
+                                                                    name: user.name,
+                                                                },
+                                                            )}
                                                             onClick={() =>
                                                                 setDeleting(
                                                                     user,
@@ -177,14 +188,16 @@ export default function Index({ users }: { users: Row[] }) {
 
             <ConfirmModal
                 open={deleting !== null}
-                title={`Delete ${deleting?.name ?? ''}?`}
-                confirmLabel="Delete user"
+                title={t('Delete :name?', { name: deleting?.name ?? '' })}
+                confirmLabel={t('Delete user')}
                 loading={busy}
                 onConfirm={remove}
                 onClose={() => setDeleting(null)}
             >
-                {deleting?.email} loses access right away and is signed out
-                everywhere. This cannot be undone.
+                {t(
+                    ':email loses access right away and is signed out everywhere. This cannot be undone.',
+                    { email: deleting?.email ?? '' },
+                )}
             </ConfirmModal>
         </AppLayout>
     );

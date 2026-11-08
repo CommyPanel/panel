@@ -5,6 +5,7 @@ import { TimeSeriesChart } from '@/components/usage/time-series-chart';
 import { UsageBar } from '@/components/usage/usage-bar';
 import { Alert } from '@/components/ui/alert';
 import { Card } from '@/components/ui/card';
+import { useT } from '@/hooks/use-t';
 import { formatBytes } from '@/lib/format';
 import {
     formatPercent,
@@ -43,6 +44,8 @@ function Tile({
     /** Shows a bar underneath. */
     percent?: number;
 }) {
+    const { t } = useT();
+
     return (
         <div className="min-w-0 space-y-1 rounded-box border border-base-300 px-4 py-3">
             <dt className="text-xs text-base-content/70">{label}</dt>
@@ -53,7 +56,10 @@ function Tile({
                 </dd>
             )}
             {percent !== undefined && (
-                <UsageBar percent={percent} label={`${label} used`} />
+                <UsageBar
+                    percent={percent}
+                    label={t(':label used', { label })}
+                />
             )}
         </div>
     );
@@ -68,6 +74,7 @@ function column<K extends keyof UsagePoint>(series: UsagePoint[], key: K) {
  * minutes, and what each container is using.
  */
 export function LiveUsage() {
+    const { t, tn } = useT();
     const { first, latest, error } = useUsagePoll<ServerUsage>(
         ServerUsageController.show().url,
     );
@@ -82,32 +89,41 @@ export function LiveUsage() {
     return (
         <div className="space-y-6">
             <Card
-                title="Live usage"
-                description="Updated every two seconds while this page is open."
+                title={t('Live usage')}
+                description={t(
+                    'Updated every two seconds while this page is open.',
+                )}
             >
                 {error && (
                     <Alert variant="warning">
-                        Usage could not be read: {error}
-                        {latest && ' Showing the last reading.'}
+                        {t('Usage could not be read: :error', { error })}
+                        {latest && ` ${t('Showing the last reading.')}`}
                     </Alert>
                 )}
 
                 <dl className="grid grid-cols-2 gap-3 xl:grid-cols-4">
                     <Tile
-                        label="CPU"
+                        label={t('CPU')}
                         value={ready ? formatPercent(now.cpu_percent) : '-'}
                         detail={
                             now && now.cpus > 0
-                                ? `${now.cpus} ${now.cpus === 1 ? 'core' : 'cores'}`
+                                ? tn(
+                                      'one::count core|other::count cores',
+                                      now.cpus,
+                                  )
                                 : undefined
                         }
                         percent={ready ? now.cpu_percent : undefined}
                     />
                     <Tile
-                        label="Memory"
+                        label={t('Memory')}
                         value={now ? formatBytes(now.mem_used) : '-'}
                         detail={
-                            now ? `of ${formatBytes(now.mem_total)}` : undefined
+                            now
+                                ? t('of :total', {
+                                      total: formatBytes(now.mem_total),
+                                  })
+                                : undefined
                         }
                         percent={
                             now && now.mem_total > 0
@@ -116,11 +132,13 @@ export function LiveUsage() {
                         }
                     />
                     <Tile
-                        label="Disk"
+                        label={t('Disk')}
                         value={now ? formatBytes(now.disk_used) : '-'}
                         detail={
                             now
-                                ? `of ${formatBytes(now.disk_total)}`
+                                ? t('of :total', {
+                                      total: formatBytes(now.disk_total),
+                                  })
                                 : undefined
                         }
                         percent={
@@ -130,7 +148,7 @@ export function LiveUsage() {
                         }
                     />
                     <Tile
-                        label="Network"
+                        label={t('Network')}
                         value={ready ? `↓ ${formatRate(now.net_rx_bps)}` : '-'}
                         detail={
                             ready
@@ -142,11 +160,11 @@ export function LiveUsage() {
 
                 <div className="grid gap-6 lg:grid-cols-3">
                     <TimeSeriesChart
-                        title="CPU"
+                        title={t('CPU')}
                         times={times}
                         series={[
                             {
-                                label: 'CPU',
+                                label: t('CPU'),
                                 color: CPU,
                                 values: column(host, 'cpu'),
                             },
@@ -155,11 +173,11 @@ export function LiveUsage() {
                         yMax={100}
                     />
                     <TimeSeriesChart
-                        title="Memory"
+                        title={t('Memory')}
                         times={times}
                         series={[
                             {
-                                label: 'Memory used',
+                                label: t('Memory used'),
                                 color: CPU,
                                 values: column(host, 'mem'),
                             },
@@ -168,16 +186,16 @@ export function LiveUsage() {
                         yMax={now?.mem_total || undefined}
                     />
                     <TimeSeriesChart
-                        title="Network"
+                        title={t('Network')}
                         times={times}
                         series={[
                             {
-                                label: 'Received',
+                                label: t('Received'),
                                 color: DOWN,
                                 values: column(host, 'rx'),
                             },
                             {
-                                label: 'Sent',
+                                label: t('Sent'),
                                 color: UP,
                                 values: column(host, 'tx'),
                             },
@@ -189,26 +207,30 @@ export function LiveUsage() {
             </Card>
 
             <Card
-                title="Containers"
-                description="CPU is a share of one core: 100% is one full core. Memory is without reclaimable cache."
+                title={t('Containers')}
+                description={t(
+                    'CPU is a share of one core: 100% is one full core. Memory is without reclaimable cache.',
+                )}
                 flush
             >
                 {containers.length === 0 ? (
                     <p className="p-5 text-sm text-base-content/70 sm:p-6">
                         {latest
-                            ? 'No container is running.'
-                            : 'Waiting for the first readings.'}
+                            ? t('No container is running.')
+                            : t('Waiting for the first readings.')}
                     </p>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="table">
                             <thead>
                                 <tr>
-                                    <th>Container</th>
-                                    <th>App</th>
-                                    <th className="text-right">CPU</th>
-                                    <th>Memory</th>
-                                    <th className="text-right">Network</th>
+                                    <th>{t('Container')}</th>
+                                    <th>{t('App')}</th>
+                                    <th className="text-right">{t('CPU')}</th>
+                                    <th>{t('Memory')}</th>
+                                    <th className="text-right">
+                                        {t('Network')}
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -254,7 +276,10 @@ export function LiveUsage() {
                                                 <div className="flex items-center gap-2">
                                                     <UsageBar
                                                         percent={percent}
-                                                        label={`${c.name} memory used`}
+                                                        label={t(
+                                                            ':name memory used',
+                                                            { name: c.name },
+                                                        )}
                                                         className="w-20"
                                                     />
                                                     <span className="text-sm whitespace-nowrap">

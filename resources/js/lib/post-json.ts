@@ -1,3 +1,5 @@
+import { t } from '@/lib/i18n';
+
 /** Laravel's XSRF cookie, to send back as the X-XSRF-TOKEN header. */
 export function xsrfToken(): string {
     return decodeURIComponent(
@@ -31,7 +33,9 @@ export async function postJson<T>(
     });
 
     if (!response.ok) {
-        throw new Error(`Request failed (${response.status})`);
+        throw new Error(
+            t('Request failed (:status)', { status: response.status }),
+        );
     }
 
     return (await response.json()) as T;

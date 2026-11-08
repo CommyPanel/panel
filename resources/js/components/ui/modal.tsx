@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { useT } from '@/hooks/use-t';
 import { cn } from '@/lib/utils';
 
 type Props = {
@@ -31,6 +32,7 @@ export function Modal({
     footer,
     size = 'md',
 }: Props) {
+    const { t } = useT();
     const titleId = useId();
     const [mounted, setMounted] = useState(open);
     const [visible, setVisible] = useState(false);
@@ -87,7 +89,7 @@ export function Modal({
                         <button
                             type="button"
                             className="btn btn-circle btn-text btn-sm"
-                            aria-label="Close"
+                            aria-label={t('Close')}
                             onClick={onClose}
                         >
                             ✕

@@ -21,6 +21,6 @@ class DeployKeyController extends Controller
         $app->forceFill(['deploy_key_private' => $key['private'], 'deploy_key_public' => $key['public']])->save();
         $audit->record('app.deploy_key_generated', null, ['app' => $app->slug], $app);
 
-        return back()->with('status', 'Deploy key created. Add the public key to your repository, then deploy.');
+        return back()->with('status', __('Deploy key created. Add the public key to your repository, then deploy.'));
     }
 }

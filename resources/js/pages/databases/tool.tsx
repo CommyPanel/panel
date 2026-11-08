@@ -3,8 +3,10 @@ import { useEffect, useRef, useState } from 'react';
 import DatabaseToolController from '@/actions/App/Http/Controllers/DatabaseToolController';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { useT } from '@/hooks/use-t';
 import AuthLayout from '@/layouts/auth-layout';
 import { jsonHeaders } from '@/lib/post-json';
+import { Trans } from '@/lib/trans';
 import { cn } from '@/lib/utils';
 
 type Props = {
@@ -15,16 +17,7 @@ type Props = {
 };
 
 type Stage = 'pulling' | 'starting' | 'waiting' | 'ready' | 'opening';
-const STEPS: { stage: Stage; label: (tool: string) => string }[] = [
-    {
-        stage: 'pulling',
-        label: (tool) =>
-            `Getting ${tool} ready (a download the first time, a moment after that)`,
-    },
-    { stage: 'starting', label: () => 'Starting it next to your database' },
-    { stage: 'waiting', label: () => 'Waiting for it to answer' },
-    { stage: 'opening', label: () => 'Opening it in this tab' },
-];
+const STAGES: Stage[] = ['pulling', 'starting', 'waiting', 'opening'];
 
 async function call(
     method: 'GET' | 'POST',
@@ -55,6 +48,16 @@ const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
  * closes by itself.
  */
 export default function Tool({ server, database, tool, idle_minutes }: Props) {
+    const { t } = useT();
+    const labels: Record<string, string> = {
+        pulling: t(
+            'Getting :tool ready (a download the first time, a moment after that)',
+            { tool },
+        ),
+        starting: t('Starting it next to your database'),
+        waiting: t('Waiting for it to answer'),
+        opening: t('Opening it in this tab'),
+    };
     const [stage, setStage] = useState<Stage>('pulling');
     const [error, setError] = useState<string | null>(null);
     const [closed, setClosed] = useState(false);
@@ -84,7 +87,7 @@ export default function Tool({ server, database, tool, idle_minutes }: Props) {
             if (start.status !== 200) {
                 setError(
                     (start.data.error as string | undefined) ??
-                        `${tool} could not be started.`,
+                        t(':tool could not be started.', { tool }),
                 );
 
                 return;
@@ -103,7 +106,11 @@ export default function Tool({ server, database, tool, idle_minutes }: Props) {
                 );
 
                 if (status.status === 404) {
-                    setError(`${tool} closed before it was ready. Try again.`);
+                    setError(
+                        t(':tool closed before it was ready. Try again.', {
+                            tool,
+                        }),
+                    );
 
                     return;
                 }
@@ -111,7 +118,7 @@ export default function Tool({ server, database, tool, idle_minutes }: Props) {
                 if (status.status !== 200) {
                     setError(
                         (status.data.error as string | undefined) ??
-                            'The server did not answer.',
+                            t('The server did not answer.'),
                     );
 
                     return;
@@ -122,7 +129,7 @@ export default function Tool({ server, database, tool, idle_minutes }: Props) {
                 if (current === 'failed') {
                     setError(
                         (status.data.error as string | undefined) ??
-                            `${tool} could not be started.`,
+                            t(':tool could not be started.', { tool }),
                     );
 
                     return;
@@ -133,7 +140,7 @@ export default function Tool({ server, database, tool, idle_minutes }: Props) {
                 setStage(current as Stage);
 
                 if (Date.now() > deadline) {
-                    setError(`${tool} is taking too long to start.`);
+                    setError(t(':tool is taking too long to start.', { tool }));
 
                     return;
                 }
@@ -150,7 +157,7 @@ export default function Tool({ server, database, tool, idle_minutes }: Props) {
             if (open.status !== 200 || typeof open.data.url !== 'string') {
                 setError(
                     (open.data.error as string | undefined) ??
-                        `${tool} could not be opened.`,
+                        t(':tool could not be opened.', { tool }),
                 );
 
                 return;
@@ -160,7 +167,7 @@ export default function Tool({ server, database, tool, idle_minutes }: Props) {
         };
 
         void run().catch(() =>
-            setError('The connection to CommyPanel was lost. Try again.'),
+            setError(t('The connection to CommyPanel was lost. Try again.')),
         );
 
         return () => {
@@ -185,18 +192,23 @@ export default function Tool({ server, database, tool, idle_minutes }: Props) {
         setClosed(true);
     };
 
-    const order = STEPS.findIndex((step) => step.stage === stage);
+    const order = STAGES.findIndex((s) => s === stage);
 
     return (
         <AuthLayout
-            title={`Opening ${tool}`}
-            description={`${database.name} on ${server.name}`}
+            title={t('Opening :tool', { tool })}
+            description={t(':database on :server', {
+                database: database.name,
+                server: server.name,
+            })}
         >
             {closed ? (
                 <div className="space-y-4">
                     <p className="text-sm">
-                        Cancelled. {tool} was not opened. You can close this
-                        tab.
+                        {t(
+                            'Cancelled. :tool was not opened. You can close this tab.',
+                            { tool },
+                        )}
                     </p>
                 </div>
             ) : error ? (
@@ -212,23 +224,23 @@ export default function Tool({ server, database, tool, idle_minutes }: Props) {
                     </Alert>
                     <div className="flex flex-wrap gap-2">
                         <Button onClick={() => window.location.reload()}>
-                            Try again
+                            {t('Try again')}
                         </Button>
                     </div>
                     <p className="text-sm text-base-content/70">
-                        You can close this tab. Nothing is left running.
+                        {t('You can close this tab. Nothing is left running.')}
                     </p>
                 </div>
             ) : (
                 <div className="space-y-5">
-                    <ol className="space-y-3" aria-label="Progress">
-                        {STEPS.map((step, index) => {
+                    <ol className="space-y-3" aria-label={t('Progress')}>
+                        {STAGES.map((stage, index) => {
                             const done = index < order;
                             const current = index === order;
 
                             return (
                                 <li
-                                    key={step.stage}
+                                    key={stage}
                                     className={cn(
                                         'flex items-start gap-3 text-sm',
                                         !done &&
@@ -258,7 +270,7 @@ export default function Tool({ server, database, tool, idle_minutes }: Props) {
                                     <span
                                         className={cn(current && 'font-medium')}
                                     >
-                                        {step.label(tool)}
+                                        {labels[stage]}
                                     </span>
                                 </li>
                             );
@@ -267,26 +279,28 @@ export default function Tool({ server, database, tool, idle_minutes }: Props) {
 
                     <ul className="list-disc space-y-1.5 pl-5 text-sm text-base-content/80">
                         <li>
-                            {tool} is started for you alone, logged in as{' '}
-                            <code>{database.user}</code>, so you see this
-                            database and nothing else on the server.
+                            <Trans
+                                text=":tool is started for you alone, logged in as <code>:user</code>, so you see this database and nothing else on the server."
+                                components={{ code: <code /> }}
+                                values={{ tool, user: database.user }}
+                            />
                         </li>
                         <li>
-                            It closes by itself after{' '}
-                            <strong>
-                                {idle_minutes} minutes without activity
-                            </strong>
-                            , and is then deleted. Nothing stays installed.
-                            Opening the database again starts a fresh one.
+                            <Trans
+                                text="It closes by itself after <b>:minutes minutes without activity</b>, and is then deleted. Nothing stays installed. Opening the database again starts a fresh one."
+                                components={{ b: <strong /> }}
+                                values={{ minutes: idle_minutes }}
+                            />
                         </li>
                         <li>
-                            Everything you do there happens to the real
-                            database, and is not undone by closing the tab.
+                            {t(
+                                'Everything you do there happens to the real database, and is not undone by closing the tab.',
+                            )}
                         </li>
                     </ul>
 
                     <Button variant="ghost" onClick={() => void cancel()}>
-                        Cancel
+                        {t('Cancel')}
                     </Button>
                 </div>
             )}

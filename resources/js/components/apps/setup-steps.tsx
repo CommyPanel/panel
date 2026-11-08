@@ -1,4 +1,5 @@
 import { Check } from 'lucide-react';
+import { useT } from '@/hooks/use-t';
 import { cn } from '@/lib/utils';
 
 type Step = 'basics' | 'source' | 'settings' | 'domain';
@@ -11,8 +12,13 @@ export function Stepper({
     steps: { id: string; label: string }[];
     index: number;
 }) {
+    const { t } = useT();
+
     return (
-        <ol className="mb-6 flex flex-wrap gap-x-6 gap-y-2" aria-label="Steps">
+        <ol
+            className="mb-6 flex flex-wrap gap-x-6 gap-y-2"
+            aria-label={t('Steps')}
+        >
             {steps.map((step, i) => (
                 <li
                     key={step.id}
@@ -55,14 +61,16 @@ export function SetupSteps({
     current: Step;
     source: string;
 }) {
+    const { t } = useT();
     const steps: { id: Step; label: string }[] = [
-        { id: 'basics', label: 'Basics' },
+        { id: 'basics', label: t('Basics') },
         {
             id: 'source',
-            label: source === 'upload' ? 'Upload code' : 'Repository access',
+            label:
+                source === 'upload' ? t('Upload code') : t('Repository access'),
         },
-        { id: 'settings', label: 'Settings' },
-        { id: 'domain', label: 'Domain' },
+        { id: 'settings', label: t('Settings') },
+        { id: 'domain', label: t('Domain') },
     ];
     return (
         <Stepper

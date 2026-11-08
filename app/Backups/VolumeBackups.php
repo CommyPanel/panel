@@ -36,7 +36,7 @@ class VolumeBackups
         $dir = $this->directory($app);
 
         if (! is_dir($dir) && ! @mkdir($dir, 0700, true) && ! is_dir($dir)) {
-            throw new BackupFailed("The backup folder {$dir} could not be created.");
+            throw new BackupFailed(__('The backup folder :dir could not be created.', ['dir' => $dir]));
         }
 
         $name = $volume.'-'.date('Ymd-His').'.tar.gz';
@@ -44,7 +44,7 @@ class VolumeBackups
         try {
             $this->host->backupVolume($app->slug, $volume, $dir.'/'.$name);
         } catch (HostOperationFailed $e) {
-            throw new BackupFailed("Could not back up {$volume}: {$e->getMessage()}", 0, $e);
+            throw new BackupFailed(__('Could not back up :volume: :error', ['volume' => $volume, 'error' => $e->getMessage()]), 0, $e);
         }
 
         @chmod($dir.'/'.$name, 0600);
@@ -80,7 +80,7 @@ class VolumeBackups
         $path = $this->directory($app).'/'.$name;
 
         if (preg_match(self::NAME, $name) !== 1 || ! is_file($path)) {
-            throw new BackupFailed('There is no such backup.');
+            throw new BackupFailed(__('There is no such backup.'));
         }
 
         return $path;

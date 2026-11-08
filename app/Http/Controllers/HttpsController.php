@@ -22,7 +22,7 @@ class HttpsController extends Controller
             $https->disable();
             $audit->record('https.disabled');
 
-            return back()->with('status', 'Automatic HTTPS is off. Existing certificates keep working until they expire.');
+            return back()->with('status', __('Automatic HTTPS is off. Existing certificates keep working until they expire.'));
         }
 
         $https->enable($data['email'] ?? null);
@@ -32,6 +32,6 @@ class HttpsController extends Controller
             $tls->ensure($app);
         }
 
-        return back()->with('status', 'Automatic HTTPS is on. Certificates are requested as domains connect.');
+        return back()->with('status', __('Automatic HTTPS is on. Certificates are requested as domains connect.'));
     }
 }

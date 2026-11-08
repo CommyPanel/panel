@@ -25,11 +25,11 @@ class DatabaseNames
         $name = trim($name);
 
         if (preg_match('/^[a-z][a-z0-9_]{0,30}$/', $name) !== 1) {
-            throw new DatabaseException('Use lowercase letters, digits and underscores, starting with a letter, up to 31 characters.');
+            throw new DatabaseException(__('Use lowercase letters, digits and underscores, starting with a letter, up to 31 characters.'));
         }
 
         if (in_array($name, self::RESERVED_DATABASES, true) || self::reservedUser($name)) {
-            throw new DatabaseException("{$name} is a name the database server keeps for itself.");
+            throw new DatabaseException(__(':name is a name the database server keeps for itself.', ['name' => $name]));
         }
 
         return $name;
@@ -84,11 +84,11 @@ class DatabaseNames
         $prefix = strtoupper(trim($prefix));
 
         if (preg_match('/^[A-Z][A-Z0-9_]{0,30}$/', $prefix) !== 1) {
-            throw new DatabaseException('Use capital letters, digits and underscores, starting with a letter.');
+            throw new DatabaseException(__('Use capital letters, digits and underscores, starting with a letter.'));
         }
 
         if (in_array($prefix, ['PORT', 'PATH', 'HOME', 'USER', 'HOSTNAME', 'ASPNETCORE'], true)) {
-            throw new DatabaseException("{$prefix} would replace an important variable. Choose another name.");
+            throw new DatabaseException(__(':prefix would replace an important variable. Choose another name.', ['prefix' => $prefix]));
         }
 
         return $prefix;

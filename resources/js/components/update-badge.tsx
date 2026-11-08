@@ -1,5 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import { CircleArrowUp } from 'lucide-react';
+import { useT } from '@/hooks/use-t';
 import { Tooltip } from '@/components/ui/tooltip';
 
 /**
@@ -9,13 +10,21 @@ import { Tooltip } from '@/components/ui/tooltip';
  */
 export function UpdateBadge() {
     const { update } = usePage().props;
+    const { t } = useT();
 
     if (!update) return null;
 
-    const label = `A newer version of CommyPanel is available (${update.latest}). You are running ${update.current}.`;
+    const label = t(
+        'A newer version of CommyPanel is available (:latest). You are running :current.',
+        { latest: update.latest, current: update.current },
+    );
 
     return (
-        <Tooltip label={`A newer version is available (${update.latest})`}>
+        <Tooltip
+            label={t('A newer version is available (:latest)', {
+                latest: update.latest,
+            })}
+        >
             <Link
                 href="/settings/updates"
                 aria-label={label}
@@ -28,7 +37,7 @@ export function UpdateBadge() {
                     />
                     <CircleArrowUp className="relative size-4" aria-hidden />
                 </span>
-                <span className="hidden sm:inline">Update</span>
+                <span className="hidden sm:inline">{t('Update')}</span>
             </Link>
         </Tooltip>
     );

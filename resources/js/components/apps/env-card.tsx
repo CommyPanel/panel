@@ -5,10 +5,12 @@ import EnvVarController from '@/actions/App/Http/Controllers/EnvVarController';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useT } from '@/hooks/use-t';
 
 type Props = { slug: string; keys: string[] };
 
 export function EnvCard({ slug, keys }: Props) {
+    const { t } = useT();
     const form = useForm({ key: '', value: '' });
 
     const submit = (event: FormEvent) => {
@@ -26,8 +28,10 @@ export function EnvCard({ slug, keys }: Props) {
 
     return (
         <Card
-            title="Environment variables"
-            description="Values are stored encrypted and never shown again. Changes reach the running app when you apply them (a button appears on the app) or deploy. PORT is set for you."
+            title={t('Environment variables')}
+            description={t(
+                'Values are stored encrypted and never shown again. Changes reach the running app when you apply them (a button appears on the app) or deploy. PORT is set for you.',
+            )}
         >
             {keys.length > 0 && (
                 <ul className="divide-y divide-base-300 rounded-field border border-base-300">
@@ -40,7 +44,7 @@ export function EnvCard({ slug, keys }: Props) {
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                aria-label={`Remove ${key}`}
+                                aria-label={t('Remove :name', { name: key })}
                                 onClick={() => remove(key)}
                             >
                                 <Trash2 className="size-4" />
@@ -51,7 +55,7 @@ export function EnvCard({ slug, keys }: Props) {
             )}
             <form onSubmit={submit} className="space-y-4">
                 <Input
-                    label="Name"
+                    label={t('Name')}
                     placeholder="DATABASE_URL"
                     required
                     value={form.data.key}
@@ -59,7 +63,7 @@ export function EnvCard({ slug, keys }: Props) {
                     error={form.errors.key}
                 />
                 <Input
-                    label="Value"
+                    label={t('Value')}
                     type="password"
                     autoComplete="off"
                     value={form.data.value}
@@ -67,7 +71,7 @@ export function EnvCard({ slug, keys }: Props) {
                     error={form.errors.value}
                 />
                 <Button type="submit" loading={form.processing}>
-                    Save variable
+                    {t('Save variable')}
                 </Button>
             </form>
         </Card>

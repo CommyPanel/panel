@@ -21,7 +21,7 @@ class DeploymentController extends Controller
     public function store(Request $request, App $app, Deployer $deployer): RedirectResponse
     {
         if ($this->inProgress($app)) {
-            return back()->withErrors(['deploy' => 'A deployment is already in progress.']);
+            return back()->withErrors(['deploy' => __('A deployment is already in progress.')]);
         }
 
         $deployment = $deployer->deploy($app, $request->user());
@@ -41,7 +41,7 @@ class DeploymentController extends Controller
     public function rollback(Request $request, App $app, Deployment $deployment, Deployer $deployer): RedirectResponse
     {
         if ($this->inProgress($app)) {
-            return back()->withErrors(['deploy' => 'A deployment is already in progress.']);
+            return back()->withErrors(['deploy' => __('A deployment is already in progress.')]);
         }
 
         try {
@@ -61,7 +61,7 @@ class DeploymentController extends Controller
         $data = $request->validate(['watch' => ['required', 'boolean']]);
 
         if ($this->inProgress($app)) {
-            return back()->withErrors(['deploy' => 'A deployment is already in progress.']);
+            return back()->withErrors(['deploy' => __('A deployment is already in progress.')]);
         }
 
         try {
@@ -83,7 +83,7 @@ class DeploymentController extends Controller
         $watch->finish($app, 'A person ended the watch.');
         $audit->record('deploy.watch_ended', $request->user(), ['app' => $app->slug, 'deployment' => $deployment->number], $app);
 
-        return back()->with('status', 'The watch is over. The previous version was stopped.');
+        return back()->with('status', __('The watch is over. The previous version was stopped.'));
     }
 
     /**
@@ -92,7 +92,7 @@ class DeploymentController extends Controller
     public function apply(Request $request, App $app, Deployer $deployer): RedirectResponse
     {
         if ($this->inProgress($app)) {
-            return back()->withErrors(['deploy' => 'A deployment is already in progress.']);
+            return back()->withErrors(['deploy' => __('A deployment is already in progress.')]);
         }
 
         try {

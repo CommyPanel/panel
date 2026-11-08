@@ -134,7 +134,7 @@ class AppController extends Controller
         $app->update($request->validated());
         $audit->record('app.updated', null, ['app' => $app->slug], $app);
 
-        return back()->with('status', 'Settings saved. They apply from the next deployment.');
+        return back()->with('status', __('Settings saved. They apply from the next deployment.'));
     }
 
     public function destroy(Request $request, App $app, DestroyApp $destroy, AuditLogger $audit): RedirectResponse
@@ -153,10 +153,10 @@ class AppController extends Controller
 
         $audit->record('app.deleted', null, ['app' => $slug, 'cleanup_problems' => $problems]);
 
-        $redirect = redirect()->route('apps.index')->with('status', "App {$slug} deleted.");
+        $redirect = redirect()->route('apps.index')->with('status', __('App :slug deleted.', ['slug' => $slug]));
 
         return $problems === []
             ? $redirect
-            : $redirect->with('warning', 'Some resources could not be removed: '.implode('; ', $problems));
+            : $redirect->with('warning', __('Some resources could not be removed: :problems', ['problems' => implode('; ', $problems)]));
     }
 }

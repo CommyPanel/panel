@@ -31,6 +31,7 @@ import { UpdateBadge } from '@/components/update-badge';
 import { Toaster } from '@/components/ui/toaster';
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
 import { HostBanner } from '@/components/host-banner';
+import { useT } from '@/hooks/use-t';
 import { fortify } from '@/lib/fortify';
 import { notify } from '@/lib/toast';
 import { cn } from '@/lib/utils';
@@ -43,106 +44,112 @@ type NavItem = {
     permission?: string;
 };
 
-const NAV: { heading: string; items: NavItem[] }[] = [
+const navigation = (
+    t: (key: string) => string,
+): { heading: string; items: NavItem[] }[] => [
     {
-        heading: 'Menu',
+        heading: t('Menu'),
         items: [
-            { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+            {
+                href: '/dashboard',
+                label: t('Dashboard'),
+                icon: LayoutDashboard,
+            },
             {
                 href: '/apps',
-                label: 'Apps',
+                label: t('Apps'),
                 icon: Boxes,
                 permission: 'apps.view',
             },
             {
                 href: '/databases',
-                label: 'Databases',
+                label: t('Databases'),
                 icon: Database,
                 permission: 'databases.view',
             },
             {
                 href: '/domains',
-                label: 'Domains',
+                label: t('Domains'),
                 icon: Globe,
                 permission: 'domains.view',
             },
             {
                 href: '/server',
-                label: 'Server',
+                label: t('Server'),
                 icon: Server,
                 permission: 'server.view',
             },
         ],
     },
     {
-        heading: 'Access',
+        heading: t('Access'),
         items: [
             {
                 href: '/users',
-                label: 'Users',
+                label: t('Users'),
                 icon: Users,
                 permission: 'users.view',
             },
             {
                 href: '/roles',
-                label: 'Roles',
+                label: t('Roles'),
                 icon: UserCog,
                 permission: 'roles.view',
             },
             {
                 href: '/permissions',
-                label: 'Permissions',
+                label: t('Permissions'),
                 icon: KeyRound,
                 permission: 'permissions.view',
             },
         ],
     },
     {
-        heading: 'Settings',
+        heading: t('Settings'),
         items: [
             {
                 href: '/settings/appearance',
-                label: 'Appearance',
+                label: t('Appearance'),
                 icon: Palette,
             },
             {
                 href: '/settings/security',
-                label: 'Security',
+                label: t('Security'),
                 icon: ShieldCheck,
             },
             {
                 href: '/settings/tokens',
-                label: 'API tokens',
+                label: t('API tokens'),
                 icon: Braces,
                 permission: 'tokens.manage',
             },
             {
                 href: '/settings/audit-log',
-                label: 'Audit log',
+                label: t('Audit log'),
                 icon: ScrollText,
                 permission: 'audit.view',
             },
             {
                 href: '/settings/backups',
-                label: 'Backups',
+                label: t('Backups'),
                 icon: DatabaseBackup,
                 permission: 'backups.view',
             },
             {
                 href: '/settings/github',
-                label: 'GitHub',
+                label: t('GitHub'),
                 icon: GitBranch,
                 permission: 'github.manage',
             },
             {
                 href: '/settings/notifications',
-                label: 'Notifications',
+                label: t('Notifications'),
                 icon: Bell,
                 permission: 'notifications.manage',
             },
             {
                 href: '/settings/updates',
-                label: 'Updates',
+                label: t('Updates'),
                 icon: CircleArrowUp,
                 permission: 'server.view',
             },
@@ -170,15 +177,18 @@ type SidebarProps = {
 function Sidebar({ collapsed, url, name, onNavigate }: SidebarProps) {
     const { auth, update } = usePage().props;
     const { permissions } = auth;
+    const { t } = useT();
     // Only what the user may open; a group with nothing left disappears.
-    const visibleNav = NAV.map((group) => ({
-        ...group,
-        items: group.items.filter(
-            (item) =>
-                item.permission === undefined ||
-                permissions.includes(item.permission),
-        ),
-    })).filter((group) => group.items.length > 0);
+    const visibleNav = navigation(t)
+        .map((group) => ({
+            ...group,
+            items: group.items.filter(
+                (item) =>
+                    item.permission === undefined ||
+                    permissions.includes(item.permission),
+            ),
+        }))
+        .filter((group) => group.items.length > 0);
 
     return (
         <div className="flex h-full flex-col">
@@ -191,7 +201,7 @@ function Sidebar({ collapsed, url, name, onNavigate }: SidebarProps) {
                 <Brand name={name} showName={!collapsed} />
             </div>
             <nav
-                aria-label="Main navigation"
+                aria-label={t('Main navigation')}
                 className="flex-1 space-y-6 overflow-y-auto px-3 py-4"
             >
                 {visibleNav.map((group) => (
@@ -251,7 +261,9 @@ function Sidebar({ collapsed, url, name, onNavigate }: SidebarProps) {
                                                                 'lg:hidden',
                                                         )}
                                                         role="img"
-                                                        aria-label="A newer version is available"
+                                                        aria-label={t(
+                                                            'A newer version is available',
+                                                        )}
                                                     />
                                                 )}
                                         </Link>
@@ -271,6 +283,7 @@ type Props = { title: string; children: ReactNode };
 export default function AppLayout({ title, children }: Props) {
     const { name, auth, flash } = usePage().props;
     const { url } = usePage();
+    const { t } = useT();
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [collapsed, setCollapsed] = useState(readCollapsed);
 
@@ -329,14 +342,14 @@ export default function AppLayout({ title, children }: Props) {
                     <div className="fixed inset-0 z-40 lg:hidden">
                         <button
                             type="button"
-                            aria-label="Close menu"
+                            aria-label={t('Close menu')}
                             className="absolute inset-0 bg-black/50"
                             onClick={() => setDrawerOpen(false)}
                         />
                         <aside className="absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-base-100 shadow-xl">
                             <button
                                 type="button"
-                                aria-label="Close menu"
+                                aria-label={t('Close menu')}
                                 className="btn absolute top-4 right-3 btn-circle btn-text btn-sm"
                                 onClick={() => setDrawerOpen(false)}
                             >
@@ -361,7 +374,7 @@ export default function AppLayout({ title, children }: Props) {
                     <header className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-base-300 bg-base-100 px-4 sm:px-6">
                         <button
                             type="button"
-                            aria-label="Open menu"
+                            aria-label={t('Open menu')}
                             className="btn btn-circle btn-text btn-sm lg:hidden"
                             onClick={() => setDrawerOpen(true)}
                         >
@@ -371,8 +384,8 @@ export default function AppLayout({ title, children }: Props) {
                             type="button"
                             aria-label={
                                 collapsed
-                                    ? 'Expand sidebar'
-                                    : 'Collapse sidebar'
+                                    ? t('Expand sidebar')
+                                    : t('Collapse sidebar')
                             }
                             className="btn hidden btn-circle btn-text btn-sm lg:inline-flex"
                             onClick={toggleCollapsed}
@@ -388,7 +401,7 @@ export default function AppLayout({ title, children }: Props) {
                             <UpdateBadge />
                             <ThemeMenu />
                             <Dropdown
-                                label="Account menu"
+                                label={t('Account menu')}
                                 trigger={
                                     <>
                                         <span className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
@@ -419,7 +432,7 @@ export default function AppLayout({ title, children }: Props) {
                                             }}
                                         >
                                             <ShieldCheck className="size-4" />
-                                            Security
+                                            {t('Security')}
                                         </DropdownItem>
                                         <DropdownItem
                                             tone="danger"
@@ -429,7 +442,7 @@ export default function AppLayout({ title, children }: Props) {
                                             }}
                                         >
                                             <LogOut className="size-4" />
-                                            Log out
+                                            {t('Log out')}
                                         </DropdownItem>
                                     </>
                                 )}

@@ -78,6 +78,6 @@ class DomainController extends Controller
         // From a domain's own page there is nothing to go back to.
         $redirect = $request->input('return') === 'domains' ? redirect()->route('domains.index') : back();
 
-        return $redirect->with('status', "{$name} removed.");
+        return $redirect->with('status', __(':name removed.', ['name' => $name]));
     }
 }

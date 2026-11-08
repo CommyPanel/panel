@@ -1,39 +1,40 @@
 import { CheckCircle2, Circle, Loader2, XCircle } from 'lucide-react';
+import { useT } from '@/hooks/use-t';
 import { cn } from '@/lib/utils';
 import type { DeploymentStage, DeploymentStatus } from '@/types';
 
 type Step = { stage: DeploymentStage; label: string; detail: string };
 
-const STEPS: Step[] = [
+const steps = (t: (key: string) => string): Step[] => [
     {
         stage: 'fetch',
-        label: 'Get the code',
-        detail: 'Clone the repository or unpack the upload',
+        label: t('Get the code'),
+        detail: t('Clone the repository or unpack the upload'),
     },
     {
         stage: 'build',
-        label: 'Build the image',
-        detail: 'Detect the project and build a container image',
+        label: t('Build the image'),
+        detail: t('Detect the project and build a container image'),
     },
     {
         stage: 'release',
-        label: 'Release command',
-        detail: 'Run the release command in the new image',
+        label: t('Release command'),
+        detail: t('Run the release command in the new image'),
     },
     {
         stage: 'start',
-        label: 'Start the container',
-        detail: 'Run the new version next to the old one',
+        label: t('Start the container'),
+        detail: t('Run the new version next to the old one'),
     },
     {
         stage: 'health',
-        label: 'Health check',
-        detail: 'Wait until the app answers',
+        label: t('Health check'),
+        detail: t('Wait until the app answers'),
     },
     {
         stage: 'switch',
-        label: 'Go live',
-        detail: 'Move traffic to the new version',
+        label: t('Go live'),
+        detail: t('Move traffic to the new version'),
     },
 ];
 
@@ -68,12 +69,12 @@ const ICONS = {
     pending: <Circle className="size-5 text-base-content/40" aria-hidden />,
 };
 
-const STATE_LABEL: Record<State, string> = {
-    done: 'done',
-    active: 'in progress',
-    failed: 'failed',
-    pending: 'waiting',
-};
+const stateLabels = (t: (key: string) => string): Record<State, string> => ({
+    done: t('done'),
+    active: t('in progress'),
+    failed: t('failed'),
+    pending: t('waiting'),
+});
 
 type Props = {
     stage: DeploymentStage | null;
@@ -89,19 +90,21 @@ export function DeploymentStages({
     isRollback,
     hasReleaseCommand,
 }: Props) {
-    const steps = STEPS.filter((s) => {
+    const { t } = useT();
+    const labels = stateLabels(t);
+    const list = steps(t).filter((s) => {
         if (s.stage === 'release') return hasReleaseCommand && !isRollback;
         if (s.stage === 'fetch' || s.stage === 'build') return !isRollback;
         return true;
     });
     const current =
         stage === 'done'
-            ? steps.length
-            : steps.findIndex((s) => s.stage === stage);
+            ? list.length
+            : list.findIndex((s) => s.stage === stage);
 
     return (
-        <ol className="space-y-1" aria-label="Deployment progress">
-            {steps.map((step, index) => {
+        <ol className="space-y-1" aria-label={t('Deployment progress')}>
+            {list.map((step, index) => {
                 const state = stateOf(index, current, status);
 
                 return (
@@ -125,7 +128,7 @@ export function DeploymentStages({
                                 {step.label}
                                 <span className="sr-only">
                                     {' '}
-                                    ({STATE_LABEL[state]})
+                                    ({labels[state]})
                                 </span>
                             </span>
                             <span className="block text-xs text-base-content/70">

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { useT } from '@/hooks/use-t';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 
@@ -18,6 +19,7 @@ type GitHubRepos = {
 };
 
 export default function Create({ github }: { github: GitHubRepos | null }) {
+    const { t } = useT();
     const form = useForm({
         name: '',
         stack_hint: '',
@@ -38,40 +40,44 @@ export default function Create({ github }: { github: GitHubRepos | null }) {
             ? [
                   {
                       value: 'github',
-                      title: 'GitHub repository',
-                      text: 'Pick one of the repositories you gave CommyPanel access to.',
+                      title: t('GitHub repository'),
+                      text: t(
+                          'Pick one of the repositories you gave CommyPanel access to.',
+                      ),
                       icon: GitPullRequest,
                   },
               ]
             : []),
         {
             value: 'git',
-            title: 'Git repository',
-            text: 'GitHub, GitLab, Bitbucket or any Git server',
+            title: t('Git repository'),
+            text: t('GitHub, GitLab, Bitbucket or any Git server'),
             icon: GitBranch,
         },
         {
             value: 'upload',
-            title: "I'll upload it myself",
-            text: 'A .zip or .tar.gz of your project',
+            title: t("I'll upload it myself"),
+            text: t('A .zip or .tar.gz of your project'),
             icon: Upload,
         },
     ];
 
     return (
-        <AppLayout title="New app">
+        <AppLayout title={t('New app')}>
             <PageHeader
-                title="New app"
-                description="Tell us what to run and where the code lives. You will get a live view while it is built."
+                title={t('New app')}
+                description={t(
+                    'Tell us what to run and where the code lives. You will get a live view while it is built.',
+                )}
             />
             <SetupSteps
                 current="basics"
                 source={form.data.source === 'upload' ? 'upload' : 'git'}
             />
             <form onSubmit={submit} className="space-y-6">
-                <Card title="1. The basics">
+                <Card title={t('1. The basics')}>
                     <Input
-                        label="App name"
+                        label={t('App name')}
                         required
                         autoFocus
                         value={form.data.name}
@@ -79,22 +85,24 @@ export default function Create({ github }: { github: GitHubRepos | null }) {
                         error={form.errors.name}
                     />
                     <Select
-                        label="App type (optional)"
+                        label={t('App type (optional)')}
                         value={form.data.stack_hint}
                         onChange={(e) =>
                             form.setData('stack_hint', e.target.value)
                         }
                         error={form.errors.stack_hint}
-                        hint="Leave on automatic and CommyPanel detects it from your code. A Dockerfile in your project always wins."
+                        hint={t(
+                            'Leave on automatic and CommyPanel detects it from your code. A Dockerfile in your project always wins.',
+                        )}
                     >
-                        <option value="">Detect automatically</option>
+                        <option value="">{t('Detect automatically')}</option>
                         <option value="dotnet">.NET</option>
                         <option value="go">Go</option>
                         <option value="node">Node.js</option>
                     </Select>
                     <fieldset className="space-y-2">
                         <legend className="mb-1 label-text">
-                            Where is the code?
+                            {t('Where is the code?')}
                         </legend>
                         <div className="grid gap-3 sm:grid-cols-2">
                             {sources.map((source) => (
@@ -140,7 +148,7 @@ export default function Create({ github }: { github: GitHubRepos | null }) {
                                 <Alert variant="error">{github.error}</Alert>
                             )}
                             <Select
-                                label="Repository"
+                                label={t('Repository')}
                                 required
                                 value={form.data.github_repo}
                                 onChange={(e) => {
@@ -155,18 +163,24 @@ export default function Create({ github }: { github: GitHubRepos | null }) {
                                     }));
                                 }}
                                 error={form.errors.github_repo}
-                                hint="Missing one? Give the CommyPanel app access to it on GitHub, then reload this page."
+                                hint={t(
+                                    'Missing one? Give the CommyPanel app access to it on GitHub, then reload this page.',
+                                )}
                             >
-                                <option value="">Choose a repository</option>
+                                <option value="">
+                                    {t('Choose a repository')}
+                                </option>
                                 {github.repositories.map((repo) => (
                                     <option key={repo.name} value={repo.name}>
                                         {repo.name}
-                                        {repo.private ? ' (private)' : ''}
+                                        {repo.private
+                                            ? ` ${t('(private)')}`
+                                            : ''}
                                     </option>
                                 ))}
                             </Select>
                             <Input
-                                label="Branch"
+                                label={t('Branch')}
                                 required
                                 value={form.data.git_branch}
                                 onChange={(e) =>
@@ -188,13 +202,19 @@ export default function Create({ github }: { github: GitHubRepos | null }) {
                                     }
                                 />
                                 <span className="text-sm">
-                                    Deploy on every push to this branch
+                                    {t('Deploy on every push to this branch')}
                                     <span className="block text-base-content/70">
-                                        Off by default. When on, each push to{' '}
-                                        {form.data.git_branch || 'the branch'}{' '}
-                                        builds and deploys the app by itself.
-                                        You can change it later in the
-                                        app&apos;s settings.
+                                        {form.data.git_branch
+                                            ? t(
+                                                  "Off by default. When on, each push to :branch builds and deploys the app by itself. You can change it later in the app's settings.",
+                                                  {
+                                                      branch: form.data
+                                                          .git_branch,
+                                                  },
+                                              )
+                                            : t(
+                                                  "Off by default. When on, each push to the branch builds and deploys the app by itself. You can change it later in the app's settings.",
+                                              )}
                                     </span>
                                 </span>
                             </label>
@@ -203,7 +223,7 @@ export default function Create({ github }: { github: GitHubRepos | null }) {
                     {form.data.source === 'git' && (
                         <>
                             <Input
-                                label="Repository address"
+                                label={t('Repository address')}
                                 placeholder="https://github.com/you/app.git or git@github.com:you/app.git"
                                 required
                                 value={form.data.git_url}
@@ -213,7 +233,7 @@ export default function Create({ github }: { github: GitHubRepos | null }) {
                                 error={form.errors.git_url}
                             />
                             <Input
-                                label="Branch"
+                                label={t('Branch')}
                                 required
                                 value={form.data.git_branch}
                                 onChange={(e) =>
@@ -226,10 +246,10 @@ export default function Create({ github }: { github: GitHubRepos | null }) {
                 </Card>
                 <div className="flex gap-2">
                     <Button type="submit" loading={form.processing}>
-                        Continue
+                        {t('Continue')}
                     </Button>
                     <Link href={AppController.index()} className="btn btn-text">
-                        Cancel
+                        {t('Cancel')}
                     </Link>
                 </div>
             </form>

@@ -25,7 +25,7 @@ class EnvVarController extends Controller
 
         $audit->record('app.env_set', null, ['app' => $app->slug, 'key' => $data['key']], $app);
 
-        return back()->with('status', "{$data['key']} saved. Apply changes to use it.");
+        return back()->with('status', __(':key saved. Apply changes to use it.', ['key' => $data['key']]));
     }
 
     public function import(Request $request, App $app, EnvParser $parser, AuditLogger $audit): RedirectResponse
@@ -34,7 +34,7 @@ class EnvVarController extends Controller
         $parsed = $parser->parse($data['env']);
 
         if ($parsed['vars'] === []) {
-            return back()->withErrors(['env' => 'No variables found. Use one KEY=value per line.']);
+            return back()->withErrors(['env' => __('No variables found. Use one KEY=value per line.')]);
         }
 
         foreach ($parsed['vars'] as $key => $value) {
@@ -44,8 +44,10 @@ class EnvVarController extends Controller
         $audit->record('app.env_imported', null, ['app' => $app->slug, 'keys' => array_keys($parsed['vars'])], $app);
 
         $skipped = count($parsed['skipped']);
-        $message = count($parsed['vars']).' variable(s) saved. Apply changes to use them.'
-            .($skipped > 0 ? " {$skipped} line(s) were skipped." : '');
+        $saved = count($parsed['vars']);
+        $message = $skipped > 0
+            ? __(':count variable(s) saved. Apply changes to use them. :skipped line(s) were skipped.', ['count' => $saved, 'skipped' => $skipped])
+            : __(':count variable(s) saved. Apply changes to use them.', ['count' => $saved]);
 
         return back()->with('status', $message);
     }
@@ -55,6 +57,6 @@ class EnvVarController extends Controller
         $app->envVars()->where('key', $key)->delete();
         $audit->record('app.env_removed', null, ['app' => $app->slug, 'key' => $key], $app);
 
-        return back()->with('status', "{$key} removed. Apply the changes to stop using it.");
+        return back()->with('status', __(':key removed. Apply the changes to stop using it.', ['key' => $key]));
     }
 }

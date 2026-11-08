@@ -11,9 +11,11 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useProgress } from '@/hooks/use-progress';
+import { useT } from '@/hooks/use-t';
 import SetupLayout from '@/layouts/setup-layout';
 import { formatDate } from '@/lib/format';
 import { postQuietly } from '@/lib/post-json';
+import { Trans } from '@/lib/trans';
 import type { HttpsSettings, ServerAddress } from '@/types';
 
 type Panel = {
@@ -34,6 +36,7 @@ type Panel = {
 type Props = { https: HttpsSettings; server: ServerAddress; panel: Panel };
 
 export default function Welcome({ https, server, panel }: Props) {
+    const { t } = useT();
     // The page follows DNS and the certificate by itself: it re-checks DNS while that is
     // not right yet, and keeps looking until the certificate is in place or has failed.
     const waitingForDns =
@@ -54,8 +57,10 @@ export default function Welcome({ https, server, panel }: Props) {
 
     return (
         <SetupLayout
-            title="Welcome to CommyPanel"
-            description="Two quick steps to serve the panel on your own domain with HTTPS. You can skip both and do them later."
+            title={t('Welcome to CommyPanel')}
+            description={t(
+                'Two quick steps to serve the panel on your own domain with HTTPS. You can skip both and do them later.',
+            )}
             step={https.enabled ? 2 : 1}
         >
             {!https.enabled ? (
@@ -69,8 +74,8 @@ export default function Welcome({ https, server, panel }: Props) {
                     className="btn btn-primary"
                 >
                     {https.enabled && panel.certificate.status === 'active'
-                        ? 'Finish'
-                        : 'Skip for now'}
+                        ? t('Finish')
+                        : t('Skip for now')}
                 </Link>
             </div>
         </SetupLayout>
@@ -78,6 +83,7 @@ export default function Welcome({ https, server, panel }: Props) {
 }
 
 function TermsStep({ https }: { https: HttpsSettings }) {
+    const { t } = useT();
     const form = useForm({ agree: false, email: '' });
 
     const submit = (event: FormEvent) => {
@@ -88,23 +94,28 @@ function TermsStep({ https }: { https: HttpsSettings }) {
     return (
         <Card
             title="Let's Encrypt"
-            description="Free certificates for the panel and your apps, renewed automatically. Let's Encrypt asks you to accept its agreement first."
+            description={t(
+                "Free certificates for the panel and your apps, renewed automatically. Let's Encrypt asks you to accept its agreement first.",
+            )}
         >
             {https.staging && (
                 <Alert variant="warning">
-                    Test mode: certificates come from Let's Encrypt's staging
-                    service, so browsers will warn about them.
+                    {t(
+                        "Test mode: certificates come from Let's Encrypt's staging service, so browsers will warn about them.",
+                    )}
                 </Alert>
             )}
             <form onSubmit={submit} className="space-y-4">
                 <Input
-                    label="Contact email (optional)"
+                    label={t('Contact email (optional)')}
                     type="email"
                     placeholder="you@example.com"
                     value={form.data.email}
                     onChange={(e) => form.setData('email', e.target.value)}
                     error={form.errors.email}
-                    hint="Sent to Let's Encrypt so they can warn you about problems with your certificates."
+                    hint={t(
+                        "Sent to Let's Encrypt so they can warn you about problems with your certificates.",
+                    )}
                 />
                 <label className="flex items-start gap-3 text-sm">
                     <input
@@ -116,16 +127,19 @@ function TermsStep({ https }: { https: HttpsSettings }) {
                         }
                     />
                     <span>
-                        I agree to the{' '}
-                        <a
-                            href="https://letsencrypt.org/repository/"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="link link-primary"
-                        >
-                            Let's Encrypt Subscriber Agreement
-                        </a>
-                        .
+                        <Trans
+                            text="I agree to the <link>Let's Encrypt Subscriber Agreement</link>."
+                            components={{
+                                link: (
+                                    <a
+                                        href="https://letsencrypt.org/repository/"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="link link-primary"
+                                    />
+                                ),
+                            }}
+                        />
                     </span>
                 </label>
                 {form.errors.agree && (
@@ -139,7 +153,7 @@ function TermsStep({ https }: { https: HttpsSettings }) {
                     disabled={!form.data.agree}
                 >
                     <Lock className="size-4" aria-hidden />
-                    Turn on HTTPS
+                    {t('Turn on HTTPS')}
                 </Button>
             </form>
         </Card>
@@ -166,6 +180,7 @@ function DomainStep({
 }
 
 function ChooseDomain() {
+    const { t } = useT();
     const form = useForm({ domain: '' });
 
     const submit = (event: FormEvent) => {
@@ -175,21 +190,25 @@ function ChooseDomain() {
 
     return (
         <Card
-            title="Panel domain"
-            description="Serve this panel on a domain of your own, on the normal HTTPS port. Until then it stays reachable on its current address."
+            title={t('Panel domain')}
+            description={t(
+                'Serve this panel on a domain of your own, on the normal HTTPS port. Until then it stays reachable on its current address.',
+            )}
         >
             <form onSubmit={submit} className="space-y-4">
                 <Input
-                    label="Domain"
+                    label={t('Domain')}
                     placeholder="panel.example.com"
                     required
                     value={form.data.domain}
                     onChange={(e) => form.setData('domain', e.target.value)}
                     error={form.errors.domain}
-                    hint="A domain or subdomain you control. The next screen shows the DNS records to create."
+                    hint={t(
+                        'A domain or subdomain you control. The next screen shows the DNS records to create.',
+                    )}
                 />
                 <Button type="submit" loading={form.processing}>
-                    Continue
+                    {t('Continue')}
                 </Button>
             </form>
         </Card>
@@ -205,6 +224,7 @@ function DomainStatus({
     server: ServerAddress;
     progress: { waiting: boolean; gaveUp: boolean };
 }) {
+    const { t } = useT();
     const [checking, setChecking] = useState(false);
     const { certificate, dns } = panel;
     const verified = dns?.status === 'verified';
@@ -222,7 +242,7 @@ function DomainStatus({
 
     return (
         <Card
-            title={panel.domain ?? 'Panel domain'}
+            title={panel.domain ?? t('Panel domain')}
             actions={
                 <Button
                     variant="ghost"
@@ -233,7 +253,7 @@ function DomainStatus({
                         })
                     }
                 >
-                    Use another domain
+                    {t('Use another domain')}
                 </Button>
             }
         >
@@ -242,11 +262,19 @@ function DomainStatus({
                     <Alert variant="success">
                         <Lock className="size-4 shrink-0" aria-hidden />
                         <span>
-                            The panel is now served at {panel.url}
                             {certificate.expires_at
-                                ? ` (certificate valid until ${formatDate(certificate.expires_at)})`
-                                : ''}
-                            .
+                                ? t(
+                                      'The panel is now served at :url (certificate valid until :date).',
+                                      {
+                                          url: panel.url,
+                                          date: formatDate(
+                                              certificate.expires_at,
+                                          ),
+                                      },
+                                  )
+                                : t('The panel is now served at :url.', {
+                                      url: panel.url,
+                                  })}
                         </span>
                     </Alert>
                     <a
@@ -255,11 +283,12 @@ function DomainStatus({
                         rel="noreferrer"
                     >
                         <ExternalLink className="size-4" aria-hidden />
-                        Open the panel on its domain
+                        {t('Open the panel on its domain')}
                     </a>
                     <p className="text-sm text-base-content/70">
-                        You will sign in again there. The old address keeps
-                        working as a fallback.
+                        {t(
+                            'You will sign in again there. The old address keeps working as a fallback.',
+                        )}
                     </p>
                 </div>
             ) : (
@@ -283,18 +312,20 @@ function DomainStatus({
                     )}
                     {verified && certificate.status === 'none' && (
                         <Alert variant="info">
-                            DNS is correct. The certificate is being requested.
+                            {t(
+                                'DNS is correct. The certificate is being requested.',
+                            )}
                         </Alert>
                     )}
                     {certificate.status === 'issuing' && (
                         <Alert variant="info">
-                            Getting the certificate from Let's Encrypt…
+                            {t("Getting the certificate from Let's Encrypt…")}
                         </Alert>
                     )}
                     {certificate.status === 'failed' && (
                         <Alert variant="error">
                             {certificate.error ??
-                                'The certificate could not be issued.'}
+                                t('The certificate could not be issued.')}
                         </Alert>
                     )}
                     {progress.waiting && (
@@ -302,10 +333,9 @@ function DomainStatus({
                             className="text-sm text-base-content/70"
                             role="status"
                         >
-                            Checking by itself every 5 seconds. This page
-                            updates when DNS is right and again when the
-                            certificate is installed; DNS changes can take a few
-                            minutes, sometimes longer.
+                            {t(
+                                'Checking by itself every 5 seconds. This page updates when DNS is right and again when the certificate is installed; DNS changes can take a few minutes, sometimes longer.',
+                            )}
                         </p>
                     )}
                     {progress.gaveUp && (
@@ -313,16 +343,18 @@ function DomainStatus({
                             className="text-sm text-base-content/70"
                             role="status"
                         >
-                            Stopped checking automatically after half an hour.
-                            CommyPanel still re-checks every five minutes; press
-                            Check DNS to look again now.
+                            {t(
+                                'Stopped checking automatically after half an hour. CommyPanel still re-checks every five minutes; press Check DNS to look again now.',
+                            )}
                         </p>
                     )}
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-sm text-base-content/70">
                             {dns?.checked_at
-                                ? `Last checked ${formatDate(dns.checked_at)}`
-                                : 'Not checked yet'}
+                                ? t('Last checked :date', {
+                                      date: formatDate(dns.checked_at),
+                                  })
+                                : t('Not checked yet')}
                         </p>
                         <Button
                             variant="soft"
@@ -332,8 +364,8 @@ function DomainStatus({
                         >
                             <RefreshCw className="size-4" aria-hidden />
                             {certificate.status === 'failed'
-                                ? 'Check and retry'
-                                : 'Check DNS'}
+                                ? t('Check and retry')
+                                : t('Check DNS')}
                         </Button>
                     </div>
                 </div>

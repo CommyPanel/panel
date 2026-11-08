@@ -13,9 +13,11 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CommandBox } from '@/components/ui/command-box';
+import { useT } from '@/hooks/use-t';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate, timeAgo } from '@/lib/format';
 import { useCan } from '@/lib/permissions';
+import { Trans } from '@/lib/trans';
 import type { ReleaseSummary, UpdateInfo } from '@/types/update';
 
 function Release({
@@ -25,6 +27,8 @@ function Release({
     release: ReleaseSummary;
     defaultOpen?: boolean;
 }) {
+    const { t } = useT();
+
     return (
         <details open={defaultOpen} className="group space-y-3">
             <summary className="flex cursor-pointer flex-wrap items-baseline justify-between gap-2 rounded-field py-1 marker:content-none">
@@ -50,7 +54,7 @@ function Release({
                         rel="noreferrer noopener"
                         className="link inline-flex items-center gap-1 link-primary"
                     >
-                        On GitHub
+                        {t('On GitHub')}
                         <ExternalLink className="size-3.5" aria-hidden />
                     </a>
                 </span>
@@ -65,11 +69,15 @@ function Release({
 }
 
 function Status({ update }: { update: UpdateInfo }) {
+    const { t } = useT();
+
     if (!update.supported) {
         return (
             <Alert variant="info">
-                This is a development build ({update.current}), so there is no
-                released version to compare it with and update checks are off.
+                {t(
+                    'This is a development build (:version), so there is no released version to compare it with and update checks are off.',
+                    { version: update.current },
+                )}
             </Alert>
         );
     }
@@ -83,11 +91,15 @@ function Status({ update }: { update: UpdateInfo }) {
                 />
                 <div className="space-y-1">
                     <p className="text-lg font-semibold">
-                        Version {update.latest} is available
+                        {t('Version :version is available', {
+                            version: update.latest ?? '',
+                        })}
                     </p>
                     <p className="text-sm text-base-content/70">
-                        You are running {update.current}. Read the release notes
-                        below, then follow the steps to upgrade.
+                        {t(
+                            'You are running :version. Read the release notes below, then follow the steps to upgrade.',
+                            { version: update.current },
+                        )}
                     </p>
                 </div>
             </div>
@@ -97,8 +109,9 @@ function Status({ update }: { update: UpdateInfo }) {
     if (update.checked_at === null) {
         return (
             <p className="text-sm text-base-content/70">
-                Nothing has been checked yet. CommyPanel looks for new versions
-                when someone signs in, or you can check now.
+                {t(
+                    'Nothing has been checked yet. CommyPanel looks for new versions when someone signs in, or you can check now.',
+                )}
             </p>
         );
     }
@@ -111,10 +124,12 @@ function Status({ update }: { update: UpdateInfo }) {
             />
             <div className="space-y-1">
                 <p className="text-lg font-semibold">
-                    You are running the latest version
+                    {t('You are running the latest version')}
                 </p>
                 <p className="text-sm text-base-content/70">
-                    CommyPanel {update.current} is the newest release.
+                    {t('CommyPanel :version is the newest release.', {
+                        version: update.current,
+                    })}
                 </p>
             </div>
         </div>
@@ -122,6 +137,7 @@ function Status({ update }: { update: UpdateInfo }) {
 }
 
 export default function Updates({ update }: { update: UpdateInfo }) {
+    const { t, tn } = useT();
     const { errors } = usePage().props;
     const can = useCan();
     const canManage = can('server.manage');
@@ -156,10 +172,12 @@ export default function Updates({ update }: { update: UpdateInfo }) {
             : 'sudo commypanel upgrade';
 
     return (
-        <AppLayout title="Updates">
+        <AppLayout title={t('Updates')}>
             <PageHeader
-                title="Updates"
-                description="Which version of CommyPanel this server runs, and how to move to a newer one."
+                title={t('Updates')}
+                description={t(
+                    'Which version of CommyPanel this server runs, and how to move to a newer one.',
+                )}
             />
 
             {errors.update && <Alert variant="error">{errors.update}</Alert>}
@@ -178,136 +196,145 @@ export default function Updates({ update }: { update: UpdateInfo }) {
                                     loading={checking}
                                 >
                                     <RefreshCw className="size-4" aria-hidden />
-                                    Check now
+                                    {t('Check now')}
                                 </Button>
                             )
                         }
-                        title="Status"
+                        title={t('Status')}
                     >
                         <Status update={update} />
                         {update.error && (
                             <Alert variant="warning">
-                                The last check did not work: {update.error}{' '}
-                                <a
-                                    href={update.releases_url}
-                                    target="_blank"
-                                    rel="noreferrer noopener"
-                                    className="link"
-                                >
-                                    See the releases on GitHub
-                                </a>
-                                .
+                                <Trans
+                                    text="The last check did not work: :error <link>See the releases on GitHub</link>."
+                                    components={{
+                                        link: (
+                                            <a
+                                                href={update.releases_url}
+                                                target="_blank"
+                                                rel="noreferrer noopener"
+                                                className="link"
+                                            />
+                                        ),
+                                    }}
+                                    values={{ error: update.error ?? '' }}
+                                />
                             </Alert>
                         )}
                         {update.checked_at && (
                             <p className="text-xs text-base-content/70">
-                                Last checked {timeAgo(update.checked_at)}.
+                                {t('Last checked :when.', {
+                                    when: timeAgo(update.checked_at),
+                                })}
                             </p>
                         )}
                     </Card>
 
                     <Card
-                        title="Why keep CommyPanel up to date"
-                        description="It controls your server, so running an old version is a risk."
+                        title={t('Why keep CommyPanel up to date')}
+                        description={t(
+                            'It controls your server, so running an old version is a risk.',
+                        )}
                     >
                         <p className="text-sm">
-                            New releases bring security patches, bug fixes and
-                            new features. Fixes only reach you when you upgrade,
-                            and a known problem that stays unpatched is the
-                            easiest way into a server. Upgrade soon after a
-                            release, and read what changed first.
+                            {t(
+                                'New releases bring security patches, bug fixes and new features. Fixes only reach you when you upgrade, and a known problem that stays unpatched is the easiest way into a server. Upgrade soon after a release, and read what changed first.',
+                            )}
                         </p>
                     </Card>
 
                     <Card
-                        title="How to upgrade"
-                        description="Upgrading is done on the server itself, not from this page."
+                        title={t('How to upgrade')}
+                        description={t(
+                            'Upgrading is done on the server itself, not from this page.',
+                        )}
                     >
                         <ol className="list-decimal space-y-3 pl-5 text-sm">
                             <li>
-                                <strong>Read the release notes</strong> below,
-                                especially anything under “Before you upgrade”.
-                                Some releases need you to do something
-                                afterwards, such as granting a new permission to
-                                your own roles.
+                                <Trans
+                                    text="<b>Read the release notes</b> below, especially anything under “Before you upgrade”. Some releases need you to do something afterwards, such as granting a new permission to your own roles."
+                                    components={{ b: <strong /> }}
+                                />
                             </li>
                             <li>
-                                <strong>
-                                    Check that no deployment is running.
-                                </strong>{' '}
-                                The upgrade restarts the agent, which interrupts
-                                a build in progress.
+                                <Trans
+                                    text="<b>Check that no deployment is running.</b> The upgrade restarts the agent, which interrupts a build in progress."
+                                    components={{ b: <strong /> }}
+                                />
                             </li>
                             <li>
-                                <strong>Take a backup or snapshot</strong> of
-                                the server if you can. The upgrade backs up
-                                CommyPanel&apos;s own databases first, but not
-                                your apps&apos; data.
+                                <Trans
+                                    text="<b>Take a backup or snapshot</b> of the server if you can. The upgrade backs up CommyPanel's own databases first, but not your apps' data."
+                                    components={{ b: <strong /> }}
+                                />
                             </li>
                             <li className="space-y-2">
                                 <span>
-                                    <strong>
-                                        Connect to the server over SSH
-                                    </strong>{' '}
-                                    and run:
+                                    <Trans
+                                        text="<b>Connect to the server over SSH</b> and run:"
+                                        components={{ b: <strong /> }}
+                                    />
                                 </span>
                                 <CommandBox command={command} />
                                 <span className="block text-base-content/70">
-                                    It tells you what is about to happen and
-                                    asks you to confirm before anything is
-                                    changed.
+                                    {t(
+                                        'It tells you what is about to happen and asks you to confirm before anything is changed.',
+                                    )}
                                 </span>
                             </li>
                             <li>
-                                <strong>Wait for it to finish,</strong> then
-                                reload this page. It shows the new version, and
-                                the update badge in the top bar disappears.
+                                <Trans
+                                    text="<b>Wait for it to finish,</b> then reload this page. It shows the new version, and the update badge in the top bar disappears."
+                                    components={{ b: <strong /> }}
+                                />
                             </li>
                         </ol>
                     </Card>
 
                     <Card
-                        title="What to expect"
-                        description="What happens to your server while it upgrades."
+                        title={t('What to expect')}
+                        description={t(
+                            'What happens to your server while it upgrades.',
+                        )}
                     >
                         <ul className="list-disc space-y-3 pl-5 text-sm">
                             <li>
-                                <strong>Your apps keep running.</strong> Docker
-                                and your containers are not restarted, and nginx
-                                is only reloaded gracefully, so your apps and
-                                domains stay up.
+                                <Trans
+                                    text="<b>Your apps keep running.</b> Docker and your containers are not restarted, and nginx is only reloaded gracefully, so your apps and domains stay up."
+                                    components={{ b: <strong /> }}
+                                />
                             </li>
                             <li>
-                                <strong>
-                                    CommyPanel is briefly unavailable.
-                                </strong>{' '}
-                                Its background services (the agent, the queue
-                                workers and the scheduler) restart and the panel
-                                switches to the new release. If this page shows
-                                an error for a short while, wait and reload; you
-                                may be asked to sign in again.
+                                <Trans
+                                    text="<b>CommyPanel is briefly unavailable.</b> Its background services (the agent, the queue workers and the scheduler) restart and the panel switches to the new release. If this page shows an error for a short while, wait and reload; you may be asked to sign in again."
+                                    components={{ b: <strong /> }}
+                                />
                             </li>
                             <li>
-                                <strong>A failed upgrade goes back.</strong> The
-                                installer waits up to 45 seconds for the new
-                                version to answer. If it does not, the previous
-                                version is started again. Database changes made
-                                by the new version are kept, so read the
-                                installer&apos;s output, fix the cause and run
-                                the upgrade again. The newest backups of the
-                                panel&apos;s databases are in{' '}
-                                <code>/var/lib/commypanel/backups</code>.
+                                <Trans
+                                    text="<b>A failed upgrade goes back.</b> The installer waits up to 45 seconds for the new version to answer. If it does not, the previous version is started again. Database changes made by the new version are kept, so read the installer's output, fix the cause and run the upgrade again. The newest backups of the panel's databases are in <code>/var/lib/commypanel/backups</code>."
+                                    components={{
+                                        b: <strong />,
+                                        code: <code />,
+                                    }}
+                                />
                             </li>
                         </ul>
                     </Card>
 
                     {update.newer.length > 0 && (
                         <Card
-                            title="What changed"
+                            title={t('What changed')}
                             description={
                                 update.newer.length > 1
-                                    ? `Release notes for the ${update.newer.length} releases since ${update.current}, newest first.`
-                                    : `Release notes for ${update.newer[0].version}.`
+                                    ? tn(
+                                          'one::Release notes for the :count release since :version, newest first.|other::Release notes for the :count releases since :version, newest first.',
+                                          update.newer.length,
+                                          { version: update.current },
+                                      )
+                                    : t('Release notes for :version.', {
+                                          version: update.newer[0].version,
+                                      })
                             }
                         >
                             <div className="space-y-8">
@@ -324,8 +351,10 @@ export default function Updates({ update }: { update: UpdateInfo }) {
 
                     {update.newer.length === 0 && update.installed && (
                         <Card
-                            title="Release notes for this version"
-                            description="You are up to date. This is what the version you run brought."
+                            title={t('Release notes for this version')}
+                            description={t(
+                                'You are up to date. This is what the version you run brought.',
+                            )}
                         >
                             <Release release={update.installed} />
                         </Card>
@@ -333,11 +362,11 @@ export default function Updates({ update }: { update: UpdateInfo }) {
                 </div>
 
                 <div className="min-w-0 space-y-6">
-                    <Card title="Versions">
+                    <Card title={t('Versions')}>
                         <dl className="divide-y divide-base-300 text-sm">
                             <div className="flex justify-between gap-4 py-2">
                                 <dt className="text-base-content/70">
-                                    Running
+                                    {t('Running')}
                                 </dt>
                                 <dd className="font-medium">
                                     {update.current}
@@ -345,7 +374,7 @@ export default function Updates({ update }: { update: UpdateInfo }) {
                             </div>
                             <div className="flex justify-between gap-4 py-2">
                                 <dt className="text-base-content/70">
-                                    Latest release
+                                    {t('Latest release')}
                                 </dt>
                                 <dd className="font-medium">
                                     {update.latest ?? '-'}
@@ -358,14 +387,16 @@ export default function Updates({ update }: { update: UpdateInfo }) {
                             rel="noreferrer noopener"
                             className="link inline-flex items-center gap-1 text-sm link-primary"
                         >
-                            All releases on GitHub
+                            {t('All releases on GitHub')}
                             <ExternalLink className="size-3.5" aria-hidden />
                         </a>
                     </Card>
 
                     <Card
-                        title="Automatic checks"
-                        description="How CommyPanel finds out about new versions."
+                        title={t('Automatic checks')}
+                        description={t(
+                            'How CommyPanel finds out about new versions.',
+                        )}
                     >
                         <label className="flex cursor-pointer items-start gap-3">
                             <input
@@ -378,26 +409,24 @@ export default function Updates({ update }: { update: UpdateInfo }) {
                                 onChange={(e) => toggle(e.target.checked)}
                             />
                             <span className="text-sm">
-                                Look for new versions when someone signs in
+                                {t(
+                                    'Look for new versions when someone signs in',
+                                )}
                             </span>
                         </label>
                         {update.forced_off && (
                             <p className="text-sm text-base-content/70">
-                                Switched off in the server&apos;s configuration
-                                (<code>COMMYPANEL_UPDATE_CHECK=false</code>), so
-                                nothing is checked, not even by hand.
+                                <Trans
+                                    text="Switched off in the server's configuration (<code>COMMYPANEL_UPDATE_CHECK=false</code>), so nothing is checked, not even by hand."
+                                    components={{ code: <code /> }}
+                                />
                             </p>
                         )}
                         <p className="text-sm text-base-content/70">
-                            When someone signs in, CommyPanel asks GitHub for
-                            this project&apos;s list of releases, in the
-                            background and at most once every 6 hours. GitHub
-                            sees this server&apos;s address and the CommyPanel
-                            version number, and nothing else is sent. To stop
-                            all checks, set{' '}
-                            <code>COMMYPANEL_UPDATE_CHECK=false</code> in the
-                            server&apos;s environment file (
-                            <code>/etc/commypanel/env</code>).
+                            <Trans
+                                text="When someone signs in, CommyPanel asks GitHub for this project's list of releases, in the background and at most once every 6 hours. GitHub sees this server's address and the CommyPanel version number, and nothing else is sent. To stop all checks, set <code>COMMYPANEL_UPDATE_CHECK=false</code> in the server's environment file (<code2>/etc/commypanel/env</code2>)."
+                                components={{ code: <code />, code2: <code /> }}
+                            />
                         </p>
                     </Card>
                 </div>

@@ -49,23 +49,22 @@ class AppNginxController extends Controller
         }
 
         return back()->with('status', $live
-            ? 'Saved. nginx accepted the configuration and reloaded.'
-            : 'Saved. It is applied once the app has a domain and a live release.');
+            ? __('Saved. nginx accepted the configuration and reloaded.')
+            : __('Saved. It is applied once the app has a domain and a live release.'));
     }
 
     private function inactiveReason(App $app): string
     {
-        $missing = [];
+        $noRelease = $app->active_deployment_id === null;
+        $noDomain = ! $app->domains()->exists();
 
-        if ($app->active_deployment_id === null) {
-            $missing[] = 'a live release';
+        if ($noRelease && $noDomain) {
+            return __('The app has no nginx site yet: it needs a live release and a domain.');
         }
 
-        if (! $app->domains()->exists()) {
-            $missing[] = 'a domain';
-        }
-
-        return 'The app has no nginx site yet: it needs '.implode(' and ', $missing).'.';
+        return $noRelease
+            ? __('The app has no nginx site yet: it needs a live release.')
+            : __('The app has no nginx site yet: it needs a domain.');
     }
 
     /**

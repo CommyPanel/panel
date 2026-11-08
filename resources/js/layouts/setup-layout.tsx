@@ -6,13 +6,14 @@ import { Brand } from '@/components/brand';
 import { HostBanner } from '@/components/host-banner';
 import { ThemeMenu } from '@/components/theme-menu';
 import { Toaster } from '@/components/ui/toaster';
+import { useT } from '@/hooks/use-t';
 import { notify } from '@/lib/toast';
 
 /** The steps of the first run, in order; `step` is the index of the current one. */
-const STEPS = [
-    { id: 'admin', label: 'Admin account' },
-    { id: 'https', label: "Let's Encrypt" },
-    { id: 'domain', label: 'Panel domain' },
+const steps = (t: (key: string) => string) => [
+    { id: 'admin', label: t('Admin account') },
+    { id: 'https', label: t("Let's Encrypt") },
+    { id: 'domain', label: t('Panel domain') },
 ];
 
 type Props = {
@@ -34,6 +35,7 @@ export default function SetupLayout({
     children,
 }: Props) {
     const { name, flash } = usePage().props;
+    const { t } = useT();
 
     // The server's one-off messages ("saved", ...) arrive as flash data.
     useEffect(() => {
@@ -60,7 +62,7 @@ export default function SetupLayout({
                             </p>
                         )}
                     </header>
-                    <Stepper steps={STEPS} index={step} />
+                    <Stepper steps={steps(t)} index={step} />
                     <HostBanner />
                     <div className="space-y-6">{children}</div>
                 </div>

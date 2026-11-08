@@ -80,7 +80,7 @@ class ApiTokenController extends Controller
         ], ['abilities.required' => 'Choose what the token may do.', 'abilities.*.in' => 'You cannot give a token something you may not do yourself.']);
 
         if ($user->tokens()->count() >= self::MAX_TOKENS) {
-            return back()->withErrors(['name' => 'You have '.self::MAX_TOKENS.' tokens. Revoke one you no longer use first.']);
+            return back()->withErrors(['name' => __('You have :max tokens. Revoke one you no longer use first.', ['max' => self::MAX_TOKENS])]);
         }
 
         $never = $data['days'] === 'never';
@@ -105,6 +105,6 @@ class ApiTokenController extends Controller
 
         $audit->record('token.revoked', $request->user(), ['name' => $name]);
 
-        return back()->with('status', "The token {$name} was revoked. Anything still using it stops working now.");
+        return back()->with('status', __('The token :name was revoked. Anything still using it stops working now.', ['name' => $name]));
     }
 }

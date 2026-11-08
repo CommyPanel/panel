@@ -63,7 +63,7 @@ class UserController extends Controller
 
         $audit->record('user.created', null, ['user' => $user->email, 'role' => $role?->name], $user);
 
-        return redirect()->route('users.index')->with('status', "{$user->name} was added.");
+        return redirect()->route('users.index')->with('status', __(':name was added.', ['name' => $user->name]));
     }
 
     public function edit(Request $request, User $user): Response
@@ -117,7 +117,7 @@ class UserController extends Controller
             'password_changed' => $passwordChanged,
         ], $user);
 
-        return redirect()->route('users.index')->with('status', "{$user->name} was updated.");
+        return redirect()->route('users.index')->with('status', __(':name was updated.', ['name' => $user->name]));
     }
 
     public function destroy(Request $request, User $user, AuditLogger $audit, RevokeSessions $revoke): RedirectResponse
@@ -126,7 +126,7 @@ class UserController extends Controller
         $this->guard($actor, $user);
 
         if ($user->is($actor)) {
-            return back()->withErrors(['user' => 'You cannot delete your own account.']);
+            return back()->withErrors(['user' => __('You cannot delete your own account.')]);
         }
 
         $email = $user->email;
@@ -135,7 +135,7 @@ class UserController extends Controller
 
         $audit->record('user.deleted', null, ['user' => $email]);
 
-        return redirect()->route('users.index')->with('status', "{$email} was deleted.");
+        return redirect()->route('users.index')->with('status', __(':email was deleted.', ['email' => $email]));
     }
 
     /**
@@ -143,8 +143,8 @@ class UserController extends Controller
      */
     private function guard(?User $actor, User $target): void
     {
-        abort_if($target->isSuper(), 403, 'The super user cannot be changed here. Use the admin:reset command on the server.');
-        abort_if($actor === null || ! $this->access->canManage($actor, $target), 403, 'That account has more access than you do.');
+        abort_if($target->isSuper(), 403, __('The super user cannot be changed here. Use the admin:reset command on the server.'));
+        abort_if($actor === null || ! $this->access->canManage($actor, $target), 403, __('That account has more access than you do.'));
     }
 
     /**
@@ -154,21 +154,21 @@ class UserController extends Controller
     {
         if ($id === null || $id === '') {
             return $editing !== null && $editing->is($actor) && $editing->getRoleNames()->isNotEmpty()
-                ? throw ValidationException::withMessages(['role' => 'You cannot remove your own role.'])
+                ? throw ValidationException::withMessages(['role' => __('You cannot remove your own role.')])
                 : null;
         }
 
         $role = Role::query()->where('guard_name', 'web')->whereKey($id)->firstOrFail();
 
         if ($editing !== null && $editing->is($actor) && ! $editing->hasRole($role)) {
-            throw ValidationException::withMessages(['role' => 'You cannot change your own role.']);
+            throw ValidationException::withMessages(['role' => __('You cannot change your own role.')]);
         }
 
         // Keeping the role someone already has is always fine; handing out a new one is not if it exceeds your own access.
         $keeps = $editing?->hasRole($role) ?? false;
 
         if (! $keeps && ($actor === null || ! $this->access->canHandOutRole($actor, $role))) {
-            throw ValidationException::withMessages(['role' => 'That role grants more than you have yourself, so you cannot give it to someone.']);
+            throw ValidationException::withMessages(['role' => __('That role grants more than you have yourself, so you cannot give it to someone.')]);
         }
 
         return $role;

@@ -1,4 +1,5 @@
 import { Lock } from 'lucide-react';
+import { useT } from '@/hooks/use-t';
 import { Tooltip } from '@/components/ui/tooltip';
 
 /**
@@ -12,13 +13,23 @@ export function LockIcon({
     what: 'app' | 'volume';
     align?: 'start' | 'end';
 }) {
-    const label = `This ${what} is locked and cannot be deleted. Unlock it to delete it.`;
+    const { t } = useT();
+    const label =
+        what === 'app'
+            ? t(
+                  'This app is locked and cannot be deleted. Unlock it to delete it.',
+              )
+            : t(
+                  'This volume is locked and cannot be deleted. Unlock it to delete it.',
+              );
 
     return (
         <Tooltip label={label} align={align}>
             <span
                 role="img"
-                aria-label={`Locked ${what}`}
+                aria-label={
+                    what === 'app' ? t('Locked app') : t('Locked volume')
+                }
                 tabIndex={0}
                 className="inline-flex items-center rounded-field text-base-content/70 outline-offset-2"
             >
