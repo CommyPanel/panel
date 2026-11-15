@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Api\TokenAccess;
 use App\Audit\AuditLogger;
+use App\Deploy\EnvLimits;
 use App\Models\App;
 use App\Models\AppEnvVar;
 use Illuminate\Http\JsonResponse;
@@ -39,6 +40,8 @@ class EnvController extends ApiController
             ['key' => self::KEY_RULES, 'value' => ['present', 'nullable', 'string', 'max:32768']],
             ['key.not_in' => 'PORT is set by CommyPanel.', 'key.regex' => 'Use letters, digits and underscores, not starting with a digit.'],
         )->validate();
+
+        EnvLimits::assertFits($app, [$data['key'] => (string) ($data['value'] ?? '')], 'value');
 
         $created = ! $app->envVars()->where('key', $data['key'])->exists();
         AppEnvVar::query()->updateOrCreate(['app_id' => $app->id, 'key' => $data['key']], ['value' => (string) ($data['value'] ?? '')]);

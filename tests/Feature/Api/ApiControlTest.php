@@ -5,6 +5,7 @@ use App\Audit\Severity;
 use App\Auth\SyncRolesAndPermissions;
 use App\Enums\DeploymentStatus;
 use App\Host\Data\ContainerSpec;
+use App\Host\Drivers\FakeHostDriver;
 use App\Host\HostDriver;
 use App\Jobs\RunDeployment;
 use App\Models\App;
@@ -145,6 +146,21 @@ describe('logs', function () {
             ->and(Severity::of('api.logs_read'))->toBe(Severity::WARNING);
     });
 
+    it('survives output that is not valid text', function () {
+        ($this->live)();
+        app()->instance(HostDriver::class, new class extends FakeHostDriver
+        {
+            public function containerLogs(string $name, int $tail = 200): string
+            {
+                return "start\n\xff\xfe binary \xc3\x28 end\n";
+            }
+        });
+
+        $response = ($this->api)(($this->token)([TokenAccess::LOGS]))->getJson('/api/v1/apps/shop/logs')->assertOk();
+
+        expect($response->json('data.logs'))->toContain('start')->toContain('end');
+    });
+
     it('says there is nothing when the app has no running container', function () {
         App::factory()->create(['slug' => 'idle']);
 
@@ -197,6 +213,29 @@ describe('environment variables', function () {
         $api->putJson('/api/v1/apps/shop/env/GOOD')->assertUnprocessable()->assertJsonStructure(['error', 'errors' => ['value']]);
     });
 
+    it('refuses to grow an app past the limits, so a loop cannot make it unable to start', function () {
+        $app = ($this->live)();
+        foreach (range(1, 200) as $i) {
+            AppEnvVar::query()->create(['app_id' => $app->id, 'key' => 'K'.$i, 'value' => 'v']);
+        }
+        $api = ($this->api)(($this->token)([TokenAccess::ENV]));
+
+        $api->putJson('/api/v1/apps/shop/env/ONE_TOO_MANY', ['value' => 'x'])->assertUnprocessable()->assertJsonStructure(['error', 'errors' => ['value']]);
+        $api->putJson('/api/v1/apps/shop/env/K1', ['value' => 'replaced'])->assertOk();
+        expect($app->envVars()->count())->toBe(200);
+    });
+
+    it('refuses values that add up to too much', function () {
+        ($this->live)();
+        $api = ($this->api)(($this->token)([TokenAccess::ENV]));
+
+        foreach (range(1, 8) as $i) {
+            $api->putJson('/api/v1/apps/shop/env/BIG'.$i, ['value' => str_repeat('x', 32768)])->assertCreated();
+        }
+
+        $api->putJson('/api/v1/apps/shop/env/BIG9', ['value' => 'x'])->assertUnprocessable();
+    });
+
     it('removes a variable, and says 404 for one that is not there', function () {
         $app = ($this->live)();
         AppEnvVar::query()->create(['app_id' => $app->id, 'key' => 'GONE', 'value' => 'x']);
@@ -239,6 +278,32 @@ describe('apply changes', function () {
         ($this->live)();
 
         ($this->api)(($this->token)([TokenAccess::READ, TokenAccess::ENV]))->postJson('/api/v1/apps/shop/apply')->assertForbidden();
+    });
+});
+
+describe('tokens and the rest of the panel', function () {
+    it('are worth nothing outside the API: a token opens no page and no panel action', function () {
+        ($this->live)();
+        $plain = ($this->token)(array_keys(TokenAccess::abilities()));
+
+        foreach (['/dashboard', '/apps/shop', '/settings/security', '/users'] as $url) {
+            $this->withToken($plain)->get($url)->assertRedirect('/login');
+        }
+
+        $this->withToken($plain)->post('/apps/shop/stop')->assertRedirect('/login');
+        $this->withToken($plain)->delete('/apps/shop')->assertRedirect('/login');
+    });
+});
+
+describe('wrong addresses', function () {
+    it('answers a wrong address or method with a plain JSON 404 or 405, and no cookie', function () {
+        foreach (['GET', 'POST', 'PUT', 'DELETE'] as $method) {
+            $response = $this->json($method, '/api/v1/nowhere/at/all')->assertNotFound()->assertJsonStructure(['error']);
+            expect($response->headers->getCookies())->toBe([]);
+        }
+
+        $response = $this->getJson('/api/v1/apps/shop/stop')->assertStatus(405)->assertHeader('Allow', 'POST');
+        expect($response->json('error'))->toBeString()->and($response->headers->getCookies())->toBe([]);
     });
 });
 

@@ -25,6 +25,29 @@ it('sets, updates and removes environment variables', function () {
     expect($this->shop->fresh()->environment())->toBe(['EMPTY' => '']);
 });
 
+it('stops an app from carrying too many variables or too much text', function () {
+    foreach (range(1, 200) as $i) {
+        AppEnvVar::query()->create(['app_id' => $this->shop->id, 'key' => 'K'.$i, 'value' => 'v']);
+    }
+
+    // The 201st is refused; replacing one that exists is not.
+    $this->post('/apps/shop/env', ['key' => 'ONE_TOO_MANY', 'value' => 'x'])->assertSessionHasErrors('key');
+    $this->post('/apps/shop/env', ['key' => 'K1', 'value' => 'new'])->assertSessionHasNoErrors();
+    $this->post('/apps/shop/env/import', ['env' => 'FRESH=1
+'])->assertSessionHasErrors('env');
+    expect($this->shop->envVars()->count())->toBe(200);
+});
+
+it('stops the values of an app from adding up to more than the limit', function () {
+    foreach (range(1, 7) as $i) {
+        $this->post('/apps/shop/env', ['key' => 'BIG'.$i, 'value' => str_repeat('x', 32768)])->assertSessionHasNoErrors();
+    }
+
+    // 8 x 32 KB is exactly 256 KB; the ninth does not fit.
+    $this->post('/apps/shop/env', ['key' => 'BIG8', 'value' => str_repeat('x', 32768)])->assertSessionHasNoErrors();
+    $this->post('/apps/shop/env', ['key' => 'BIG9', 'value' => 'x'])->assertSessionHasErrors('key');
+});
+
 it('rejects invalid or reserved variable names', function (string $key) {
     $this->post('/apps/shop/env', ['key' => $key, 'value' => 'x'])->assertSessionHasErrors('key');
 

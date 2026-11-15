@@ -36,6 +36,7 @@ class LogsController extends ApiController
             return response()->json(['error' => $e->getMessage()], 502);
         }
 
-        return response()->json(['data' => ['live' => true, 'lines' => $lines, 'logs' => $logs]]);
+        // Programs print bytes that are not text; JSON cannot carry them, so they are replaced.
+        return response()->json(['data' => ['live' => true, 'lines' => $lines, 'logs' => mb_scrub($logs, 'UTF-8')]]);
     }
 }

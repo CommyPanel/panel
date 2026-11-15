@@ -27,6 +27,19 @@ function goLive(App $app): void
     app(HostDriver::class)->runContainer(new ContainerSpec('shop-4', 'commypanel/shop:4', 20001, 8080));
 }
 
+it('survives output that is not valid text', function () {
+    goLive($this->shop);
+    app()->instance(HostDriver::class, new class extends FakeHostDriver
+    {
+        public function containerLogs(string $name, int $tail = 200): string
+        {
+            return "start\n\xff\xfe binary \xc3\x28 end\n";
+        }
+    });
+
+    $this->getJson('/apps/shop/logs')->assertOk()->assertJsonPath('live', true);
+});
+
 it('reads the running container\'s logs', function () {
     goLive($this->shop);
 

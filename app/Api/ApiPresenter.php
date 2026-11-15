@@ -48,7 +48,7 @@ class ApiPresenter
             'created_at' => $deployment->created_at?->toIso8601String(),
             'finished_at' => $deployment->finished_at?->toIso8601String(),
             'url' => route('api.apps.deployments.show', ['app' => $app->slug, 'number' => $deployment->number]),
-            ...($withLog ? ['log' => $deployment->log ?? ''] : []),
+            ...($withLog ? ['log' => mb_scrub($deployment->log ?? '', 'UTF-8')] : []),
         ];
     }
 }

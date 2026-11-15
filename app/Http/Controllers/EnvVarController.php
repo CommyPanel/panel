@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Audit\AuditLogger;
+use App\Deploy\EnvLimits;
 use App\Deploy\EnvParser;
 use App\Models\App;
 use App\Models\AppEnvVar;
@@ -17,6 +18,8 @@ class EnvVarController extends Controller
             'key' => ['required', 'string', 'max:128', 'regex:/^[A-Za-z_][A-Za-z0-9_]*$/', 'not_in:PORT'],
             'value' => ['present', 'nullable', 'string', 'max:32768'],
         ], ['key.not_in' => 'PORT is set by CommyPanel.', 'key.regex' => 'Use letters, digits and underscores, not starting with a digit.']);
+
+        EnvLimits::assertFits($app, [$data['key'] => (string) ($data['value'] ?? '')], 'key');
 
         AppEnvVar::query()->updateOrCreate(
             ['app_id' => $app->id, 'key' => $data['key']],
@@ -36,6 +39,8 @@ class EnvVarController extends Controller
         if ($parsed['vars'] === []) {
             return back()->withErrors(['env' => __('No variables found. Use one KEY=value per line.')]);
         }
+
+        EnvLimits::assertFits($app, $parsed['vars'], 'env');
 
         foreach ($parsed['vars'] as $key => $value) {
             AppEnvVar::query()->updateOrCreate(['app_id' => $app->id, 'key' => $key], ['value' => $value]);

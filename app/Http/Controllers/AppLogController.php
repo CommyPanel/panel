@@ -33,7 +33,8 @@ class AppLogController extends Controller
             return response()->json(['error' => $e->getMessage()], 502);
         }
 
-        return response()->json(['live' => true, 'logs' => $logs, 'lines' => $lines]);
+        // Programs print bytes that are not text; JSON cannot carry them, so they are replaced.
+        return response()->json(['live' => true, 'logs' => mb_scrub($logs, 'UTF-8'), 'lines' => $lines]);
     }
 
     public function download(Request $request, App $app, HostDriver $host, AuditLogger $audit): Response

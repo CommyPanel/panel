@@ -60,6 +60,7 @@ use App\Http\Controllers\UpdateController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserSessionController;
 use App\Http\Controllers\WelcomeController;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard')->name('home');
@@ -382,5 +383,7 @@ Route::middleware('auth')->group(function () {
 
 // Anything that matches nothing: through the web group, so the 404 page has a session and the
 // panel's look (a route-less 404 never runs the middleware that draws it).
+// It only ever answers 404 or 405 and changes nothing, so it needs no CSRF check (without this a POST to
+// a wrong address would be told its "page expired" instead of "not found").
 Route::match(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'], '{fallbackPlaceholder}', FallbackController::class)
-    ->where('fallbackPlaceholder', '.*')->fallback();
+    ->where('fallbackPlaceholder', '.*')->fallback()->withoutMiddleware(ValidateCsrfToken::class);

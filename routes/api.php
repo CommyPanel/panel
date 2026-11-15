@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\DeploymentsController;
 use App\Http\Controllers\Api\V1\EnvController;
 use App\Http\Controllers\Api\V1\LogsController;
 use App\Http\Controllers\Api\V1\TokenController;
+use App\Http\Controllers\FallbackController;
 use App\Http\Middleware\LimitApiFailures;
 use Illuminate\Support\Facades\Route;
 
@@ -47,3 +48,8 @@ Route::prefix('v1')->name('api.')->middleware([LimitApiFailures::class, 'throttl
         Route::delete('apps/{app:slug}/env/{key}', [EnvController::class, 'destroy'])->where('key', '[A-Za-z_][A-Za-z0-9_]*')->name('apps.env.destroy');
     });
 });
+
+// Anything under /api that matches nothing: a plain JSON 404 (or 405 with the allowed methods), with no
+// session and no cookie, whatever the method (the web group's fallback would ask a bot for a CSRF token).
+Route::match(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'], '{fallbackPlaceholder}', FallbackController::class)
+    ->where('fallbackPlaceholder', '.*')->fallback();

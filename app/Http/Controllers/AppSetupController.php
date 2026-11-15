@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Audit\AuditLogger;
 use App\Deploy\Deployer;
 use App\Deploy\DestroyApp;
+use App\Deploy\EnvLimits;
 use App\Deploy\EnvParser;
 use App\Deploy\LockedException;
 use App\Deploy\Source\AccessState;
@@ -160,6 +161,8 @@ class AppSetupController extends Controller
         $data = $request->validated();
         $env = $parser->parse((string) ($data['env'] ?? ''));
         unset($data['env']);
+
+        EnvLimits::assertFits($app, $env['vars'], 'env');
 
         DB::transaction(function () use ($app, $data, $env) {
             $app->forceFill([...$data, 'setup_step' => SetupStep::Domain])->save();
