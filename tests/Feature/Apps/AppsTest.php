@@ -114,6 +114,20 @@ it('saves the release command, and clears it when left empty', function () {
     expect($app->fresh()->release_command)->toBeNull();
 });
 
+it('saves the health check timeout, clears it when empty and keeps it within bounds', function () {
+    $app = App::factory()->create();
+
+    $this->patch("/apps/{$app->slug}", validAppInput(['health_timeout' => 300]))->assertSessionHasNoErrors();
+    expect($app->fresh()->health_timeout)->toBe(300);
+
+    $this->patch("/apps/{$app->slug}", validAppInput(['health_timeout' => 5]))->assertSessionHasErrors('health_timeout');
+    $this->patch("/apps/{$app->slug}", validAppInput(['health_timeout' => 5000]))->assertSessionHasErrors('health_timeout');
+    expect($app->fresh()->health_timeout)->toBe(300);
+
+    $this->patch("/apps/{$app->slug}", validAppInput(['health_timeout' => '']))->assertSessionHasNoErrors();
+    expect($app->fresh()->health_timeout)->toBeNull();
+});
+
 it('sends a draft app to its setup instead of its page', function () {
     $app = App::factory()->create(['setup_step' => SetupStep::Source]);
 

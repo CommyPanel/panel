@@ -237,7 +237,7 @@ class DeployApp
 
     private function checkHealth(App $app, Deployment $deployment, DeployLogger $log): void
     {
-        $timeout = (int) config('commypanel.deploy.health_timeout');
+        $timeout = $app->health_timeout ?? (int) config('commypanel.deploy.health_timeout');
         $this->stage($deployment, DeploymentStage::Health);
         $log->step("Waiting up to {$timeout}s for {$app->health_path} to answer.");
 

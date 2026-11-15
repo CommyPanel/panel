@@ -381,6 +381,7 @@ function SettingsStep({ app }: { app: AppSetup }) {
     const form = useForm({
         container_port: String(app.container_port),
         health_path: app.health_path,
+        health_timeout: app.health_timeout ? String(app.health_timeout) : '',
         release_command: app.release_command ?? '',
         memory_limit_mb: app.memory_limit_mb ? String(app.memory_limit_mb) : '',
         cpu_limit: app.cpu_limit ? String(app.cpu_limit) : '',
@@ -455,6 +456,21 @@ function SettingsStep({ app }: { app: AppSetup }) {
                     error={form.errors.health_path}
                     hint={t(
                         'A new version goes live once this path answers (anything below HTTP 500).',
+                    )}
+                />
+                <Input
+                    label={t('Health check timeout (seconds)')}
+                    type="number"
+                    min={10}
+                    max={1800}
+                    placeholder={t('Default')}
+                    value={form.data.health_timeout}
+                    onChange={(e) =>
+                        form.setData('health_timeout', e.target.value)
+                    }
+                    error={form.errors.health_timeout}
+                    hint={t(
+                        'How long a new version gets to answer the health check before the deployment fails. Slow starters, such as big .NET apps, may need more. Empty uses the server default (60 seconds).',
                     )}
                 />
                 <ReleaseCommandInput

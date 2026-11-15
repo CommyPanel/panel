@@ -47,6 +47,7 @@ use Illuminate\Support\Str;
  * @property Carbon|null $source_verified_at
  * @property int $container_port
  * @property string $health_path
+ * @property int|null $health_timeout
  * @property string|null $release_command
  * @property int|null $memory_limit_mb
  * @property string|null $cpu_limit

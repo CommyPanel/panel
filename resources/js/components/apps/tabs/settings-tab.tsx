@@ -29,6 +29,7 @@ export function SettingsTab({
         git_branch: app.git_branch,
         container_port: String(app.container_port),
         health_path: app.health_path,
+        health_timeout: app.health_timeout?.toString() ?? '',
         release_command: app.release_command ?? '',
         memory_limit_mb: app.memory_limit_mb?.toString() ?? '',
         cpu_limit: app.cpu_limit?.toString() ?? '',
