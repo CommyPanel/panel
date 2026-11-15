@@ -18,6 +18,13 @@ return [
     |
     */
 
+    /*
+    | Sanctum's own routes (the cookie route for single-page-app logins) are not used: the API takes bearer
+    | tokens only, so nothing here offers them.
+    */
+
+    'routes' => false,
+
     'stateful' => [],
 
     /*

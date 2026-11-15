@@ -33,7 +33,9 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            // Laravel's own file route (`/storage/{path}`, for signed temporary links) is not used by the panel,
+            // so it is not offered.
+            'serve' => false,
             'throw' => false,
             'report' => false,
         ],
