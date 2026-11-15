@@ -3,6 +3,8 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        {{-- A control panel is private: no crawler should index or follow any page of it, the sign-in page included. --}}
+        <meta name="robots" content="noindex, nofollow">
 
         <script>
             // Apply the saved theme before first paint to avoid a flash.
