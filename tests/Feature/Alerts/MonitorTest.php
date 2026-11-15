@@ -56,6 +56,20 @@ beforeEach(function () {
 });
 
 describe('apps', function () {
+    it('looks at a Redis app with a PING instead of an HTTP request', function () {
+        $this->shop->update(['template' => 'redis']);
+        $this->health->healthy = false;
+
+        foreach (range(1, 3) as $_) {
+            ($this->look)();
+            Carbon::setTestNow(now()->addMinute());
+        }
+
+        expect(($this->sent)())->toBe(['app.down'])
+            ->and($this->health->pings)->toBe([['port' => 20001], ['port' => 20001], ['port' => 20001]])
+            ->and($this->health->calls)->toBe([]);
+    });
+
     it('is down after three failed minutes in a row, not before, and tells it once', function () {
         $this->health->healthy = false;
 

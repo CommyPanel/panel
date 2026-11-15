@@ -16,4 +16,14 @@ class AssumeHealthyChecker implements HealthChecker
     {
         return true;
     }
+
+    public function waitUntilPingAnswers(int $port, int $timeoutSeconds): bool
+    {
+        return true;
+    }
+
+    public function probePing(int $port): bool
+    {
+        return true;
+    }
 }

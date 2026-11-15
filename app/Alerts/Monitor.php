@@ -70,7 +70,9 @@ class Monitor
             }
 
             try {
-                $healthy = $this->health->probe($live->host_port, $app->health_path);
+                $healthy = $app->pingHealth()
+                    ? $this->health->probePing($live->host_port)
+                    : $this->health->probe($live->host_port, $app->health_path);
             } catch (Throwable) {
                 $healthy = false;
             }

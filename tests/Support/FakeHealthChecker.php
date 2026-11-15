@@ -22,6 +22,23 @@ class FakeHealthChecker implements HealthChecker
         return $this->healthy;
     }
 
+    /** @var list<array{port: int, timeout?: int}> */
+    public array $pings = [];
+
+    public function waitUntilPingAnswers(int $port, int $timeoutSeconds): bool
+    {
+        $this->pings[] = ['port' => $port, 'timeout' => $timeoutSeconds];
+
+        return $this->healthy;
+    }
+
+    public function probePing(int $port): bool
+    {
+        $this->pings[] = ['port' => $port];
+
+        return $this->healthy;
+    }
+
     public function probe(int $port, string $path): bool
     {
         $this->calls[] = ['port' => $port, 'path' => $path];

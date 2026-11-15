@@ -3,6 +3,7 @@
 namespace App\Databases;
 
 use App\Dns\PanelDomain;
+use App\FastApps\FastApps;
 use App\Host\Data\NetworkAttachment;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
@@ -181,6 +182,9 @@ class AppLinks
             $env["{$p}_URL"] = "http://{$link->target->slug}:{$port}";
             $env["{$p}_HOST"] = $link->target->slug;
             $env["{$p}_PORT"] = $port;
+
+            // A quick-install app knows more about itself than its web address: a Redis URL, an SMTP port, access keys.
+            $env = [...$env, ...(FastApps::find($link->target->template)?->linkEnvironment($link->target, $p) ?? [])];
         }
 
         return $env;

@@ -1,6 +1,7 @@
 <?php
 
 use App\Audit\Severity;
+use App\Databases\AppLinks;
 use App\Deploy\Deployer;
 use App\Deploy\Health\HealthChecker;
 use App\Deploy\Source\TemplateSourceFetcher;
@@ -50,12 +51,12 @@ function finishedElasticsearch(string $name = 'Search'): App
 }
 
 describe('the create page', function () {
-    it('lists the five apps, warns about Elasticsearch and offers Kibana the Elasticsearch apps', function () {
+    it('lists the apps, warns about Elasticsearch and offers Kibana the Elasticsearch apps', function () {
         finishedElasticsearch('Logs');
 
         $this->get('/apps/create')->assertInertia(fn (Assert $page) => $page
             ->component('apps/create')
-            ->where('fast_apps', fn ($apps) => collect($apps)->pluck('id')->all() === ['meilisearch', 'typesense', 'grafana', 'elasticsearch', 'kibana'])
+            ->where('fast_apps', fn ($apps) => collect($apps)->pluck('id')->all() === ['meilisearch', 'typesense', 'grafana', 'elasticsearch', 'kibana', 'uptime-kuma', 'mailpit', 'gotenberg', 'redis', 'n8n', 'garage'])
             ->where('fast_apps.3.warnings.1', fn ($text) => str_contains($text, 'vm.max_map_count=262144'))
             ->where('fast_apps.4.fields.0.key', 'elasticsearch')
             ->where('fast_apps.4.fields.0.options', [['value' => 'logs', 'label' => 'Logs']]));
@@ -195,7 +196,7 @@ describe('the build', function () {
 
         expect($sha)->toStartWith("template-{$template}-")
             ->and($fetcher->lastCommitMessage())->toBe($image)
-            ->and(File::get("{$dir}/Dockerfile"))->toStartWith("FROM {$image}\n");
+            ->and(File::get("{$dir}/Dockerfile"))->toStartWith("FROM {$image}");
 
         $plan = app(StackDetector::class)->plan($dir, 80);
 
@@ -206,6 +207,12 @@ describe('the build', function () {
         'Grafana' => ['grafana', 'grafana/grafana:12.2.0'],
         'Elasticsearch' => ['elasticsearch', 'docker.elastic.co/elasticsearch/elasticsearch:8.19.0'],
         'Kibana' => ['kibana', 'docker.elastic.co/kibana/kibana:8.19.0'],
+        'Uptime Kuma' => ['uptime-kuma', 'louislam/uptime-kuma:2.5.11'],
+        'Mailpit' => ['mailpit', 'axllent/mailpit:v1.33'],
+        'Gotenberg' => ['gotenberg', 'gotenberg/gotenberg:9.5'],
+        'Redis' => ['redis', 'redis:8.10'],
+        'n8n' => ['n8n', 'docker.n8n.io/n8nio/n8n:3.2.2'],
+        'Garage' => ['garage', 'dxflrs/garage:v2.5.0'],
     ]);
 
     it('secures Elasticsearch in its own settings file', function () {
@@ -220,7 +227,7 @@ describe('the build', function () {
     it('never puts a generated secret into any build context', function () {
         $secrets = [];
 
-        foreach (['meilisearch', 'typesense', 'grafana', 'elasticsearch'] as $template) {
+        foreach (['meilisearch', 'typesense', 'grafana', 'elasticsearch', 'mailpit', 'gotenberg', 'redis', 'n8n', 'garage'] as $template) {
             $this->post('/apps', quickForm($template, ucfirst($template).' App'));
         }
         finishedElasticsearch('Search');
@@ -329,6 +336,190 @@ describe('the passwords', function () {
         App::factory()->create(['slug' => 'plain']);
 
         ($this->confirmed)()->getJson('/apps/plain/credentials')->assertNotFound();
+    });
+});
+
+describe('the second batch', function () {
+    it('sets each one up with its port, volume, health check and generated secrets', function (string $template, int $port, array $volumes, array $variables, ?int $memory, ?int $timeout) {
+        $this->post('/apps', quickForm($template, 'Quick One'))->assertRedirect('/apps/quick-one/setup');
+
+        $app = App::query()->firstOrFail();
+
+        expect($app->container_port)->toBe($port)
+            ->and($app->volumes()->pluck('path')->all())->toBe($volumes)
+            ->and(collect($app->environment())->keys()->sort()->values()->all())->toBe(collect($variables)->sort()->values()->all())
+            ->and($app->memory_limit_mb)->toBe($memory)
+            ->and($app->health_timeout)->toBe($timeout);
+
+        foreach ($app->environment() as $key => $value) {
+            expect($value)->not->toBe('', $key);
+        }
+    })->with([
+        'Uptime Kuma' => ['uptime-kuma', 3001, ['/app/data'], [], null, 120],
+        'Mailpit' => ['mailpit', 8025, ['/data'], ['MP_UI_AUTH'], null, null],
+        'Gotenberg' => ['gotenberg', 3000, [], ['API_ENABLE_BASIC_AUTH', 'GOTENBERG_API_BASIC_AUTH_USERNAME', 'GOTENBERG_API_BASIC_AUTH_PASSWORD'], 1024, 90],
+        'Redis' => ['redis', 6379, ['/data'], ['REDIS_PASSWORD'], null, 120],
+        'n8n' => ['n8n', 5678, ['/home/node/.n8n'], ['N8N_ENCRYPTION_KEY'], null, 180],
+        'Garage' => ['garage', 3900, ['/data'], ['GARAGE_RPC_SECRET', 'GARAGE_ADMIN_TOKEN', 'COMMYPANEL_ACCESS_KEY_ID', 'COMMYPANEL_SECRET_ACCESS_KEY', 'COMMYPANEL_BUCKET'], null, 120],
+    ]);
+
+    it('warns about what to know first', function () {
+        $warnings = collect(FastApps::catalog())->mapWithKeys(fn ($app) => [$app['id'] => $app['warnings']]);
+
+        expect($warnings['uptime-kuma'][0])->toContain('first person')
+            ->and($warnings['n8n'][0])->toContain('HTTPS')
+            ->and($warnings['redis'][0])->toContain('stop the app')
+            ->and($warnings['garage'][0])->toContain('stop the app')
+            ->and($warnings['gotenberg'][0])->toContain('1 GB');
+    });
+
+    it('gives Garage a key in its own format, and Mailpit a login for the inbox', function () {
+        $this->post('/apps', quickForm('garage', 'Files'));
+        $this->post('/apps', quickForm('mailpit', 'Inbox'));
+        $garage = App::query()->where('template', 'garage')->firstOrFail()->environment();
+        $mail = App::query()->where('template', 'mailpit')->firstOrFail()->environment();
+
+        expect($garage['COMMYPANEL_ACCESS_KEY_ID'])->toMatch('/^GK[0-9a-f]{24}$/')
+            ->and($garage['COMMYPANEL_SECRET_ACCESS_KEY'])->toMatch('/^[0-9a-f]{64}$/')
+            ->and($garage['GARAGE_RPC_SECRET'])->toMatch('/^[0-9a-f]{64}$/')
+            ->and($mail['MP_UI_AUTH'])->toMatch('/^admin:[A-Za-z0-9]{24}$/');
+    });
+
+    describe('Redis', function () {
+        it('has no web interface: it takes no domain, and says so on its page', function () {
+            $this->post('/apps', quickForm('redis', 'Cache'));
+            $app = App::query()->firstOrFail();
+            $app->forceFill(['setup_step' => null])->save();
+
+            $this->post('/apps/cache/domains', ['name' => 'cache.example.com', 'redirect' => 'none'])->assertSessionHasErrors('name');
+            $this->get('/apps/cache')->assertInertia(fn (Assert $page) => $page->where('app.template.private', true));
+
+            expect($app->domains()->count())->toBe(0);
+        });
+
+        it('is checked with a PING, while the others are checked over HTTP', function () {
+            $this->post('/apps', quickForm('redis', 'Cache'));
+            $this->post('/apps', quickForm('grafana', 'Charts'));
+            $redis = App::query()->where('template', 'redis')->firstOrFail();
+            $grafana = App::query()->where('template', 'grafana')->firstOrFail();
+
+            expect($redis->pingHealth())->toBeTrue()->and($grafana->pingHealth())->toBeFalse();
+
+            $redis->forceFill(['setup_step' => null, 'config_changed_at' => null])->save();
+            $health = new FakeHealthChecker;
+            app()->instance(HealthChecker::class, $health);
+            app()->instance(TrafficSwitcher::class, new RecordingTrafficSwitcher);
+
+            $deployment = app(Deployer::class)->deploy($redis->fresh())->fresh();
+
+            expect($deployment->status->value)->toBe('active')
+                ->and($health->pings)->toHaveCount(1)
+                ->and($health->pings[0]['timeout'])->toBe(120)
+                ->and($health->calls)->toBe([]);
+        });
+
+        it('keeps a second Redis off the same data, and keeps the password off the command line', function () {
+            $script = FastApps::find('redis')->files(new App(['slug' => 'cache']))['commypanel-start.sh'];
+
+            expect($script)->toContain('flock -n 9')
+                ->toContain('Stop the app, then deploy again')
+                ->toContain('echo "requirepass $REDIS_PASSWORD"')
+                ->toContain('exec setpriv --reuid=redis --regid=redis --clear-groups redis-server "$conf"');
+        });
+    });
+
+    describe('what a linked app is told', function () {
+        function linkedTo(string $template, string $name, string $prefix = 'SVC'): array
+        {
+            test()->post('/apps', quickForm($template, $name));
+            $target = App::query()->where('template', $template)->latest('id')->firstOrFail();
+            $target->forceFill(['setup_step' => null])->save();
+            $consumer = App::factory()->create(['slug' => 'consumer-'.$template, 'setup_step' => null]);
+
+            app(AppLinks::class)->linkApp($consumer, $target, $prefix);
+
+            return [$target->fresh(), app(AppLinks::class)->environment($consumer)];
+        }
+
+        it('gets a Redis URL with the password instead of the web-style one', function () {
+            [$redis, $env] = linkedTo('redis', 'Cache', 'CACHE');
+            $password = $redis->environment()['REDIS_PASSWORD'];
+
+            expect($env['CACHE_URL'])->toBe("redis://:{$password}@cache:6379")
+                ->and($env['CACHE_HOST'])->toBe('cache')
+                ->and($env['CACHE_PORT'])->toBe('6379')
+                ->and($env['CACHE_PASSWORD'])->toBe($password);
+        });
+
+        it('gets the SMTP address of Mailpit as well as its web address', function () {
+            [, $env] = linkedTo('mailpit', 'Inbox', 'MAIL');
+
+            expect($env)->toMatchArray([
+                'MAIL_URL' => 'http://inbox:8025',
+                'MAIL_SMTP_HOST' => 'inbox',
+                'MAIL_SMTP_PORT' => '1025',
+            ]);
+        });
+
+        it('gets the access key, secret, region and bucket of Garage', function () {
+            [$garage, $env] = linkedTo('garage', 'Files', 'S3');
+            $vars = $garage->environment();
+
+            expect($env)->toMatchArray([
+                'S3_URL' => 'http://files:3900',
+                'S3_ACCESS_KEY_ID' => $vars['COMMYPANEL_ACCESS_KEY_ID'],
+                'S3_SECRET_ACCESS_KEY' => $vars['COMMYPANEL_SECRET_ACCESS_KEY'],
+                'S3_REGION' => 'garage',
+                'S3_BUCKET' => 'main',
+            ]);
+        });
+
+        it('gets the user and password of Gotenberg', function () {
+            [$gotenberg, $env] = linkedTo('gotenberg', 'Pdf', 'PDF');
+
+            expect($env['PDF_USER'])->toBe('gotenberg')
+                ->and($env['PDF_PASSWORD'])->toBe($gotenberg->environment()['GOTENBERG_API_BASIC_AUTH_PASSWORD']);
+        });
+
+        it('gets nothing extra from an app that has nothing to add', function () {
+            [, $env] = linkedTo('uptime-kuma', 'Watch', 'KUMA');
+
+            expect($env)->toBe(['KUMA_URL' => 'http://watch:3001', 'KUMA_HOST' => 'watch', 'KUMA_PORT' => '3001']);
+        });
+    });
+
+    it('shows what to connect with, the secret rows marked', function (string $template, array $rows) {
+        $this->post('/apps', quickForm($template, 'Quick One'));
+        App::query()->firstOrFail()->forceFill(['setup_step' => null])->save();
+
+        $response = $this->withSession(['auth.password_confirmed_at' => time()])->getJson('/apps/quick-one/credentials')->assertOk();
+
+        expect(collect($response->json('rows'))->map(fn ($r) => [$r['label'], $r['secret']])->all())->toBe($rows);
+    })->with([
+        'Uptime Kuma' => ['uptime-kuma', [['Address for linked apps', false]]],
+        'Mailpit' => ['mailpit', [['SMTP address for linked apps', false], ['Address for linked apps', false], ['User', false], ['Password', true]]],
+        'Gotenberg' => ['gotenberg', [['Address for linked apps', false], ['User', false], ['Password', true]]],
+        'Redis' => ['redis', [['Address for linked apps', false], ['Password', true], ['Connection URL', true]]],
+        'n8n' => ['n8n', [['Address for linked apps', false], ['Encryption key', true]]],
+        'Garage' => ['garage', [['Address for linked apps', false], ['Region', false], ['Bucket', false], ['Access key', false], ['Secret key', true]]],
+    ]);
+
+    it('has setup scripts that parse', function (string $template) {
+        $path = $this->dataPath.'/script.sh';
+        File::ensureDirectoryExists($this->dataPath);
+        File::put($path, FastApps::find($template)->files(new App(['slug' => 'x']))['commypanel-start.sh']);
+
+        exec('sh -n '.escapeshellarg($path).' 2>&1', $out, $code);
+
+        expect($code)->toBe(0, implode("\n", $out));
+    })->with(['redis', 'garage']);
+
+    it('builds Garage from its own image and a plain Alpine, with no secret in the settings file', function () {
+        $files = FastApps::find('garage')->files(new App(['slug' => 'files']));
+
+        expect($files['Dockerfile'])->toContain('FROM dxflrs/garage:v2.5.0 AS garage')->toContain('FROM alpine:3.22')
+            ->and($files['garage.toml'])->not->toContain('secret')->not->toContain('token')
+            ->and($files['garage.toml'])->toContain('replication_factor = 1');
     });
 });
 

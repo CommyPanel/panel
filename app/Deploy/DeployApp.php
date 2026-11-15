@@ -247,9 +247,14 @@ class DeployApp
     {
         $timeout = $app->health_timeout ?? (int) config('commypanel.deploy.health_timeout');
         $this->stage($deployment, DeploymentStage::Health);
-        $log->step("Waiting up to {$timeout}s for {$app->health_path} to answer.");
+        $ping = $app->pingHealth();
+        $log->step($ping ? "Waiting up to {$timeout}s for the app to answer a PING." : "Waiting up to {$timeout}s for {$app->health_path} to answer.");
 
-        if ($this->health->waitUntilHealthy((int) $deployment->host_port, $app->health_path, $timeout)) {
+        $healthy = $ping
+            ? $this->health->waitUntilPingAnswers((int) $deployment->host_port, $timeout)
+            : $this->health->waitUntilHealthy((int) $deployment->host_port, $app->health_path, $timeout);
+
+        if ($healthy) {
             $log->line('The new version is healthy.');
 
             return;

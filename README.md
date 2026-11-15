@@ -242,7 +242,7 @@ CommyPanel is pre-1.0. What you should know before you rely on it:
 
 - [Installing, upgrading and backups](docs/installing.md)
 - [Running apps](docs/apps.md): private repositories, release commands, volumes, locking
-- [Ready-made apps](docs/quick-install.md): Meilisearch, Typesense, Grafana, Elasticsearch, Kibana
+- [Ready-made apps](docs/quick-install.md): Meilisearch, Typesense, Grafana, Elasticsearch, Kibana, Uptime Kuma, Mailpit, Gotenberg, Redis, n8n, Garage
 - [Databases](docs/databases.md): servers, links, backups, phpMyAdmin and pgAdmin
 - [GitHub connection](docs/github.md)
 - [API tokens and the API](docs/api.md)

@@ -40,6 +40,42 @@ class HttpHealthChecker implements HealthChecker
         }
     }
 
+    public function waitUntilPingAnswers(int $port, int $timeoutSeconds): bool
+    {
+        for ($attempt = 0; $attempt < max(1, $timeoutSeconds); $attempt++) {
+            if ($this->probePing($port)) {
+                return true;
+            }
+
+            Sleep::for(1)->second();
+        }
+
+        return false;
+    }
+
+    /**
+     * Redis answers `PING` with +PONG, or with -NOAUTH when a password is set; either proves it is
+     * up. Anything else (nothing, a closed connection, -LOADING while it reads its data) is not yet.
+     */
+    public function probePing(int $port): bool
+    {
+        $socket = @stream_socket_client("tcp://127.0.0.1:{$port}", $errno, $error, 3);
+
+        if ($socket === false) {
+            return false;
+        }
+
+        try {
+            stream_set_timeout($socket, 3);
+            fwrite($socket, "PING\r\n");
+            $line = fgets($socket, 128);
+
+            return is_string($line) && (str_starts_with($line, '+PONG') || str_starts_with($line, '-NOAUTH'));
+        } finally {
+            fclose($socket);
+        }
+    }
+
     private function url(int $port, string $path): string
     {
         return "http://127.0.0.1:{$port}".(str_starts_with($path, '/') ? $path : '/'.$path);

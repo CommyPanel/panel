@@ -8,6 +8,7 @@ use App\Enums\DeploymentStatus;
 use App\Enums\SetupStep;
 use App\Enums\SourceType;
 use App\Enums\Stack;
+use App\FastApps\FastApps;
 use Database\Factories\AppFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -70,6 +71,12 @@ class App extends Model
     protected $guarded = [];
 
     protected $hidden = ['deploy_key_private', 'git_token', 'webhook_secret'];
+
+    /** A quick-install app whose health check is a Redis PING instead of an HTTP request. */
+    public function pingHealth(): bool
+    {
+        return $this->template !== null && FastApps::find($this->template)?->pingHealth() === true;
+    }
 
     protected function casts(): array
     {

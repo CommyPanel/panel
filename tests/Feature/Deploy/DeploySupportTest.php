@@ -197,6 +197,59 @@ describe('http health checker', function () {
     });
 });
 
+describe('ping health checker', function () {
+    beforeEach(fn () => Sleep::fake());
+
+    /**
+     * Listens on a free port in another process, answers one connection with $reply (or just closes it,
+     * as Docker's port proxy does while the app is not listening yet) and ends.
+     *
+     * @return array{0: int, 1: resource}
+     */
+    function pingServer(?string $reply): array
+    {
+        $code = '$s = stream_socket_server("tcp://127.0.0.1:0"); '
+            .'echo explode(":", stream_socket_get_name($s, false))[1], "\n"; '
+            .'$c = @stream_socket_accept($s, 10); '
+            .'if ($c) { fgets($c); '.($reply === null ? '' : 'fwrite($c, '.var_export($reply, true).'); ').'fclose($c); }';
+        $process = proc_open([PHP_BINARY, '-r', $code], [1 => ['pipe', 'w']], $pipes);
+        $port = (int) trim((string) fgets($pipes[1]));
+
+        return [$port, $process];
+    }
+
+    it('is healthy when Redis answers PONG, or says it wants a password', function (string $reply) {
+        [$port, $process] = pingServer($reply);
+
+        expect((new HttpHealthChecker)->probePing($port))->toBeTrue();
+        proc_close($process);
+    })->with(["+PONG\r\n", "-NOAUTH Authentication required.\r\n"]);
+
+    it('is not healthy while Redis is loading, answers something else, or the connection is closed with no answer', function (?string $reply) {
+        [$port, $process] = pingServer($reply);
+
+        expect((new HttpHealthChecker)->probePing($port))->toBeFalse();
+        proc_close($process);
+    })->with(["-LOADING Redis is loading the dataset in memory\r\n", "HTTP/1.1 400 Bad Request\r\n", null]);
+
+    it('is not healthy when nothing listens, and gives up after the timeout', function () {
+        [$port, $process] = pingServer(null);
+        // Let the helper end: one failed connection from the first probe.
+        (new HttpHealthChecker)->probePing($port);
+        proc_close($process);
+
+        expect((new HttpHealthChecker)->waitUntilPingAnswers($port, 3))->toBeFalse();
+        Sleep::assertSleptTimes(3);
+    });
+
+    it('waits until it answers', function () {
+        [$port, $process] = pingServer("+PONG\r\n");
+
+        expect((new HttpHealthChecker)->waitUntilPingAnswers($port, 5))->toBeTrue();
+        proc_close($process);
+    });
+});
+
 describe('queueing', function () {
     it('queues a numbered deployment and records who asked', function () {
         Queue::fake();

@@ -21,6 +21,21 @@ abstract class QuickApp implements FastApp
         return null;
     }
 
+    public function private(): bool
+    {
+        return false;
+    }
+
+    public function pingHealth(): bool
+    {
+        return false;
+    }
+
+    public function linkEnvironment(App $target, string $prefix): array
+    {
+        return [];
+    }
+
     public function healthTimeout(): ?int
     {
         return null;
@@ -61,6 +76,16 @@ abstract class QuickApp implements FastApp
     protected function secret(int $length = 32): string
     {
         return Str::random($length);
+    }
+
+    /**
+     * A secret in hexadecimal, for the tools that insist on it.
+     *
+     * @param  positive-int  $bytes
+     */
+    protected function hex(int $bytes = 16): string
+    {
+        return bin2hex(random_bytes($bytes));
     }
 
     protected function variable(App $app, string $key): string

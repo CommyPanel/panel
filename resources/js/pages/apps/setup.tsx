@@ -521,26 +521,43 @@ function DomainStep({ app, server }: { app: AppSetup; server: ServerAddress }) {
     const { t } = useT();
     const [busy, setBusy] = useState(false);
     const hasDomains = app.domains.length > 0;
+    const hidden = app.template?.private === true;
 
     return (
         <div className="space-y-6">
-            <Card
-                title={
-                    app.source_type === 'template'
-                        ? t('2. Domain')
-                        : t('4. Domain')
-                }
-                description={t(
-                    'Optional: point a domain at this app. You can also do it after the first deployment; the app is reachable only through its domains.',
-                )}
-            >
-                <p className="text-sm text-base-content/70">
-                    {t(
-                        'Add a domain below, create the DNS records it shows, and CommyPanel connects it and gets a certificate once DNS has updated. You do not have to wait for that to deploy.',
-                    )}
-                </p>
-            </Card>
-            <AppDomains slug={app.slug} domains={app.domains} server={server} />
+            {hidden ? (
+                <Card title={t('2. Domain')}>
+                    <p className="text-sm text-base-content/70">
+                        {t(
+                            'This app has no web interface, so it takes no domain. Other apps reach it through a link: add one on their Links tab.',
+                        )}
+                    </p>
+                </Card>
+            ) : (
+                <>
+                    <Card
+                        title={
+                            app.source_type === 'template'
+                                ? t('2. Domain')
+                                : t('4. Domain')
+                        }
+                        description={t(
+                            'Optional: point a domain at this app. You can also do it after the first deployment; the app is reachable only through its domains.',
+                        )}
+                    >
+                        <p className="text-sm text-base-content/70">
+                            {t(
+                                'Add a domain below, create the DNS records it shows, and CommyPanel connects it and gets a certificate once DNS has updated. You do not have to wait for that to deploy.',
+                            )}
+                        </p>
+                    </Card>
+                    <AppDomains
+                        slug={app.slug}
+                        domains={app.domains}
+                        server={server}
+                    />
+                </>
+            )}
             <div className="flex flex-wrap gap-2">
                 <Button
                     loading={busy}
@@ -555,7 +572,11 @@ function DomainStep({ app, server }: { app: AppSetup; server: ServerAddress }) {
                         )
                     }
                 >
-                    {hasDomains ? t('Create and deploy') : t('Skip and deploy')}
+                    {hasDomains
+                        ? t('Create and deploy')
+                        : hidden
+                          ? t('Deploy')
+                          : t('Skip and deploy')}
                 </Button>
                 {app.source_type === 'template' ? (
                     <Button

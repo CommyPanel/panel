@@ -41,7 +41,12 @@ export type AppSummary = {
     stack: string | null;
     source_type: 'git' | 'upload' | 'template';
     /** The quick-install recipe the app was made from, if any. */
-    template: { id: string; name: string; release: string } | null;
+    template: {
+        id: string;
+        name: string;
+        release: string;
+        private: boolean;
+    } | null;
     status: AppStatus;
     locked: boolean;
     git_url: string | null;

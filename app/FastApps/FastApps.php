@@ -12,7 +12,10 @@ final class FastApps
      */
     public static function all(): array
     {
-        $apps = [new Meilisearch, new Typesense, new Grafana, new Elasticsearch, new Kibana];
+        $apps = [
+            new Meilisearch, new Typesense, new Grafana, new Elasticsearch, new Kibana,
+            new UptimeKuma, new Mailpit, new Gotenberg, new Redis, new N8n, new Garage,
+        ];
 
         return array_combine(array_map(fn (FastApp $a) => $a->id(), $apps), $apps);
     }

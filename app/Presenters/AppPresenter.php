@@ -44,13 +44,13 @@ class AppPresenter
     /**
      * The quick-install recipe the app was made from, or null. Nothing secret is part of it.
      *
-     * @return array<string, string>|null
+     * @return array<string, string|bool>|null
      */
     public static function template(App $app): ?array
     {
         $template = FastApps::find($app->template);
 
-        return $template === null ? null : ['id' => $template->id(), 'name' => $template->name(), 'release' => $template->release()];
+        return $template === null ? null : ['id' => $template->id(), 'name' => $template->name(), 'release' => $template->release(), 'private' => $template->private()];
     }
 
     /**

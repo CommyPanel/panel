@@ -5,6 +5,7 @@ namespace App\Dns;
 use App\Audit\AuditLogger;
 use App\Deploy\Traffic\AppRouting;
 use App\Enums\DomainStatus;
+use App\FastApps\FastApps;
 use App\Models\App;
 use App\Models\Domain;
 use App\Tls\TlsPlanner;
@@ -68,6 +69,10 @@ class AddAppDomain
 
         if ($name === null) {
             throw ValidationException::withMessages(['name' => 'Enter a domain such as app.example.com, without http://, paths or wildcards.']);
+        }
+
+        if (FastApps::find($app->template)?->private()) {
+            throw ValidationException::withMessages(['name' => 'This app has no web interface, so it takes no domain. Other apps reach it through a link.']);
         }
 
         $hasWww = str_starts_with($name, 'www.');
