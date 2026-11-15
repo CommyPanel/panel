@@ -78,7 +78,11 @@ class DeploymentController extends Controller
      */
     public function endWatch(Request $request, App $app, Deployment $deployment, WatchService $watch, AuditLogger $audit): RedirectResponse
     {
-        abort_unless($deployment->watch_state === 'watching', 404);
+        // The page may be a few seconds behind: the watch can have run out, or been ended, since it was
+        // drawn. That is not an error worth a 404 page, only news.
+        if ($deployment->watch_state !== 'watching') {
+            return back()->with('warning', __('The watch was already over.'));
+        }
 
         $watch->finish($app, 'A person ended the watch.');
         $audit->record('deploy.watch_ended', $request->user(), ['app' => $app->slug, 'deployment' => $deployment->number], $app);

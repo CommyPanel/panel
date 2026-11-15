@@ -366,11 +366,26 @@ describe('the second batch', function () {
     it('warns about what to know first', function () {
         $warnings = collect(FastApps::catalog())->mapWithKeys(fn ($app) => [$app['id'] => $app['warnings']]);
 
-        expect($warnings['uptime-kuma'][0])->toContain('first person')
+        expect($warnings['uptime-kuma'])->toBe([])
             ->and($warnings['n8n'][0])->toContain('HTTPS')
-            ->and($warnings['redis'][0])->toContain('stop the app')
-            ->and($warnings['garage'][0])->toContain('stop the app')
             ->and($warnings['gotenberg'][0])->toContain('1 GB');
+    });
+
+    it('explains what happens by itself, what is left to do and how to upgrade', function () {
+        $guides = collect(FastApps::catalog())->mapWithKeys(fn ($app) => [$app['id'] => $app['guide']]);
+
+        foreach ($guides as $guide) {
+            expect($guide['automatic'])->not->toBeEmpty()->and($guide['after'])->not->toBeEmpty()->and($guide['upgrade'])->not->toBeEmpty();
+        }
+
+        expect($guides['uptime-kuma']['after'][0])->toContain('first person')
+            ->and($guides['n8n']['after'][0])->toContain('first person')
+            ->and($guides['redis']['after'][0])->toContain('no web interface')
+            ->and($guides['redis']['upgrade'][1])->toContain('stop the app')
+            ->and($guides['garage']['upgrade'][1])->toContain('stop the app')
+            ->and($guides['gotenberg']['upgrade'][0])->toContain('nothing to back up')
+            ->and($guides['gotenberg']['automatic'])->not->toContain('Keeps its data in a persistent volume that survives deployments and rollbacks.')
+            ->and($guides['uptime-kuma']['automatic'])->toContain('Chooses SQLite, so there is no database to set up.');
     });
 
     it('gives Garage a key in its own format, and Mailpit a login for the inbox', function () {

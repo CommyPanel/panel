@@ -68,9 +68,7 @@ class Garage extends QuickApp
 
     public function warnings(): array
     {
-        return [
-            __('Garage cannot run twice on the same data. To upgrade it or change its variables, stop the app first, then deploy again.'),
-        ];
+        return [];
     }
 
     public function environment(array $settings): array

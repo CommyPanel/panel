@@ -37,6 +37,7 @@ final class FastApps
             'name' => $app->name(),
             'description' => $app->description(),
             'warnings' => $app->warnings(),
+            'guide' => Guide::for($app),
             'fields' => array_map(fn (Field $f) => [
                 'key' => $f->key,
                 'label' => $f->label,

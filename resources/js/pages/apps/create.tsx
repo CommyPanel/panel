@@ -2,6 +2,7 @@ import { Link, useForm } from '@inertiajs/react';
 import { GitBranch, GitPullRequest, Package, Upload } from 'lucide-react';
 import type { FormEvent } from 'react';
 import AppController from '@/actions/App/Http/Controllers/AppController';
+import { AppLogo } from '@/components/apps/app-logo';
 import { SetupSteps } from '@/components/apps/setup-steps';
 import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
@@ -23,6 +24,7 @@ type FastApp = {
     name: string;
     description: string;
     warnings: string[];
+    guide: { automatic: string[]; after: string[]; upgrade: string[] };
     fields: {
         key: string;
         label: string;
@@ -30,6 +32,47 @@ type FastApp = {
         options: { value: string; label: string }[];
     }[];
 };
+
+function GuideList({ title, items }: { title: string; items: string[] }) {
+    return (
+        <div>
+            <h3 className="text-sm font-semibold">{title}</h3>
+            <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-base-content/80">
+                {items.map((item) => (
+                    <li key={item}>{item}</li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+
+/** What the chosen app is, what CommyPanel does for it, what is left to do and how it is upgraded. */
+function AppGuide({ app }: { app: FastApp }) {
+    const { t } = useT();
+
+    return (
+        <div className="space-y-4 rounded-box border border-base-300 bg-base-200/50 p-4">
+            <div className="flex items-center gap-3">
+                <AppLogo id={app.id} className="bg-base-100" />
+                <div className="min-w-0">
+                    <h3 className="font-semibold">{app.name}</h3>
+                    <p className="text-sm text-base-content/80">
+                        {app.description}
+                    </p>
+                </div>
+            </div>
+            <GuideList
+                title={t('What CommyPanel does for you')}
+                items={app.guide.automatic}
+            />
+            <GuideList
+                title={t('What to do after it is running')}
+                items={app.guide.after}
+            />
+            <GuideList title={t('Upgrading')} items={app.guide.upgrade} />
+        </div>
+    );
+}
 
 export default function Create({
     github,
@@ -278,34 +321,30 @@ export default function Create({
                                 <legend className="mb-1 label-text">
                                     {t('Which app?')}
                                 </legend>
-                                <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
                                     {fast_apps.map((app) => (
                                         <label
                                             key={app.id}
                                             className={cn(
-                                                'flex cursor-pointer items-start gap-3 rounded-box border p-4',
+                                                'flex cursor-pointer items-center gap-3 rounded-box border p-3 focus-within:ring-2 focus-within:ring-primary/40',
                                                 form.data.template === app.id
                                                     ? 'border-primary bg-primary/5'
-                                                    : 'border-base-300',
+                                                    : 'border-base-300 hover:border-base-content/30',
                                             )}
                                         >
                                             <input
                                                 type="radio"
                                                 name="template"
-                                                className="radio mt-1 radio-primary"
+                                                className="sr-only"
                                                 checked={
                                                     form.data.template ===
                                                     app.id
                                                 }
                                                 onChange={() => choose(app)}
                                             />
-                                            <span className="min-w-0">
-                                                <span className="block font-medium">
-                                                    {app.name}
-                                                </span>
-                                                <span className="block text-sm text-base-content/70">
-                                                    {app.description}
-                                                </span>
+                                            <AppLogo id={app.id} />
+                                            <span className="min-w-0 font-medium">
+                                                {app.name}
                                             </span>
                                         </label>
                                     ))}
@@ -316,6 +355,7 @@ export default function Create({
                                     </span>
                                 )}
                             </fieldset>
+                            {chosen && <AppGuide app={chosen} />}
                             {chosen?.warnings.map((warning) => (
                                 <Alert key={warning} variant="warning">
                                     {warning}

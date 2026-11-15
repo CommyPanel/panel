@@ -208,7 +208,10 @@ describe('watching a release after it goes live', function () {
         $this->post("/apps/shop/deployments/{$second->number}/end-watch")->assertSessionHasNoErrors();
 
         expect($second->fresh()->watch_state)->toBe('ended')->and(($this->running)($this->first))->toBeFalse();
-        $this->post("/apps/shop/deployments/{$second->number}/end-watch")->assertNotFound();
+
+        // Pressing it again (a page that is a little behind) is a friendly message, not a 404 page.
+        $this->post("/apps/shop/deployments/{$second->number}/end-watch")
+            ->assertRedirect()->assertSessionHas('warning', 'The watch was already over.');
     });
 
     it('is looked at again by the job until the watch is over', function () {

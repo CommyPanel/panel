@@ -57,7 +57,6 @@ class N8n extends QuickApp
     {
         return [
             __('n8n only lets you sign in over HTTPS, so give it a domain and wait for its certificate. After adding the domain, add the variable WEBHOOK_URL (https:// and the domain, with a closing slash) on the Variables tab and apply, so webhooks show the right address.'),
-            __('The first person to open n8n creates its owner account. Open it as soon as it is running, before anyone else can.'),
         ];
     }
 

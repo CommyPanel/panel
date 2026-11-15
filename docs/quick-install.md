@@ -1,6 +1,6 @@
 # Ready-made apps
 
-Besides your own code, **Apps > New app > A ready-made app** installs software you only need to run: **Meilisearch**, **Typesense**, **Grafana**, **Elasticsearch**, **Kibana**, **Uptime Kuma**, **Mailpit**, **Gotenberg**, **Redis**, **n8n** and **Garage**. You choose the app and a name, optionally add a domain, and CommyPanel builds and starts it like any other app: the same releases, rollbacks, logs, variables, volumes, domains and HTTPS.
+Besides your own code, **Apps > New app > A ready-made app** installs software you only need to run: **Meilisearch**, **Typesense**, **Grafana**, **Elasticsearch**, **Kibana**, **Uptime Kuma**, **Mailpit**, **Gotenberg**, **Redis**, **n8n** and **Garage**. You pick the app from the list (with its logo); a short guide appears under it with what CommyPanel does for you, what to do once it runs (such as creating the first account) and how to upgrade it. You then choose a name, optionally add a domain, and CommyPanel builds and starts it like any other app: the same releases, rollbacks, logs, variables, volumes, domains and HTTPS.
 
 Each one runs the **official image** at a version CommyPanel pins (shown on the app's page), so a new CommyPanel release never changes the version under your data by itself. Their data lives in a persistent volume, which survives deployments and rollbacks.
 

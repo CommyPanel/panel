@@ -50,9 +50,7 @@ class UptimeKuma extends QuickApp
 
     public function warnings(): array
     {
-        return [
-            __('The first person to open Uptime Kuma creates its admin account. Open it as soon as it is running, before anyone else can.'),
-        ];
+        return [];
     }
 
     public function environment(array $settings): array
