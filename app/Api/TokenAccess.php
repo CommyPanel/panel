@@ -15,7 +15,7 @@ use Laravel\Sanctum\PersonalAccessToken;
  * it says, a request is still checked against what the person may do NOW, so
  * taking a permission away from a user takes it from their tokens too.
  *
- * Abilities are strings on the token: `apps:read`, `apps:deploy`, and one
+ * Abilities are strings on the token: `apps:read`, `apps:deploy`, `apps:control`, `apps:logs`, `apps:env`, and one
  * `app:<slug>` for each app the token is limited to (none means every app the
  * person may use).
  */
@@ -24,6 +24,12 @@ class TokenAccess
     public const READ = 'apps:read';
 
     public const DEPLOY = 'apps:deploy';
+
+    public const CONTROL = 'apps:control';
+
+    public const LOGS = 'apps:logs';
+
+    public const ENV = 'apps:env';
 
     /** The most a token may live, and what it gets when nothing else is said. */
     public const MAX_DAYS = 365;
@@ -39,7 +45,10 @@ class TokenAccess
     {
         return [
             self::READ => ['label' => __('Read apps and deployments'), 'description' => __('List apps, see their status and read how a deployment went.'), 'permission' => Permissions::APPS_VIEW],
-            self::DEPLOY => ['label' => __('Start deployments'), 'description' => __('Deploy an app, for example from a CI pipeline after the tests pass.'), 'permission' => Permissions::APPS_DEPLOY],
+            self::DEPLOY => ['label' => __('Start deployments'), 'description' => __('Deploy an app, for example from a CI pipeline after the tests pass. Also lets a token apply changed variables.'), 'permission' => Permissions::APPS_DEPLOY],
+            self::CONTROL => ['label' => __('Start, stop and restart apps'), 'description' => __('Stop an app, start it again and restart it. Visitors see an error while it is stopped.'), 'permission' => Permissions::APPS_CONTROL],
+            self::LOGS => ['label' => __('Read app logs'), 'description' => __('Read the output of an app\'s running container. Apps often print secrets into their logs, and every read is recorded in the audit log.'), 'permission' => Permissions::APPS_LOGS],
+            self::ENV => ['label' => __('Manage environment variables'), 'description' => __('List the names of an app\'s variables, set a variable and remove one. Values are never read back through the API, only written. They often hold secrets.'), 'permission' => Permissions::ENV_MANAGE],
         ];
     }
 

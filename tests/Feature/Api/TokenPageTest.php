@@ -42,9 +42,18 @@ it('shows a person their own tokens and what they may put on one', function () {
 
     $this->get('/settings/tokens/create')->assertInertia(fn (Assert $page) => $page
         ->component('settings/token-create')
-        ->has('abilities', 2)
+        ->has('abilities', 5)
+        ->where('abilities', fn ($abilities) => collect($abilities)->pluck('key')->sort()->values()->all() === ['apps:control', 'apps:deploy', 'apps:env', 'apps:logs', 'apps:read'])
         ->where('apps', fn ($apps) => collect($apps)->pluck('slug')->sort()->values()->all() === ['blog', 'shop'])
         ->where('default_days', 90));
+});
+
+it('offers the abilities of the permissions a person holds, and no others', function () {
+    $operator = User::factory()->regular()->create();
+    $operator->givePermissionTo('apps.view', 'apps.control', 'apps.logs', 'tokens.manage');
+
+    $this->actingAs($operator)->get('/settings/tokens/create')->assertInertia(fn (Assert $page) => $page
+        ->where('abilities', fn ($abilities) => collect($abilities)->pluck('key')->sort()->values()->all() === ['apps:control', 'apps:logs', 'apps:read']));
 });
 
 it('offers a person only the abilities they hold', function () {

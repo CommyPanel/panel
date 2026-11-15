@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AuditLogger
 {
@@ -22,6 +23,13 @@ class AuditLogger
         $actor ??= $this->request->user();
         // Artisan has no real client; the test suite does issue HTTP requests.
         $noClient = app()->runningInConsole() && ! app()->runningUnitTests();
+
+        // A call made with an API token says which one (its name, never the secret).
+        $token = $actor?->currentAccessToken();
+
+        if ($token instanceof PersonalAccessToken && request()->bearerToken() !== null) {
+            $metadata['via_token'] = $token->name;
+        }
 
         return AuditLog::query()->create([
             'user_id' => $actor?->getKey(),

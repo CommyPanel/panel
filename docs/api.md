@@ -1,14 +1,18 @@
 # API
 
-CommyPanel has a small HTTP API for scripts and CI: list apps, start a deployment, follow it. It uses
-bearer tokens, never your password or a browser session.
+CommyPanel has a small HTTP API for scripts and CI: list apps, start and follow a deployment, start, stop
+and restart an app, read its logs and manage its environment variables. It is described in
+[`openapi.yaml`](openapi.yaml), the contract the official clients are written against. It uses bearer
+tokens, never your password or a browser session.
 
 ## Create a token
 
 Settings > API tokens > New token (needs the `tokens.manage` permission). Choose:
 
-- **What it may do**: read apps and deployments (`apps:read`), start deployments (`apps:deploy`). You can
-  only give what you hold yourself.
+- **What it may do**: read apps and deployments (`apps:read`), start deployments and apply changes
+  (`apps:deploy`), start, stop and restart (`apps:control`), read logs (`apps:logs`), manage variables
+  (`apps:env`, write-only). You can only give what you hold yourself. Logs and variables are separate
+  abilities because they often hold secrets: give a token only what it needs.
 - **Which apps**: all, or only the ones you tick. A token restricted to some apps gets a 404 for any other.
 - **Valid for**: 30 days, 90 days (the default), 6 months, 1 year, or **Never expires**. A token that never
   expires works until you revoke it or its owner is deleted (and stops if its owner loses the permissions it
@@ -25,14 +29,27 @@ A token is checked against its owner's **current** permissions on every call: if
 
 All calls are under `/api/v1`, send `Accept: application/json` and `Authorization: Bearer <token>`.
 
-| Call                                    | Ability       | Answer                                                      |
-| --------------------------------------- | ------------- | ----------------------------------------------------------- |
-| `GET /apps`                             | `apps:read`   | the apps the token may see                                  |
-| `GET /apps/{slug}`                      | `apps:read`   | one app: status, stack, domains, live and latest deployment |
-| `POST /apps/{slug}/deployments`         | `apps:deploy` | `202` and the new deployment                                |
-| `GET /apps/{slug}/deployments/{number}` | `apps:read`   | the deployment; add `?log=1` for the build log              |
+| Call                                           | Ability        | Answer                                                           |
+| ---------------------------------------------- | -------------- | ---------------------------------------------------------------- |
+| `GET /apps`                                    | `apps:read`    | the apps the token may see                                       |
+| `GET /apps/{slug}`                             | `apps:read`    | one app: status, stack, domains, live and latest deployment      |
+| `POST /apps/{slug}/deployments`                | `apps:deploy`  | `202` and the new deployment                                     |
+| `GET /apps/{slug}/deployments`                 | `apps:read`    | the newest deployments; `?limit=` up to 50                       |
+| `GET /apps/{slug}/deployments/{number}`        | `apps:read`    | the deployment; add `?log=1` for the build log                   |
+| `POST /apps/{slug}/apply`                      | `apps:deploy`  | `202`: apply changed variables, volumes and links, no build      |
+| `POST /apps/{slug}/start`, `/stop`, `/restart` | `apps:control` | the app after the change; `409` if the state does not allow it   |
+| `GET /apps/{slug}/logs`                        | `apps:logs`    | the last lines (`?tail=`, 10 to 5000); every read is audited     |
+| `GET /apps/{slug}/env`                         | `apps:env`     | the names of the variables, never their values                   |
+| `PUT /apps/{slug}/env/{KEY}`                   | `apps:env`     | body `{"value": "..."}`; `201` new, `200` replaced; never echoed |
+| `DELETE /apps/{slug}/env/{KEY}`                | `apps:env`     | removes it; `404` if it is not there                             |
+| `GET /token`                                   | none           | what this token is: name, abilities, apps, expiry                |
 
-Answers hold no secrets: no environment variables, keys or webhook secrets.
+Answers hold no secrets: variable values are write-only, and nothing returns keys or webhook secrets. A variable
+change takes effect with `POST /apps/{slug}/apply`. The API does not offer a terminal, volume files, the
+credentials of ready-made apps, database passwords, users, roles, tokens, settings, backups or certificates.
+Every call is audited with the token's name.
+
+Every error is JSON with an `error` sentence (a `422` also has `errors`, field to sentences).
 
 A deployment has `status`, `stage`, `finished` and `succeeded`. Poll it until `finished` is `true`, then
 check `succeeded`. Starting a deployment while one runs answers `409` with the running one; a stopped app

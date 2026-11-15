@@ -223,7 +223,7 @@ describe('deploying', function () {
         Queue::assertPushed(RunDeployment::class);
 
         $entry = AuditLog::query()->where('action', 'api.deploy_triggered')->first();
-        expect($entry->metadata)->toBe(['app' => 'shop', 'deployment' => 1, 'token_name' => 'ci'])
+        expect($entry->metadata)->toBe(['app' => 'shop', 'deployment' => 1, 'via_token' => 'ci'])
             ->and($entry->user_id)->toBe($this->user->id);
     });
 

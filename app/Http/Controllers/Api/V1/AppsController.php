@@ -4,16 +4,15 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Api\ApiPresenter;
 use App\Api\TokenAccess;
-use App\Http\Controllers\Controller;
 use App\Models\App;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
-class AppsController extends Controller
+class AppsController extends ApiController
 {
     public function index(Request $request, TokenAccess $access): JsonResponse
     {
-        $token = $request->user()->currentAccessToken();
+        $token = $this->token($request);
 
         $apps = App::query()
             ->whereNull('setup_step')
@@ -29,8 +28,7 @@ class AppsController extends Controller
 
     public function show(Request $request, App $app, TokenAccess $access): JsonResponse
     {
-        // An app the token may not use looks the same as one that does not exist.
-        abort_unless($app->setup_step === null && $access->allowsApp($request->user()->currentAccessToken(), $app), 404);
+        $this->authorizeApp($request, $app, $access);
 
         return response()->json(['data' => ApiPresenter::app($app)]);
     }

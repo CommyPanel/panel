@@ -1,5 +1,6 @@
 <?php
 
+use App\Api\ApiErrors;
 use App\Exceptions\ErrorPages;
 use App\Exceptions\PanelNotMigrated;
 use App\Http\Controllers\GitHubWebhookController;
@@ -62,7 +63,9 @@ return Application::configure(basePath: dirname(__DIR__))
             : $e);
 
         // Pages of our own for the usual HTTP errors, and a message instead of a bare 429 page.
-        $exceptions->respond(fn (SymfonyResponse $response, Throwable $e, Request $request) => ErrorPages::respond($response, $e, $request));
+        $exceptions->respond(fn (SymfonyResponse $response, Throwable $e, Request $request) => $request->is('api/*')
+            ? ApiErrors::normalize($response)
+            : ErrorPages::respond($response, $e, $request));
         $exceptions->render(fn (ThrottleRequestsException $e, Request $request) => ErrorPages::throttled($e, $request));
 
         $exceptions->shouldRenderJsonWhen(
