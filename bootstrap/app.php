@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\ErrorPages;
 use App\Exceptions\PanelNotMigrated;
 use App\Http\Controllers\GitHubWebhookController;
 use App\Http\Controllers\PushWebhookController;
@@ -12,10 +13,12 @@ use Illuminate\Database\SQLiteDatabaseDoesNotExistException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Laravel\Sanctum\Http\Middleware\CheckAbilities;
 use Laravel\Sanctum\Http\Middleware\CheckForAnyAbility;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -57,6 +60,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->map(fn (QueryException $e) => $e->getPrevious() instanceof SQLiteDatabaseDoesNotExistException
             ? new PanelNotMigrated($e)
             : $e);
+
+        // Pages of our own for the usual HTTP errors, and a message instead of a bare 429 page.
+        $exceptions->respond(fn (SymfonyResponse $response, Throwable $e, Request $request) => ErrorPages::respond($response, $e, $request));
+        $exceptions->render(fn (ThrottleRequestsException $e, Request $request) => ErrorPages::throttled($e, $request));
 
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),

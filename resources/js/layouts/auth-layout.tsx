@@ -1,13 +1,22 @@
 import { Head, usePage } from '@inertiajs/react';
+import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { Brand } from '@/components/brand';
 import { LanguageMenu } from '@/components/language-menu';
 import { ThemeMenu } from '@/components/theme-menu';
+import { Toaster } from '@/components/ui/toaster';
+import { notify } from '@/lib/toast';
 
 type Props = { title: string; description?: string; children: ReactNode };
 
 export default function AuthLayout({ title, description, children }: Props) {
-    const { name } = usePage().props;
+    const { name, flash } = usePage().props;
+
+    // A notice from the server (a page that expired, too many tries) shows as a toast.
+    useEffect(() => {
+        if (flash?.status) notify.success(flash.status);
+        if (flash?.warning) notify.warning(flash.warning);
+    }, [flash]);
 
     return (
         <>
@@ -30,6 +39,7 @@ export default function AuthLayout({ title, description, children }: Props) {
                     <div className="mt-6">{children}</div>
                 </div>
             </main>
+            <Toaster />
         </>
     );
 }

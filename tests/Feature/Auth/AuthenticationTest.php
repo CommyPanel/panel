@@ -33,8 +33,12 @@ it('throttles repeated failed logins', function () {
         $this->post('/login', ['email' => $user->email, 'password' => 'wrong']);
     }
 
+    // A message on the form (and no bare 429 page for the browser to show in an overlay).
     $this->post('/login', ['email' => $user->email, 'password' => 'password'])
-        ->assertStatus(429);
+        ->assertRedirect()
+        ->assertSessionHasErrors('email');
+    expect(session('errors')->first('email'))->toStartWith('Too many attempts. Try again in ');
+    $this->assertGuest();
 });
 
 it('redirects guests to the login page', function () {

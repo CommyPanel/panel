@@ -38,6 +38,7 @@ use App\Http\Controllers\DeploymentController;
 use App\Http\Controllers\DomainController;
 use App\Http\Controllers\EncryptionKeyController;
 use App\Http\Controllers\EnvVarController;
+use App\Http\Controllers\FallbackController;
 use App\Http\Controllers\GitHubController;
 use App\Http\Controllers\GitTokenController;
 use App\Http\Controllers\HttpsController;
@@ -378,3 +379,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('permissions', [PermissionController::class, 'index'])->middleware('can:'.Permissions::PERMISSIONS_VIEW)->name('permissions.index');
 });
+
+// Anything that matches nothing: through the web group, so the 404 page has a session and the
+// panel's look (a route-less 404 never runs the middleware that draws it).
+Route::match(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'], '{fallbackPlaceholder}', FallbackController::class)
+    ->where('fallbackPlaceholder', '.*')->fallback();
