@@ -21,3 +21,10 @@ it('refuses to build a release without the translations', function () {
 
     expect($script)->toContain('lang/en.json')->toContain('is missing from the release');
 });
+
+it('ships the release key and refuses to build a release without one', function () {
+    $script = (string) file_get_contents(dirname(__DIR__, 2).'/scripts/build-release.sh');
+
+    expect($script)->toContain('installer/release-key.pub')->toContain('COMMYPANEL_UNSIGNED_BUILD')
+        ->and(file_exists(dirname(__DIR__, 2).'/installer/release-key.pub'))->toBeTrue();
+});

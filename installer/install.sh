@@ -10,6 +10,7 @@
 #   -y, --yes         do not ask before upgrading (for scripts)
 #   --panel-port N    port for the panel's web interface (default 8443)
 #   --tarball FILE    use a local release tarball instead of downloading
+#   --allow-unsigned  install a release without a valid signature (at your own risk)
 #   --render-only     only write config files below COMMYPANEL_ROOT (testing)
 #   --verbose         show everything instead of a progress display
 set -Eeuo pipefail
@@ -22,24 +23,86 @@ TARBALL=""
 ASSUME_YES=0
 UPGRADING=0
 RENDER_ONLY=0
+ALLOW_UNSIGNED="${COMMYPANEL_ALLOW_UNSIGNED:-0}"
+OPENSSL="${COMMYPANEL_OPENSSL:-openssl}"
 PASSTHROUGH=()
 
 die() { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
+warn() { printf '\033[1;33mwarning:\033[0m %s\n' "$*" >&2; }
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --version) VERSION="${2:?--version needs a value}"; shift 2 ;;
         --tarball) TARBALL="${2:?--tarball needs a file}"; shift 2 ;;
         -y|--yes) ASSUME_YES=1; shift ;;
+        --allow-unsigned) ALLOW_UNSIGNED=1; shift ;;
         --upgrade) UPGRADING=1; PASSTHROUGH+=("$1"); shift ;;
         --render-only) RENDER_ONLY=1; PASSTHROUGH+=("$1"); shift ;;
         --no-docker|--verbose) PASSTHROUGH+=("$1"); shift ;;
         --panel-port) PASSTHROUGH+=("$1" "${2:?--panel-port needs a value}"); shift 2 ;;
-        -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) die "Unknown option: $1" ;;
     esac
 done
+
+# The public half of the key that signs releases (Ed25519); the private half is
+# held only by the release workflow. The same text ships in every release as
+# installer/release-key.pub. An upgrade checks the new release against the key of
+# the version that is installed, never against a key that arrives with the download
+# itself. scripts/generate-signing-key.sh rewrites the block between the markers.
+embedded_key() {
+    cat <<'KEY'
+# --- release key begin ---
+# --- release key end ---
+KEY
+}
+
+# The fingerprint (SHA-256 of the public key) people compare with the one published
+# in the documentation.
+key_fingerprint() {
+    "$OPENSSL" pkey -pubin -in "$1" -outform DER 2>/dev/null | { sha256sum 2>/dev/null || shasum -a 256; } | cut -d' ' -f1
+}
+
+# Succeeds only for a valid Ed25519 signature of the tarball made with that key.
+verify_signature() {
+    local tarball=$1 sig=$2 key=$3
+    "$OPENSSL" pkeyutl -verify -pubin -inkey "$key" -rawin -in "$tarball" -sigfile "$sig" >/dev/null 2>&1
+}
+
+# Decides whether the download may be used. $1 tarball, $2 signature file (may not
+# exist), $3 the installed release's key file (may not exist), $4 scratch directory.
+# An upgrade trusts the key of the installed version; a first install, and an upgrade
+# from a version that predates signing, use the key built into this script.
+check_release_signature() {
+    local tarball=$1 sig=$2 installed_key=$3 work=$4 key="" source=""
+
+    if [ "$ALLOW_UNSIGNED" = 1 ]; then
+        warn "Skipping the signature check (--allow-unsigned). Only do this for a release you trust."
+        return 0
+    fi
+
+    if [ -s "$installed_key" ] && grep -q 'BEGIN PUBLIC KEY' "$installed_key"; then
+        key=$installed_key
+        source="the key of the installed version"
+    else
+        embedded_key | grep -v '^#' > "$work/embedded-key.pub" || true
+        if grep -q 'BEGIN PUBLIC KEY' "$work/embedded-key.pub"; then
+            key="$work/embedded-key.pub"
+            source="the key built into this installer"
+        fi
+    fi
+
+    command -v "$OPENSSL" >/dev/null 2>&1 \
+        || die "openssl is needed to check the release signature (or pass --allow-unsigned at your own risk)."
+    [ -n "$key" ] || die "This installer has no release key to check the signature with. Download the installer from the release page again, or pass --allow-unsigned at your own risk."
+    [ -s "$sig" ] || die "The release is not signed (it has no commypanel.tar.gz.sig), so nothing was installed. Pass --allow-unsigned only if you trust where it came from."
+
+    log "Release signing key SHA256:$(key_fingerprint "$key") ($source); compare it with the one in the documentation."
+    verify_signature "$tarball" "$sig" "$key" \
+        || die "The signature does not match ($source). The download was changed or was not made by CommyPanel; nothing was installed."
+    log "The release signature is valid"
+}
 
 # Asks before an upgrade, because the panel is unavailable for a moment while it
 # switches. Needs a real terminal (it reads /dev/tty, so it also works when the
@@ -82,7 +145,7 @@ TEXT
 }
 
 [ "$(id -u)" -eq 0 ] || die "Run this as root, for example: curl -fsSL <url> | sudo bash"
-for tool in tar sha256sum; do
+for tool in tar sha256sum cut; do
     command -v "$tool" >/dev/null 2>&1 || die "$tool is required."
 done
 
@@ -97,6 +160,7 @@ if [ -n "$TARBALL" ]; then
     else
         log "No $TARBALL.sha256 next to the tarball; skipping the checksum check for this local file."
     fi
+    if [ -f "$TARBALL.sig" ]; then cp "$TARBALL.sig" "$WORK/commypanel.tar.gz.sig"; fi
 else
     command -v curl >/dev/null 2>&1 || die "curl is required."
     if [ "$VERSION" = "latest" ]; then
@@ -109,6 +173,9 @@ else
         || die "Could not download $base/commypanel.tar.gz. Check that the release has the files commypanel.tar.gz and commypanel.tar.gz.sha256 attached: https://github.com/$REPO/releases"
     curl -fsSL --proto '=https' --tlsv1.2 -o "$WORK/commypanel.tar.gz.sha256" "$base/commypanel.tar.gz.sha256" \
         || die "Could not download $base/commypanel.tar.gz.sha256 (the release needs that file too)."
+    # A release made before signing started has no signature; the check below decides what that means.
+    curl -fsSL --proto '=https' --tlsv1.2 -o "$WORK/commypanel.tar.gz.sig" "$base/commypanel.tar.gz.sig" 2>/dev/null \
+        || rm -f "$WORK/commypanel.tar.gz.sig"
 fi
 
 if [ -f "$WORK/commypanel.tar.gz.sha256" ]; then
@@ -116,6 +183,10 @@ if [ -f "$WORK/commypanel.tar.gz.sha256" ]; then
     (cd "$WORK" && sha256sum --check --status commypanel.tar.gz.sha256) \
         || die "The checksum does not match. The download is corrupt or has been tampered with; nothing was installed."
 fi
+
+# Nothing is unpacked before the signature is checked. An installation that exists
+# decides which key is trusted: its own.
+check_release_signature "$WORK/commypanel.tar.gz" "$WORK/commypanel.tar.gz.sig" "$PREFIX/current/installer/release-key.pub" "$WORK"
 
 log "Unpacking"
 mkdir -p "$PREFIX/releases"

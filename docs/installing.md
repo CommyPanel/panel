@@ -15,11 +15,11 @@ CommyPanel is installed on the server it manages. It controls Docker and nginx o
 curl -fsSL https://github.com/commypanel/panel/releases/latest/download/install.sh | sudo bash
 ```
 
-The installer downloads the release, checks its SHA-256 checksum and stops if it does not match, then installs everything and prints a **one-time setup link**. Open it, choose your language, create your admin account, and you are done. The link works once and expires after an hour; run `sudo commypanel setup-url` for a new one.
+The installer downloads the release, checks its SHA-256 checksum and its signature and stops if either does not match, then installs everything and prints a **one-time setup link**. Open it, choose your language, create your admin account, and you are done. The link works once and expires after an hour; run `sudo commypanel setup-url` for a new one.
 
 Your browser will warn about the panel's certificate. It is self-signed until you give the panel a domain of its own.
 
-Options: `--panel-port N` to choose another port, `--no-docker` if you manage Docker yourself, `--version X` to install a specific version, `--yes` to skip the question before an upgrade, `--verbose` to see everything the installer does instead of the progress display.
+Options: `--panel-port N` to choose another port, `--no-docker` if you manage Docker yourself, `--version X` to install a specific version, `--yes` to skip the question before an upgrade, `--allow-unsigned` to install a release that has no valid signature (see below; at your own risk), `--verbose` to see everything the installer does instead of the progress display.
 
 ## What it installs
 
@@ -49,6 +49,26 @@ CommyPanel does not change your firewall. Open ports 80, 443 and the panel port,
 ```bash
 sudo ufw allow 80,443,8443/tcp
 ```
+
+## Check a release by hand
+
+Every release is signed with an Ed25519 key. The installer checks the signature of `commypanel.tar.gz` before it unpacks anything:
+
+- On a **first install** it uses the public key built into the installer you downloaded, and prints that key's fingerprint so you can compare it with the one below.
+- On an **upgrade** it uses the key of the version you already have installed (`/opt/commypanel/current/installer/release-key.pub`), never a key that comes with the new download. Upgrading from a version older than 0.9.0, which has no key yet, uses the key built into the installer you run.
+- A release without a signature, or with one that does not match, is refused. `--allow-unsigned` (or `COMMYPANEL_ALLOW_UNSIGNED=1`) skips the check; only use it for a file you got from a source you trust.
+
+The signing key's fingerprint (SHA-256 of the public key): `SHA256:<published with the first signed release>`.
+
+To check a download yourself you need OpenSSL 1.1.1 or newer. Download `commypanel.tar.gz`, `commypanel.tar.gz.sig` and the public key (`installer/release-key.pub` inside the tarball, or in the repository), then:
+
+```bash
+openssl pkey -pubin -in release-key.pub -outform DER | sha256sum        # the fingerprint
+openssl pkeyutl -verify -pubin -inkey release-key.pub -rawin \
+  -in commypanel.tar.gz -sigfile commypanel.tar.gz.sig                  # "Signature Verified Successfully"
+```
+
+`commypanel.tar.gz.sha256.sig` signs the checksum file the same way.
 
 ## Upgrading
 
