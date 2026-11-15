@@ -1,5 +1,9 @@
 import { Link } from '@inertiajs/react';
-import { OctagonAlert, TriangleAlert } from 'lucide-react';
+import { Download, OctagonAlert, TriangleAlert } from 'lucide-react';
+import AuditExportController from '@/actions/App/Http/Controllers/AuditExportController';
+import { Button } from '@/components/ui/button';
+import { useConfirmedAction } from '@/hooks/use-confirmed-action';
+import { useCan } from '@/lib/permissions';
 import { PageHeader } from '@/components/page-header';
 import { AuditFilterBar } from '@/components/audit/audit-filters';
 import type { AuditFilters, Severity } from '@/components/audit/audit-filters';
@@ -37,8 +41,50 @@ type Props = {
     filters: AuditFilters;
 };
 
+function ExportButtons({ filters }: { filters: AuditFilters }) {
+    const { t } = useT();
+    const confirmed = useConfirmedAction();
+
+    const download = (format: 'csv' | 'json') =>
+        confirmed.run(() => {
+            const query = new URLSearchParams({ format });
+            if (filters.q) query.set('q', filters.q);
+            filters.severity.forEach((s) => query.append('severity[]', s));
+            if (filters.from) query.set('from', filters.from);
+            if (filters.to) query.set('to', filters.to);
+
+            // A download, not a page visit: the browser keeps the page and saves the file.
+            window.location.href = `${AuditExportController.url()}?${query.toString()}`;
+        });
+
+    return (
+        <>
+            <div className="flex gap-2">
+                <Button
+                    variant="soft"
+                    size="sm"
+                    onClick={() => download('csv')}
+                >
+                    <Download className="size-4" aria-hidden />
+                    {t('Export CSV')}
+                </Button>
+                <Button
+                    variant="soft"
+                    size="sm"
+                    onClick={() => download('json')}
+                >
+                    <Download className="size-4" aria-hidden />
+                    {t('Export JSON')}
+                </Button>
+            </div>
+            {confirmed.modal}
+        </>
+    );
+}
+
 export default function AuditLog({ logs, filters }: Props) {
     const { t } = useT();
+    const can = useCan();
 
     return (
         <AppLayout title={t('Audit log')}>
@@ -47,6 +93,9 @@ export default function AuditLog({ logs, filters }: Props) {
                 description={t(
                     'Security-relevant actions on this panel, newest first.',
                 )}
+                actions={
+                    can('audit.export') && <ExportButtons filters={filters} />
+                }
             />
             <ul
                 className="mb-4 flex flex-wrap gap-x-6 gap-y-2 text-sm"

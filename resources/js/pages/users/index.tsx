@@ -1,7 +1,15 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { Lock, Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react';
+import {
+    Lock,
+    MonitorSmartphone,
+    Pencil,
+    Plus,
+    ShieldCheck,
+    Trash2,
+} from 'lucide-react';
 import { useState } from 'react';
 import UserController from '@/actions/App/Http/Controllers/UserController';
+import UserSessionController from '@/actions/App/Http/Controllers/UserSessionController';
 import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -138,6 +146,21 @@ export default function Index({ users }: { users: Row[] }) {
                                             </span>
                                         ) : (
                                             <div className="flex justify-end gap-1">
+                                                {!user.is_you &&
+                                                    can('sessions.view') && (
+                                                        <Link
+                                                            href={UserSessionController.index(
+                                                                user.id,
+                                                            )}
+                                                            className="btn btn-soft btn-sm"
+                                                        >
+                                                            <MonitorSmartphone
+                                                                className="size-4"
+                                                                aria-hidden
+                                                            />
+                                                            {t('Sessions')}
+                                                        </Link>
+                                                    )}
                                                 {user.can_edit &&
                                                     can('users.update') && (
                                                         <Link

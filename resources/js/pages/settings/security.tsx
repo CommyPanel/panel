@@ -1,4 +1,7 @@
 import { router, useForm, usePage } from '@inertiajs/react';
+import OwnSessionController from '@/actions/App/Http/Controllers/OwnSessionController';
+import { SessionList } from '@/components/sessions/session-list';
+import type { SessionRow } from '@/components/sessions/session-list';
 import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Alert } from '@/components/ui/alert';
@@ -205,7 +208,62 @@ function RecoveryCodes() {
     );
 }
 
-export default function Security() {
+function SessionsCard({
+    sessions,
+}: {
+    sessions: { supported: boolean; list: SessionRow[] };
+}) {
+    const { t } = useT();
+    const { errors } = usePage().props;
+    const others = sessions.list.some((session) => !session.current);
+
+    const revoke = (handle: string) =>
+        router.delete(OwnSessionController.destroy(handle), {
+            preserveScroll: true,
+        });
+
+    return (
+        <Card
+            title={t('Active sessions')}
+            description={t(
+                'Where you are signed in right now. Sign out any browser you do not recognise, and change your password if something looks wrong.',
+            )}
+        >
+            {errors.session && <Alert variant="error">{errors.session}</Alert>}
+            {sessions.supported ? (
+                <div className="space-y-4">
+                    <SessionList sessions={sessions.list} onRevoke={revoke} />
+                    {others && (
+                        <Button
+                            variant="soft"
+                            size="sm"
+                            onClick={() =>
+                                router.delete(
+                                    OwnSessionController.destroyOthers(),
+                                    { preserveScroll: true },
+                                )
+                            }
+                        >
+                            {t('Sign out all other browsers')}
+                        </Button>
+                    )}
+                </div>
+            ) : (
+                <p className="text-sm text-base-content/70">
+                    {t(
+                        'The session list needs the database session driver, which this installation does not use.',
+                    )}
+                </p>
+            )}
+        </Card>
+    );
+}
+
+export default function Security({
+    sessions,
+}: {
+    sessions: { supported: boolean; list: SessionRow[] };
+}) {
     const { t } = useT();
     const { auth } = usePage().props;
     const [confirmDisable, setConfirmDisable] = useState(false);
@@ -267,6 +325,7 @@ export default function Security() {
 
                 <PasswordCard />
             </div>
+            <SessionsCard sessions={sessions} />
 
             <Modal
                 open={confirmDisable}

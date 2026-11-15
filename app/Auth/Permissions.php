@@ -83,6 +83,12 @@ final class Permissions
 
     public const AUDIT_VIEW = 'audit.view';
 
+    public const AUDIT_EXPORT = 'audit.export';
+
+    public const SESSIONS_VIEW = 'sessions.view';
+
+    public const SESSIONS_REVOKE = 'sessions.revoke';
+
     /**
      * @return array<string, array{group: string, label: string, description: string}>
      */
@@ -126,6 +132,9 @@ final class Permissions
             self::ROLES_MANAGE => ['group' => __('Access'), 'label' => __('Manage roles'), 'description' => __('Create, edit and delete roles. A role can only grant permissions you hold yourself.')],
             self::PERMISSIONS_VIEW => ['group' => __('Access'), 'label' => __('View permissions'), 'description' => __('See the list of permissions and what each one allows.')],
             self::AUDIT_VIEW => ['group' => __('Access'), 'label' => __('View the audit log'), 'description' => __('Read the record of who did what on this panel.')],
+            self::AUDIT_EXPORT => ['group' => __('Access'), 'label' => __('Export the audit log'), 'description' => __('Download the audit log (with the filters you chose) as a CSV or JSON file. It lists who did what and from which address. Asks for the password unless it was confirmed recently, and every export is recorded in the audit log.')],
+            self::SESSIONS_VIEW => ['group' => __('Users'), 'label' => __('See other users\' sessions'), 'description' => __('See where other users are signed in: IP address, browser and when they were last active. Every look is recorded in the audit log.')],
+            self::SESSIONS_REVOKE => ['group' => __('Users'), 'label' => __('Sign other users out'), 'description' => __('End other users\' sessions, one browser or all of them. Not the super user and not users with more access than you have. Asks for the password unless it was confirmed recently, and is recorded in the audit log.')],
         ];
     }
 

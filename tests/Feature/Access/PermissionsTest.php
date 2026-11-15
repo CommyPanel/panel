@@ -140,6 +140,9 @@ describe('route protection', function () {
         'roles.manage' => [['get', '/roles/create'], ['post', '/roles']],
         'permissions.view' => [['get', '/permissions']],
         'audit.view' => [['get', '/settings/audit-log']],
+        'audit.export' => [['get', '/settings/audit-log/export?format=csv']],
+        'sessions.view' => [['get', '/users/1/sessions']],
+        'sessions.revoke' => [['delete', '/users/1/sessions'], ['delete', '/users/1/sessions/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa']],
     ];
 
     it('refuses a signed-in user without a role on every protected route', function (string $permission, string $method, string $url) {

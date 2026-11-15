@@ -29,7 +29,7 @@ final class Severity
         'backup.downloaded', 'backup.remote_changed', 'backup.remote_removed', 'backup.deleted', 'volume.backup_downloaded',
         'app.terminal_opened', 'app.nginx_updated', 'app.volume_file_downloaded', 'app.volume_removed', 'app.git_token_saved', 'app.env_removed',
         'token.created', 'user.created', 'user.updated', 'role.created', 'role.updated', 'role.deleted',
-        'auth.password_changed', 'auth.two_factor_failed', 'auth.login_failed', 'auth.recovery_codes_generated', 'auth.recovery_code_used',
+        'auth.password_changed', 'auth.two_factor_failed', 'auth.login_failed', 'auth.recovery_codes_generated', 'auth.recovery_code_used', 'user.sessions_viewed', 'user.session_revoked', 'user.sessions_revoked', 'audit.exported',
         'https.disabled', 'panel.domain_removed', 'panel.domain_set', 'github.disconnected', 'github.connected', 'notifications.removed',
         'deploy.failed', 'deploy.auto_rolled_back', 'deploy.auto_rollback_failed', 'tls.failed', 'docker.restart_failed',
     ];

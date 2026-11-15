@@ -22,6 +22,7 @@ use App\Http\Controllers\AppVolumeBackupController;
 use App\Http\Controllers\AppVolumeController;
 use App\Http\Controllers\AppVolumeFilesController;
 use App\Http\Controllers\AppWebhookController;
+use App\Http\Controllers\AuditExportController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\BackupController;
 use App\Http\Controllers\BackupRemoteController;
@@ -42,9 +43,11 @@ use App\Http\Controllers\HttpsController;
 use App\Http\Controllers\LanguageController;
 use App\Http\Controllers\ManagedDatabaseController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\OwnSessionController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\RolloutController;
+use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\ServerAddressController;
 use App\Http\Controllers\ServerController;
 use App\Http\Controllers\ServerDockerController;
@@ -53,6 +56,7 @@ use App\Http\Controllers\ServerUsageController;
 use App\Http\Controllers\SetupController;
 use App\Http\Controllers\UpdateController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\UserSessionController;
 use App\Http\Controllers\WelcomeController;
 use Illuminate\Support\Facades\Route;
 
@@ -68,9 +72,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::inertia('/settings/appearance', 'settings/appearance')->name('settings.appearance');
     Route::put('/settings/language', [LanguageController::class, 'update'])->name('settings.language');
-    Route::inertia('/settings/security', 'settings/security')
+    Route::get('/settings/security', SecurityController::class)
         ->middleware('password.confirm')
         ->name('settings.security');
+    Route::delete('/settings/sessions/{handle}', [OwnSessionController::class, 'destroy'])
+        ->where('handle', '[a-f0-9]{32}')->name('settings.sessions.destroy');
+    Route::delete('/settings/sessions', [OwnSessionController::class, 'destroyOthers'])->name('settings.sessions.destroy-others');
 
     // The encryption key: a password-confirmed page, audited on every visit as a high-risk action.
     Route::get('/settings/encryption-key', EncryptionKeyController::class)
@@ -333,6 +340,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/settings/audit-log', [AuditLogController::class, 'index'])
         ->middleware('can:'.Permissions::AUDIT_VIEW)->name('settings.audit-log');
+    Route::get('/settings/audit-log/export', AuditExportController::class)
+        ->middleware(['can:'.Permissions::AUDIT_EXPORT, 'password.confirm'])->name('settings.audit-log.export');
 
     Route::get('users', [UserController::class, 'index'])->middleware('can:'.Permissions::USERS_VIEW)->name('users.index');
     Route::middleware('can:'.Permissions::USERS_CREATE)->group(function () {
@@ -342,6 +351,14 @@ Route::middleware('auth')->group(function () {
     Route::middleware('can:'.Permissions::USERS_UPDATE)->group(function () {
         Route::get('users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
         Route::put('users/{user}', [UserController::class, 'update'])->name('users.update');
+    });
+    Route::get('users/{user}/sessions', [UserSessionController::class, 'index'])
+        ->middleware('can:'.Permissions::SESSIONS_VIEW)->whereNumber('user')->name('users.sessions');
+    Route::middleware(['can:'.Permissions::SESSIONS_REVOKE, 'password.confirm'])->group(function () {
+        Route::delete('users/{user}/sessions/{handle}', [UserSessionController::class, 'destroy'])
+            ->where('handle', '[a-f0-9]{32}')->whereNumber('user')->name('users.sessions.destroy');
+        Route::delete('users/{user}/sessions', [UserSessionController::class, 'destroyAll'])
+            ->whereNumber('user')->name('users.sessions.destroy-all');
     });
     Route::delete('users/{user}', [UserController::class, 'destroy'])->middleware('can:'.Permissions::USERS_DELETE)->name('users.destroy');
 
