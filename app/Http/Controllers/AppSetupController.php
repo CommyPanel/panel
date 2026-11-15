@@ -137,6 +137,9 @@ class AppSetupController extends Controller
 
     public function back(App $app): RedirectResponse
     {
+        // A quick-install app has no earlier step: its choices were made on the first page.
+        abort_if($app->source_type === SourceType::Template, 404);
+
         $previous = match ($app->setup_step) {
             SetupStep::Settings => SetupStep::Source,
             SetupStep::Domain => SetupStep::Settings,

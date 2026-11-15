@@ -6,6 +6,7 @@ use App\Http\Controllers\AppAlertsController;
 use App\Http\Controllers\AppAutoDeployController;
 use App\Http\Controllers\AppContainerController;
 use App\Http\Controllers\AppController;
+use App\Http\Controllers\AppCredentialsController;
 use App\Http\Controllers\AppDomainController;
 use App\Http\Controllers\AppLinkController;
 use App\Http\Controllers\AppLockController;
@@ -137,6 +138,10 @@ Route::middleware('auth')->group(function () {
             Route::post('rollout/abort', [RolloutController::class, 'abort'])->name('rollout.abort');
             Route::post('deployments/{deployment:number}/rollback', [DeploymentController::class, 'rollback'])->name('deployments.rollback');
         });
+
+        // The generated password or key of a quick-install app: its own permission and a recent password.
+        Route::get('credentials', AppCredentialsController::class)
+            ->middleware(['can:'.Permissions::APPS_CREDENTIALS, 'password.confirm'])->name('credentials');
 
         Route::middleware('can:'.Permissions::ENV_MANAGE)->group(function () {
             Route::post('env', [EnvVarController::class, 'store'])->name('env.store');

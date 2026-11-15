@@ -20,6 +20,7 @@ import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import AppController from '@/actions/App/Http/Controllers/AppController';
 import DeploymentController from '@/actions/App/Http/Controllers/DeploymentController';
 import { AppPower } from '@/components/apps/app-power';
+import { QuickInstallCard } from '@/components/apps/quick-install-card';
 import { AdvancedTab } from '@/components/apps/tabs/advanced-tab';
 import { DeploymentsTab } from '@/components/apps/tabs/deployments-tab';
 import { DomainsTab } from '@/components/apps/tabs/domains-tab';
@@ -281,7 +282,11 @@ export default function Show({
                 description={
                     app.source_type === 'upload'
                         ? t('Uploaded project')
-                        : (app.git_url ?? undefined)
+                        : app.source_type === 'template'
+                          ? t('Quick install: :name', {
+                                name: app.template?.name ?? '',
+                            })
+                          : (app.git_url ?? undefined)
                 }
                 actions={
                     <>
@@ -352,6 +357,14 @@ export default function Show({
                         'This app is stopped. Its domains show an error until you start it again.',
                     )}
                 </Alert>
+            )}
+
+            {app.template && can('apps.credentials') && (
+                <QuickInstallCard
+                    slug={app.slug}
+                    name={app.template.name}
+                    image={app.template.release}
+                />
             )}
 
             <Tabs

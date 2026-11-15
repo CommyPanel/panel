@@ -16,6 +16,7 @@ class StackDetector
     public function __construct(?array $stacks = null)
     {
         $this->stacks = $stacks ?? [
+            new TemplateStack,
             new DockerfileStack,
             new DotnetStack,
             new GoStack,

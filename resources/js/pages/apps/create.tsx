@@ -1,5 +1,5 @@
 import { Link, useForm } from '@inertiajs/react';
-import { GitBranch, GitPullRequest, Upload } from 'lucide-react';
+import { GitBranch, GitPullRequest, Package, Upload } from 'lucide-react';
 import type { FormEvent } from 'react';
 import AppController from '@/actions/App/Http/Controllers/AppController';
 import { SetupSteps } from '@/components/apps/setup-steps';
@@ -18,9 +18,30 @@ type GitHubRepos = {
     error: string | null;
 };
 
-export default function Create({ github }: { github: GitHubRepos | null }) {
+type FastApp = {
+    id: string;
+    name: string;
+    description: string;
+    warnings: string[];
+    fields: {
+        key: string;
+        label: string;
+        hint: string | null;
+        options: { value: string; label: string }[];
+    }[];
+};
+
+export default function Create({
+    github,
+    fast_apps,
+}: {
+    github: GitHubRepos | null;
+    fast_apps: FastApp[];
+}) {
     const { t } = useT();
     const form = useForm({
+        template: '',
+        settings: { elasticsearch: '' } as Record<string, string>,
         name: '',
         stack_hint: '',
         source: 'git',
@@ -60,7 +81,28 @@ export default function Create({ github }: { github: GitHubRepos | null }) {
             text: t('A .zip or .tar.gz of your project'),
             icon: Upload,
         },
+        {
+            value: 'template',
+            title: t('A ready-made app'),
+            text: t('Search, dashboards and more, no code needed'),
+            icon: Package,
+        },
     ];
+
+    const quick = form.data.source === 'template';
+    const chosen = fast_apps.find((app) => app.id === form.data.template);
+
+    // Choosing an app suggests its name, unless the person already typed their own.
+    const choose = (app: FastApp) =>
+        form.setData((data) => ({
+            ...data,
+            template: app.id,
+            name:
+                data.name === '' ||
+                fast_apps.some((other) => other.name === data.name)
+                    ? app.name
+                    : data.name,
+        }));
 
     return (
         <AppLayout title={t('New app')}>
@@ -72,7 +114,13 @@ export default function Create({ github }: { github: GitHubRepos | null }) {
             />
             <SetupSteps
                 current="basics"
-                source={form.data.source === 'upload' ? 'upload' : 'git'}
+                source={
+                    quick
+                        ? 'template'
+                        : form.data.source === 'upload'
+                          ? 'upload'
+                          : 'git'
+                }
             />
             <form onSubmit={submit} className="space-y-6">
                 <Card title={t('1. The basics')}>
@@ -84,25 +132,29 @@ export default function Create({ github }: { github: GitHubRepos | null }) {
                         onChange={(e) => form.setData('name', e.target.value)}
                         error={form.errors.name}
                     />
-                    <Select
-                        label={t('App type (optional)')}
-                        value={form.data.stack_hint}
-                        onChange={(e) =>
-                            form.setData('stack_hint', e.target.value)
-                        }
-                        error={form.errors.stack_hint}
-                        hint={t(
-                            'Leave on automatic and CommyPanel detects it from your code. A Dockerfile in your project always wins.',
-                        )}
-                    >
-                        <option value="">{t('Detect automatically')}</option>
-                        <option value="dotnet">.NET</option>
-                        <option value="go">Go</option>
-                        <option value="node">Node.js</option>
-                    </Select>
+                    {!quick && (
+                        <Select
+                            label={t('App type (optional)')}
+                            value={form.data.stack_hint}
+                            onChange={(e) =>
+                                form.setData('stack_hint', e.target.value)
+                            }
+                            error={form.errors.stack_hint}
+                            hint={t(
+                                'Leave on automatic and CommyPanel detects it from your code. A Dockerfile in your project always wins.',
+                            )}
+                        >
+                            <option value="">
+                                {t('Detect automatically')}
+                            </option>
+                            <option value="dotnet">.NET</option>
+                            <option value="go">Go</option>
+                            <option value="node">Node.js</option>
+                        </Select>
+                    )}
                     <fieldset className="space-y-2">
                         <legend className="mb-1 label-text">
-                            {t('Where is the code?')}
+                            {t('What do you want to run?')}
                         </legend>
                         <div className="grid gap-3 sm:grid-cols-2">
                             {sources.map((source) => (
@@ -218,6 +270,93 @@ export default function Create({ github }: { github: GitHubRepos | null }) {
                                     </span>
                                 </span>
                             </label>
+                        </>
+                    )}
+                    {quick && (
+                        <>
+                            <fieldset className="space-y-2">
+                                <legend className="mb-1 label-text">
+                                    {t('Which app?')}
+                                </legend>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    {fast_apps.map((app) => (
+                                        <label
+                                            key={app.id}
+                                            className={cn(
+                                                'flex cursor-pointer items-start gap-3 rounded-box border p-4',
+                                                form.data.template === app.id
+                                                    ? 'border-primary bg-primary/5'
+                                                    : 'border-base-300',
+                                            )}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="template"
+                                                className="radio mt-1 radio-primary"
+                                                checked={
+                                                    form.data.template ===
+                                                    app.id
+                                                }
+                                                onChange={() => choose(app)}
+                                            />
+                                            <span className="min-w-0">
+                                                <span className="block font-medium">
+                                                    {app.name}
+                                                </span>
+                                                <span className="block text-sm text-base-content/70">
+                                                    {app.description}
+                                                </span>
+                                            </span>
+                                        </label>
+                                    ))}
+                                </div>
+                                {form.errors.template && (
+                                    <span className="block text-sm text-error">
+                                        {form.errors.template}
+                                    </span>
+                                )}
+                            </fieldset>
+                            {chosen?.warnings.map((warning) => (
+                                <Alert key={warning} variant="warning">
+                                    {warning}
+                                </Alert>
+                            ))}
+                            {chosen?.fields.map((field) => (
+                                <Select
+                                    key={field.key}
+                                    label={field.label}
+                                    required
+                                    value={form.data.settings[field.key] ?? ''}
+                                    onChange={(e) =>
+                                        form.setData('settings', {
+                                            ...form.data.settings,
+                                            [field.key]: e.target.value,
+                                        })
+                                    }
+                                    error={
+                                        (form.errors as Record<string, string>)[
+                                            `settings.${field.key}`
+                                        ] ??
+                                        (form.errors as Record<string, string>)
+                                            .settings
+                                    }
+                                    hint={field.hint ?? undefined}
+                                >
+                                    <option value="">
+                                        {field.options.length === 0
+                                            ? t('None yet')
+                                            : t('Choose one')}
+                                    </option>
+                                    {field.options.map((option) => (
+                                        <option
+                                            key={option.value}
+                                            value={option.value}
+                                        >
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </Select>
+                            ))}
                         </>
                     )}
                     {form.data.source === 'git' && (

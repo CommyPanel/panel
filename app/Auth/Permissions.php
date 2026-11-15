@@ -33,6 +33,8 @@ final class Permissions
 
     public const ENV_MANAGE = 'env.manage';
 
+    public const APPS_CREDENTIALS = 'apps.credentials';
+
     public const DOMAINS_VIEW = 'domains.view';
 
     public const DOMAINS_MANAGE = 'domains.manage';
@@ -106,6 +108,7 @@ final class Permissions
             self::APPS_TERMINAL => ['group' => __('Apps'), 'label' => __('Open a terminal in an app'), 'description' => __('Run commands in a shell inside an app\'s running container, with the app\'s environment variables (often secrets such as database passwords) and its volumes. Asks for the password unless it was confirmed recently, and opening one is recorded in the audit log. This is close to full control of the app.')],
             self::APPS_DEACTIVATE => ['group' => __('Apps'), 'label' => __('Deactivate and activate apps'), 'description' => __('Take an app offline without deleting it, and bring it back.')],
             self::APPS_DELETE => ['group' => __('Apps'), 'label' => __('Delete apps'), 'description' => __('Permanently delete an app with its releases, images, domains, certificate and variables.')],
+            self::APPS_CREDENTIALS => ['group' => __('Apps'), 'label' => __('See quick-install passwords'), 'description' => __('Show the generated password or key of a quick-install app (Meilisearch, Typesense, Grafana, Elasticsearch, Kibana). Asks for the password unless it was confirmed recently, and every time it is shown is recorded in the audit log.')],
             self::ENV_MANAGE => ['group' => __('Apps'), 'label' => __('Manage environment variables'), 'description' => __('Add, replace, import and remove an app\'s environment variables. These often hold secrets such as database passwords.')],
             self::DOMAINS_VIEW => ['group' => __('Domains'), 'label' => __('View domains'), 'description' => __('See every domain with its DNS and HTTPS state.')],
             self::DOMAINS_MANAGE => ['group' => __('Domains'), 'label' => __('Manage domains and certificates'), 'description' => __('Add domains to apps, set redirects, re-check DNS, remove domains and request certificates.')],

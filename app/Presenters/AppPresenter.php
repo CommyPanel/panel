@@ -8,6 +8,7 @@ use App\Enums\AppStatus;
 use App\Enums\CertificateStatus;
 use App\Enums\DeploymentStatus;
 use App\Enums\SourceType;
+use App\FastApps\FastApps;
 use App\Models\App;
 use App\Models\Deployment;
 use App\Models\Domain;
@@ -32,11 +33,24 @@ class AppPresenter
             'status' => $app->status()->value,
             'locked' => $app->isLocked(),
             'source_type' => $app->source_type->value,
+            'template' => self::template($app),
             'git_url' => $app->git_url,
             'git_branch' => $app->git_branch,
             'active_release' => $app->activeDeployment?->number,
             'last_deployed_at' => $latest?->created_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * The quick-install recipe the app was made from, or null. Nothing secret is part of it.
+     *
+     * @return array<string, string>|null
+     */
+    public static function template(App $app): ?array
+    {
+        $template = FastApps::find($app->template);
+
+        return $template === null ? null : ['id' => $template->id(), 'name' => $template->name(), 'release' => $template->release()];
     }
 
     /**

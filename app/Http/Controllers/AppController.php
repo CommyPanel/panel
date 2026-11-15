@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Audit\AuditLogger;
 use App\Auth\Permissions;
+use App\Databases\DatabaseException;
 use App\Deploy\DestroyApp;
 use App\Deploy\LockedException;
 use App\Deploy\Source\GitProvider;
@@ -11,6 +12,8 @@ use App\Dns\PanelDomain;
 use App\Dns\ServerAddress;
 use App\Enums\SetupStep;
 use App\Enums\SourceType;
+use App\FastApps\FastApps;
+use App\FastApps\QuickInstall;
 use App\GitHub\GitHubApp;
 use App\GitHub\GitHubFailed;
 use App\Http\Requests\StoreAppRequest;
@@ -48,12 +51,29 @@ class AppController extends Controller
 
         return Inertia::render('apps/create', [
             'github' => $github->installed() ? $repos : null,
+            'fast_apps' => FastApps::catalog(),
         ]);
     }
 
-    public function store(StoreAppRequest $request, AuditLogger $audit): RedirectResponse
+    public function store(StoreAppRequest $request, AuditLogger $audit, QuickInstall $quick): RedirectResponse
     {
         $data = $request->validated();
+
+        if ($data['source'] === SourceType::Template->value) {
+            $template = FastApps::find($data['template']);
+            abort_if($template === null, 422);
+
+            try {
+                $app = $quick->create($template, $data['name'], array_map('strval', $data['settings'] ?? []));
+            } catch (DatabaseException $e) {
+                return back()->withErrors(['settings' => $e->getMessage()]);
+            }
+
+            $audit->record('app.setup_started', null, ['app' => $app->slug, 'template' => $template->id()], $app);
+
+            return redirect()->route('apps.setup', $app);
+        }
+
         $github = $data['source'] === 'github';
         $git = $github || $data['source'] === SourceType::Git->value;
 
