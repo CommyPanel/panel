@@ -4,6 +4,7 @@ namespace App\Dns;
 
 use App\Audit\AuditLogger;
 use App\Deploy\Traffic\AppRouting;
+use App\Enums\DomainStatus;
 use App\Models\App;
 use App\Models\Domain;
 use App\Tls\TlsPlanner;
@@ -33,7 +34,31 @@ class AddAppDomain
     ) {}
 
     /**
-     * @return list<Domain> the domains that were created
+     * Takes a free name (left by a deleted app) for this app, or makes a new one. A free name starts
+     * over: its old redirect and check belong to the app it had.
+     */
+    private function claim(string $name, App $app, ?string $redirectTo): Domain
+    {
+        $free = Domain::query()->where('name', $name)->whereNull('app_id')->first();
+
+        if ($free === null) {
+            return Domain::query()->create(['name' => $name, 'app_id' => $app->id, 'redirect_to' => $redirectTo]);
+        }
+
+        $free->forceFill([
+            'app_id' => $app->id,
+            'redirect_to' => $redirectTo,
+            'status' => DomainStatus::Pending,
+            'last_check' => null,
+            'last_checked_at' => null,
+            'verified_at' => null,
+        ])->save();
+
+        return $free;
+    }
+
+    /**
+     * @return list<Domain> the domains that were connected (new, or free ones taken over)
      *
      * @throws ValidationException
      */
@@ -71,7 +96,8 @@ class AddAppDomain
                 throw ValidationException::withMessages(['name' => "{$candidate} is the panel's own domain and cannot be used for an app."]);
             }
 
-            if (Domain::query()->where('name', $candidate)->exists()) {
+            // A name left behind by a deleted app (no app any more) is free to use again.
+            if (Domain::query()->where('name', $candidate)->whereNotNull('app_id')->exists()) {
                 throw ValidationException::withMessages(['name' => "{$candidate} is already connected to an app on this server."]);
             }
         }
@@ -80,10 +106,10 @@ class AddAppDomain
             $created = [];
 
             // The name that was typed redirects to its partner (example.com to www.example.com, or the reverse).
-            $created[] = Domain::query()->create(['name' => $name, 'app_id' => $app->id, 'redirect_to' => $partner]);
+            $created[] = $this->claim($name, $app, $partner);
 
             if ($partner !== null) {
-                $created[] = Domain::query()->create(['name' => $partner, 'app_id' => $app->id]);
+                $created[] = $this->claim($partner, $app, null);
             }
 
             return $created;

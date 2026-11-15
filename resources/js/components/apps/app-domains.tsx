@@ -1,13 +1,16 @@
-import { useForm } from '@inertiajs/react';
+import { useForm, usePage } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useDomainProgress } from '@/hooks/use-domain-progress';
 import { ServerAddressNote } from '@/components/domains/server-address-card';
+import { useState } from 'react';
 import type { FormEvent } from 'react';
 import AppDomainController from '@/actions/App/Http/Controllers/AppDomainController';
 import { DomainCard } from '@/components/domains/domain-card';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Tabs } from '@/components/ui/tabs';
 import { useT } from '@/hooks/use-t';
 import type { DomainRow, ServerAddress } from '@/types';
 
@@ -64,14 +67,30 @@ function redirectOptions(
 /** Add a domain to one app, with its optional www/bare redirect. */
 export function AddAppDomainCard({ slug }: { slug: string }) {
     const { t } = useT();
+    const free =
+        (usePage().props as { free_domains?: string[] }).free_domains ?? [];
+    const [mode, setMode] = useState<'type' | 'free'>('type');
     const form = useForm({ name: '', redirect: 'none' });
     const options = redirectOptions(form.data.name, t);
+    const choosing = mode === 'free' && free.length > 0;
+
+    const switchTo = (next: 'type' | 'free') => {
+        setMode(next);
+        form.setData({
+            name: next === 'free' ? (free[0] ?? '') : '',
+            redirect: 'none',
+        });
+        form.clearErrors();
+    };
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
         form.submit(AppDomainController.store(slug), {
             preserveScroll: true,
-            onSuccess: () => form.reset(),
+            onSuccess: () => {
+                form.reset();
+                setMode('type');
+            },
         });
     };
 
@@ -83,60 +102,97 @@ export function AddAppDomainCard({ slug }: { slug: string }) {
             )}
         >
             <form onSubmit={submit} className="space-y-4">
-                <Input
-                    label={t('Domain')}
-                    placeholder="app.example.com"
-                    required
-                    value={form.data.name}
-                    onChange={(e) => {
-                        form.setData('name', e.target.value);
-                        form.setData('redirect', 'none');
-                    }}
-                    error={form.errors.name}
-                />
-                <fieldset className="space-y-2">
-                    <legend className="mb-1 label-text">
-                        {t('Redirection')}
-                    </legend>
-                    {options.map((option) => (
-                        <label
-                            key={option.value}
-                            className="flex items-start gap-3"
-                        >
-                            <input
-                                type="radio"
-                                name="redirect"
-                                className="radio mt-0.5 radio-primary"
-                                checked={form.data.redirect === option.value}
-                                disabled={option.disabled}
-                                onChange={() =>
-                                    form.setData('redirect', option.value)
-                                }
-                            />
-                            <span className="min-w-0 text-sm">
-                                <span
-                                    className={
-                                        option.disabled
-                                            ? 'text-base-content/60'
-                                            : undefined
+                {free.length > 0 && (
+                    <Tabs
+                        label={t('How to choose the domain')}
+                        active={mode}
+                        onChange={switchTo}
+                        tabs={[
+                            { id: 'type', label: t('Type a domain') },
+                            {
+                                id: 'free',
+                                label: t('Use a free domain'),
+                                badge: free.length,
+                            },
+                        ]}
+                    />
+                )}
+                {choosing ? (
+                    <Select
+                        label={t('Free domain')}
+                        value={form.data.name}
+                        onChange={(e) => form.setData('name', e.target.value)}
+                        error={form.errors.name}
+                        hint={t(
+                            'Domains CommyPanel already knows that no app uses, for example after deleting an app. DNS is checked again.',
+                        )}
+                    >
+                        {free.map((name) => (
+                            <option key={name} value={name}>
+                                {name}
+                            </option>
+                        ))}
+                    </Select>
+                ) : (
+                    <Input
+                        label={t('Domain')}
+                        placeholder="app.example.com"
+                        required
+                        value={form.data.name}
+                        onChange={(e) => {
+                            form.setData('name', e.target.value);
+                            form.setData('redirect', 'none');
+                        }}
+                        error={form.errors.name}
+                    />
+                )}
+                {!choosing && (
+                    <fieldset className="space-y-2">
+                        <legend className="mb-1 label-text">
+                            {t('Redirection')}
+                        </legend>
+                        {options.map((option) => (
+                            <label
+                                key={option.value}
+                                className="flex items-start gap-3"
+                            >
+                                <input
+                                    type="radio"
+                                    name="redirect"
+                                    className="radio mt-0.5 radio-primary"
+                                    checked={
+                                        form.data.redirect === option.value
                                     }
-                                >
-                                    {option.label}
-                                </span>
-                                {option.hint && (
-                                    <span className="block text-base-content/60">
-                                        {option.hint}
+                                    disabled={option.disabled}
+                                    onChange={() =>
+                                        form.setData('redirect', option.value)
+                                    }
+                                />
+                                <span className="min-w-0 text-sm">
+                                    <span
+                                        className={
+                                            option.disabled
+                                                ? 'text-base-content/60'
+                                                : undefined
+                                        }
+                                    >
+                                        {option.label}
                                     </span>
-                                )}
+                                    {option.hint && (
+                                        <span className="block text-base-content/60">
+                                            {option.hint}
+                                        </span>
+                                    )}
+                                </span>
+                            </label>
+                        ))}
+                        {form.errors.redirect && (
+                            <span className="block text-sm text-error">
+                                {form.errors.redirect}
                             </span>
-                        </label>
-                    ))}
-                    {form.errors.redirect && (
-                        <span className="block text-sm text-error">
-                            {form.errors.redirect}
-                        </span>
-                    )}
-                </fieldset>
+                        )}
+                    </fieldset>
+                )}
                 <Button type="submit" loading={form.processing}>
                     <Plus className="size-4" aria-hidden />
                     {t('Add domain')}

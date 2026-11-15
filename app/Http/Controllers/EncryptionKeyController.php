@@ -20,7 +20,8 @@ class EncryptionKeyController extends Controller
         $audit->record('server.key_viewed', $request->user(), ['setup' => $request->boolean('setup')]);
 
         return Inertia::render('settings/encryption-key', [
-            'key' => (string) config('app.key'),
+            // Not called `key`: React never passes a prop of that name to a component.
+            'encryption_key' => (string) config('app.key'),
             'setup' => $request->boolean('setup'),
         ]);
     }

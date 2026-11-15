@@ -10,7 +10,7 @@ import { useT } from '@/hooks/use-t';
 import AppLayout from '@/layouts/app-layout';
 import SetupLayout from '@/layouts/setup-layout';
 
-type Props = { key: string; setup: boolean };
+type Props = { encryption_key: string; setup: boolean };
 
 function KeyCard({ secret }: { secret: string }) {
     const { t } = useT();
@@ -87,7 +87,10 @@ function KeyCard({ secret }: { secret: string }) {
     );
 }
 
-export default function EncryptionKey({ key: secret, setup }: Props) {
+export default function EncryptionKey({
+    encryption_key: secret,
+    setup,
+}: Props) {
     const { t } = useT();
     const [saved, setSaved] = useState(false);
 

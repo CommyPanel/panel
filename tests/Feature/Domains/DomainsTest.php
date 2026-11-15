@@ -6,6 +6,7 @@ use App\Dns\ServerAddress;
 use App\Enums\CertificateStatus;
 use App\Enums\DeploymentStatus;
 use App\Enums\DomainStatus;
+use App\Enums\SetupStep;
 use App\Host\Data\NginxSite;
 use App\Host\HostDriver;
 use App\Models\App;
@@ -71,6 +72,44 @@ it('adds a domain to an app, normalises it and checks DNS straight away', functi
         ->and($domain->status)->toBe(DomainStatus::Verified)
         ->and($domain->verified_at)->not->toBeNull()
         ->and(AuditLog::query()->pluck('action')->all())->toContain('domain.added', 'domain.verified');
+});
+
+describe('domains left behind by a deleted app', function () {
+    it('can be used again by a new app, starting over', function () {
+        $old = App::factory()->create(['slug' => 'old']);
+        Domain::query()->create(['name' => 'kibana.example.com', 'app_id' => $old->id, 'redirect_to' => 'www.kibana.example.com', 'status' => DomainStatus::Verified, 'verified_at' => now()]);
+        $old->delete();
+        $domain = Domain::query()->where('name', 'kibana.example.com')->sole();
+        expect($domain->app_id)->toBeNull();
+
+        $app = App::factory()->create(['slug' => 'kibana']);
+        $this->post("/apps/{$app->slug}/domains", ['name' => 'Kibana.Example.com', 'redirect' => 'none'])->assertSessionHasNoErrors();
+
+        $domain->refresh();
+        expect(Domain::query()->where('name', 'kibana.example.com')->count())->toBe(1)
+            ->and($domain->app_id)->toBe($app->id)
+            ->and($domain->redirect_to)->toBeNull();
+    });
+
+    it('still cannot take a domain another app uses', function () {
+        $other = App::factory()->create(['slug' => 'other']);
+        Domain::query()->create(['name' => 'used.example.com', 'app_id' => $other->id]);
+        $app = App::factory()->create(['slug' => 'mine']);
+
+        $this->post("/apps/{$app->slug}/domains", ['name' => 'used.example.com', 'redirect' => 'none'])->assertSessionHasErrors('name');
+    });
+
+    it('is offered on the app page and in the wizard, without the panel domain or taken ones', function () {
+        $other = App::factory()->create(['slug' => 'other']);
+        Domain::query()->create(['name' => 'taken.example.com', 'app_id' => $other->id]);
+        Domain::query()->create(['name' => 'free-b.example.com', 'app_id' => null]);
+        Domain::query()->create(['name' => 'free-a.example.com', 'app_id' => null]);
+        $app = App::factory()->create(['slug' => 'mine']);
+        $draft = App::factory()->create(['slug' => 'draft', 'setup_step' => SetupStep::Domain, 'source_verified_at' => now()]);
+
+        $this->get("/apps/{$app->slug}")->assertInertia(fn (Assert $page) => $page->where('free_domains', ['free-a.example.com', 'free-b.example.com']));
+        $this->get("/apps/{$draft->slug}/setup")->assertInertia(fn (Assert $page) => $page->where('free_domains', ['free-a.example.com', 'free-b.example.com']));
+    });
 });
 
 it('rejects invalid, duplicate and panel domains', function (string $input) {

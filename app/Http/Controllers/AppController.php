@@ -8,6 +8,7 @@ use App\Databases\DatabaseException;
 use App\Deploy\DestroyApp;
 use App\Deploy\LockedException;
 use App\Deploy\Source\GitProvider;
+use App\Dns\FreeDomains;
 use App\Dns\PanelDomain;
 use App\Dns\ServerAddress;
 use App\Enums\SetupStep;
@@ -94,7 +95,7 @@ class AppController extends Controller
         return redirect()->route('apps.setup', $app);
     }
 
-    public function show(Request $request, App $app, HttpsSettings $https, ServerAddress $server, PanelDomain $panel): Response|RedirectResponse
+    public function show(Request $request, App $app, HttpsSettings $https, ServerAddress $server, PanelDomain $panel, FreeDomains $free): Response|RedirectResponse
     {
         if ($app->setup_step !== null) {
             return redirect()->route('apps.setup', $app);
@@ -109,6 +110,7 @@ class AppController extends Controller
             'env_keys' => $app->envVars()->orderBy('key')->pluck('key')->values(),
             'https' => ['enabled' => $https->enabled(), 'staging' => $https->staging()],
             'server' => $server->forPage(),
+            'free_domains' => $free->names(),
             'webhook' => $this->webhook($request, $app, $panel),
         ]);
     }

@@ -23,7 +23,7 @@ it('shows the key after confirmation and audits the visit as danger', function (
         ->get('/settings/encryption-key');
     $r->assertInertia(fn (Assert $page) => $page
         ->component('settings/encryption-key')
-        ->where('key', config('app.key'))
+        ->where('encryption_key', config('app.key'))
         ->where('setup', false));
 
     $log = AuditLog::query()->where('action', 'server.key_viewed')->sole();

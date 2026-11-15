@@ -14,6 +14,7 @@ use App\Deploy\Source\GitUrl;
 use App\Deploy\Source\InvalidArchive;
 use App\Deploy\Source\RepositoryAccessChecker;
 use App\Deploy\Source\UploadStorage;
+use App\Dns\FreeDomains;
 use App\Dns\ServerAddress;
 use App\Enums\SetupStep;
 use App\Enums\SourceType;
@@ -35,7 +36,7 @@ use Inertia\Response;
  */
 class AppSetupController extends Controller
 {
-    public function show(App $app, UploadStorage $uploads, ServerAddress $server): Response|RedirectResponse
+    public function show(App $app, UploadStorage $uploads, ServerAddress $server, FreeDomains $free): Response|RedirectResponse
     {
         if ($app->setup_step === null) {
             return redirect()->route('apps.show', $app);
@@ -60,6 +61,7 @@ class AppSetupController extends Controller
                 ...($app->deploy_key_public === null ? ['url' => null, 'steps' => []] : $provider->deployKeyInstructions((string) $app->git_url)),
             ],
             'server' => $server->forPage(),
+            'free_domains' => $free->names(),
             'limits' => ['max_archive_mb' => (int) config('commypanel.uploads.max_archive_mb')],
         ]);
     }
