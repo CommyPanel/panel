@@ -884,6 +884,7 @@
     "Move traffic to the new version": "Trafiği yeni sürüme taşı",
     "Moving to the next step": "Sonraki adıma geçiliyor",
     "My GitHub account": "GitHub hesabım",
+    "n8n needs about 2 GB of memory for itself. On a smaller server other apps may be stopped by the system.": "n8n kendisi için yaklaşık 2 GB bellek gerektirir. Daha küçük bir sunucuda sistem diğer uygulamaları durdurabilir.",
     "n8n only lets you sign in over HTTPS, so give it a domain and wait for its certificate. After adding the domain, add the variable WEBHOOK_URL (https:// and the domain, with a closing slash) on the Variables tab and apply, so webhooks show the right address.": "n8n yalnızca HTTPS üzerinden oturum açmaya izin verir: ona bir alan adı verin ve sertifikasını bekleyin. Alan adını ekledikten sonra Değişkenler sekmesine WEBHOOK_URL değişkenini (https:// ve alan adı, sonunda eğik çizgiyle) ekleyin ve uygulayın; böylece webhook'lar doğru adresi gösterir.",
     "Name": "Ad",
     "Name of the new database": "Yeni veritabanının adı",

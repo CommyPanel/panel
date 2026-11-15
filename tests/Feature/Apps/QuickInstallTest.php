@@ -359,7 +359,7 @@ describe('the second batch', function () {
         'Mailpit' => ['mailpit', 8025, ['/data'], ['MP_UI_AUTH'], null, null],
         'Gotenberg' => ['gotenberg', 3000, [], ['API_ENABLE_BASIC_AUTH', 'GOTENBERG_API_BASIC_AUTH_USERNAME', 'GOTENBERG_API_BASIC_AUTH_PASSWORD'], 1024, 90],
         'Redis' => ['redis', 6379, ['/data'], ['REDIS_PASSWORD'], null, 120],
-        'n8n' => ['n8n', 5678, ['/home/node/.n8n'], ['N8N_ENCRYPTION_KEY'], null, 180],
+        'n8n' => ['n8n', 5678, ['/home/node/.n8n'], ['N8N_ENCRYPTION_KEY'], 2048, 180],
         'Garage' => ['garage', 3900, ['/data'], ['GARAGE_RPC_SECRET', 'GARAGE_ADMIN_TOKEN', 'COMMYPANEL_ACCESS_KEY_ID', 'COMMYPANEL_SECRET_ACCESS_KEY', 'COMMYPANEL_BUCKET'], null, 120],
     ]);
 
@@ -367,7 +367,8 @@ describe('the second batch', function () {
         $warnings = collect(FastApps::catalog())->mapWithKeys(fn ($app) => [$app['id'] => $app['warnings']]);
 
         expect($warnings['uptime-kuma'])->toBe([])
-            ->and($warnings['n8n'][0])->toContain('HTTPS')
+            ->and($warnings['n8n'][0])->toContain('2 GB')
+            ->and($warnings['n8n'][1])->toContain('HTTPS')
             ->and($warnings['gotenberg'][0])->toContain('1 GB');
     });
 

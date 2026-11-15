@@ -8,7 +8,7 @@ use App\Models\App;
  * n8n, workflow automation. Its credentials and workflows live in a volume, encrypted with a
  * generated key that stays in the app's variables (without it the saved credentials cannot be read
  * again). It sits behind the panel's nginx, so it is told to trust one proxy. Its login cookie is
- * secure, so it needs HTTPS: a domain and its certificate.
+ * secure, so it needs HTTPS: a domain and its certificate. It needs real memory (2 GB limit, 1.5 GB heap).
  */
 class N8n extends QuickApp
 {
@@ -48,6 +48,13 @@ class N8n extends QuickApp
         return 180;
     }
 
+    public function memoryLimitMb(): ?int
+    {
+        // Its first start runs a long list of database migrations; with the default 512 MB the Node
+        // heap stops at about 250 MB and it crashes in a loop.
+        return 2048;
+    }
+
     public function volumePaths(): array
     {
         return ['/home/node/.n8n'];
@@ -56,6 +63,7 @@ class N8n extends QuickApp
     public function warnings(): array
     {
         return [
+            __('n8n needs about 2 GB of memory for itself. On a smaller server other apps may be stopped by the system.'),
             __('n8n only lets you sign in over HTTPS, so give it a domain and wait for its certificate. After adding the domain, add the variable WEBHOOK_URL (https:// and the domain, with a closing slash) on the Variables tab and apply, so webhooks show the right address.'),
         ];
     }
@@ -69,7 +77,7 @@ class N8n extends QuickApp
     {
         return <<<DOCKER
         FROM {$this->image()}
-        ENV N8N_PORT=5678 N8N_PROXY_HOPS=1 N8N_DIAGNOSTICS_ENABLED=false N8N_VERSION_NOTIFICATIONS_ENABLED=false N8N_TEMPLATES_ENABLED=false
+        ENV NODE_OPTIONS=--max-old-space-size=1536 N8N_PORT=5678 N8N_PROXY_HOPS=1 N8N_DIAGNOSTICS_ENABLED=false N8N_VERSION_NOTIFICATIONS_ENABLED=false N8N_TEMPLATES_ENABLED=false
 
         DOCKER;
     }

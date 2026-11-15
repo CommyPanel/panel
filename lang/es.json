@@ -884,6 +884,7 @@
     "Move traffic to the new version": "Mover el tráfico a la nueva versión",
     "Moving to the next step": "Pasando al siguiente paso",
     "My GitHub account": "Mi cuenta de GitHub",
+    "n8n needs about 2 GB of memory for itself. On a smaller server other apps may be stopped by the system.": "n8n necesita unos 2 GB de memoria para sí mismo. En un servidor más pequeño, el sistema puede detener otras aplicaciones.",
     "n8n only lets you sign in over HTTPS, so give it a domain and wait for its certificate. After adding the domain, add the variable WEBHOOK_URL (https:// and the domain, with a closing slash) on the Variables tab and apply, so webhooks show the right address.": "n8n solo permite iniciar sesión por HTTPS: dele un dominio y espere a su certificado. Tras añadir el dominio, añada la variable WEBHOOK_URL (https:// y el dominio, con una barra final) en la pestaña Variables y aplique, para que los webhooks muestren la dirección correcta.",
     "Name": "Nombre",
     "Name of the new database": "Nombre de la nueva base de datos",

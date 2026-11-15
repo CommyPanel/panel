@@ -884,6 +884,7 @@
     "Move traffic to the new version": "Перемкнути трафік на нову версію",
     "Moving to the next step": "Перехід до наступного кроку",
     "My GitHub account": "Мій обліковий запис GitHub",
+    "n8n needs about 2 GB of memory for itself. On a smaller server other apps may be stopped by the system.": "n8n потрібно близько 2 ГБ пам'яті для себе. На меншому сервері система може зупинити інші застосунки.",
     "n8n only lets you sign in over HTTPS, so give it a domain and wait for its certificate. After adding the domain, add the variable WEBHOOK_URL (https:// and the domain, with a closing slash) on the Variables tab and apply, so webhooks show the right address.": "n8n дозволяє вхід лише через HTTPS: дайте йому домен і дочекайтеся сертифіката. Після додавання домену додайте на вкладці «Змінні» змінну WEBHOOK_URL (https:// і домен, з косою рискою в кінці) і застосуйте, щоб вебхуки показували правильну адресу.",
     "Name": "Назва",
     "Name of the new database": "Назва нової бази даних",

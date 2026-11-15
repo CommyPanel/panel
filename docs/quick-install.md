@@ -15,7 +15,7 @@ Each one runs the **official image** at a version CommyPanel pins (shown on the 
 | Mailpit       | `axllent/mailpit:v1.33`                                | 8025 | `/data`                         | default      |
 | Gotenberg     | `gotenberg/gotenberg:9.5`                              | 3000 | none                            | 1024 MB      |
 | Redis         | `redis:8.10`                                           | 6379 | `/data`                         | default      |
-| n8n           | `docker.n8n.io/n8nio/n8n:3.2.2`                        | 5678 | `/home/node/.n8n`               | default      |
+| n8n           | `docker.n8n.io/n8nio/n8n:3.2.2`                        | 5678 | `/home/node/.n8n`               | 2048 MB      |
 | Garage        | `dxflrs/garage:v2.5.0`                                 | 3900 | `/data`                         | default      |
 
 ## Passwords and keys
