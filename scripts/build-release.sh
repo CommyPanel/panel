@@ -36,9 +36,15 @@ fi
 (cd "$ROOT" && npm run build --silent)
 
 log "Collecting the application"
-for path in app bootstrap config database public resources/views routes artisan composer.json composer.lock LICENSE installer; do
+for path in app bootstrap config database lang public resources/views routes artisan composer.json composer.lock LICENSE installer; do
     mkdir -p "$STAGE/$(dirname "$path")"
     cp -R "$ROOT/$path" "$STAGE/$path"
+done
+
+# The translations are read at runtime (lang/<code>.json and lang/<code>/*.php): a release without them
+# shows every language as English, so refuse to build one.
+for file in lang/en.json lang/fr.json lang/de.json lang/es.json lang/ru.json lang/uk.json lang/tr.json lang/fr/validation.php; do
+    [ -f "$STAGE/$file" ] || { printf 'error: %s is missing from the release\n' "$file" >&2; exit 1; }
 done
 
 # Runtime state and local leftovers never ship.
