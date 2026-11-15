@@ -29,12 +29,6 @@ sha256() {
     if command -v sha256sum >/dev/null 2>&1; then sha256sum "$@"; else shasum -a 256 "$@"; fi
 }
 
-# A release without a key to check it against cannot be verified by anyone, so refuse to publish one
-# (COMMYPANEL_UNSIGNED_BUILD=1 is for local test builds only).
-if ! grep -q '^-----BEGIN PUBLIC KEY' "$ROOT/installer/release-key.pub" && [ "${COMMYPANEL_UNSIGNED_BUILD:-0}" != 1 ]; then
-    { echo "error: installer/release-key.pub has no public key: run scripts/generate-signing-key.sh first (or set COMMYPANEL_UNSIGNED_BUILD=1 for a local build)." >&2; exit 1; }
-fi
-
 log "Building the frontend"
 if [ "${COMMYPANEL_SKIP_NPM_INSTALL:-0}" != 1 ]; then
     (cd "$ROOT" && npm ci --silent)

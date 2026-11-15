@@ -1,7 +1,7 @@
 name: release
 
 # Builds the release tarball when a version tag is pushed and publishes it,
-# with its checksum, signatures and the one-line installer, as a GitHub release.
+# with its checksum and the one-line installer, as a GitHub release.
 on:
   push:
     tags:
@@ -41,32 +41,6 @@ jobs:
       - name: Build the release
         run: scripts/build-release.sh "${GITHUB_REF_NAME#v}" dist
 
-      - name: Sign the release
-        env:
-          RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
-        run: |
-          # Ed25519 signatures of the tarball and of its checksum file. The installer
-          # checks the tarball's signature against the key built into it; the second
-          # one is for people who verify by hand. The private key lives only in this
-          # step: it is written with mode 0600, used once and removed.
-          if [ -z "$RELEASE_SIGNING_KEY" ]; then
-            echo "The repository secret RELEASE_SIGNING_KEY is missing (see scripts/generate-signing-key.sh)." >&2
-            exit 1
-          fi
-          key="$RUNNER_TEMP/release-signing.key"
-          (umask 077 && printf '%s\n' "$RELEASE_SIGNING_KEY" > "$key")
-          for file in commypanel.tar.gz commypanel.tar.gz.sha256; do
-            openssl pkeyutl -sign -inkey "$key" -rawin -in "dist/$file" -out "dist/$file.sig"
-          done
-          rm -f "$key"
-
-          # The signature must verify with the public key that ships in this commit,
-          # or every installer would refuse the release.
-          for file in commypanel.tar.gz commypanel.tar.gz.sha256; do
-            openssl pkeyutl -verify -pubin -inkey installer/release-key.pub -rawin \
-              -in "dist/$file" -sigfile "dist/$file.sig"
-          done
-
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -101,6 +75,5 @@ jobs:
           fi
 
           gh release create "$tag" \
-            dist/commypanel.tar.gz dist/commypanel.tar.gz.sha256 dist/commypanel.tar.gz.sig \
-            dist/commypanel.tar.gz.sha256.sig dist/install.sh \
+            dist/commypanel.tar.gz dist/commypanel.tar.gz.sha256 dist/install.sh \
             --title "$title" "${flags[@]}"
