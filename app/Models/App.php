@@ -25,6 +25,9 @@ use Illuminate\Support\Str;
  * @property Stack|null $stack
  * @property Stack|null $stack_hint
  * @property SourceType $source_type
+ * @property string|null $template
+ * @property array<string, string>|null $template_settings
+ * @property int|null $health_timeout
  * @property string|null $git_url
  * @property string $git_branch
  * @property string|null $deploy_key_private
@@ -83,6 +86,7 @@ class App extends Model
             'rollout_auto' => 'boolean',
             'locked_at' => 'datetime',
             'source_type' => SourceType::class,
+            'template_settings' => 'array',
             'deploy_key_private' => 'encrypted',
             'git_token' => 'encrypted',
             'webhook_secret' => 'encrypted',

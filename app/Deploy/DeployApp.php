@@ -13,7 +13,9 @@ use App\Deploy\Stacks\DetectionFailed;
 use App\Deploy\Stacks\StackDetector;
 use App\Enums\DeploymentStage;
 use App\Enums\DeploymentStatus;
+use App\Enums\SourceType;
 use App\Enums\Stack;
+use App\FastApps\QuickInstall;
 use App\Host\Data\ContainerSpec;
 use App\Host\Data\ImageBuildSpec;
 use App\Host\Data\TaskSpec;
@@ -46,6 +48,7 @@ class DeployApp
         private readonly ReleaseSwitcher $switcher,
         private readonly WatchService $watch,
         private readonly RolloutService $rollouts,
+        private readonly QuickInstall $quick,
     ) {}
 
     public function __invoke(Deployment $deployment): void
@@ -91,6 +94,11 @@ class DeployApp
 
             $this->switcher->goLive($app, $deployment, $previous, $log);
 
+            // A quick-install app's first-start answers (Kibana's one-time password) have done their job.
+            if ($app->template !== null) {
+                $this->quick->afterLive($app);
+            }
+
             $log->line('Deployment finished.');
             $this->audit->record('deploy.succeeded', null, ['app' => $app->slug, 'deployment' => $deployment->number]);
             DeployAlerts::dispatchFor($deployment);
@@ -123,7 +131,7 @@ class DeployApp
     private function build(App $app, Deployment $deployment, string $workDir, DeployLogger $log): void
     {
         $this->stage($deployment, DeploymentStage::Fetch);
-        $log->step("Fetching {$app->git_url} ({$app->git_branch}).");
+        $log->step($app->source_type === SourceType::Template ? 'Preparing the quick-install recipe.' : "Fetching {$app->git_url} ({$app->git_branch}).");
         $sha = $this->source->fetch($app, $workDir);
         $deployment->forceFill(['commit_sha' => $sha, 'commit_message' => $this->source->lastCommitMessage()])->save();
         $log->step("Commit {$sha}.");
@@ -237,7 +245,7 @@ class DeployApp
 
     private function checkHealth(App $app, Deployment $deployment, DeployLogger $log): void
     {
-        $timeout = (int) config('commypanel.deploy.health_timeout');
+        $timeout = $app->health_timeout ?? (int) config('commypanel.deploy.health_timeout');
         $this->stage($deployment, DeploymentStage::Health);
         $log->step("Waiting up to {$timeout}s for {$app->health_path} to answer.");
 

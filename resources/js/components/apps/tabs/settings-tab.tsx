@@ -22,7 +22,8 @@ export function SettingsTab({
     webhook: AppWebhook | null;
 }) {
     const { t } = useT();
-    const upload = app.source_type === 'upload';
+    // A quick-install app has no repository and no archive: only a name and the runtime.
+    const git = app.source_type === 'git';
     const form = useForm<AppFormData>({
         name: app.name,
         git_url: app.git_url ?? '',
@@ -49,7 +50,7 @@ export function SettingsTab({
         <div className="grid items-start gap-6 xl:grid-cols-3">
             <div className="min-w-0 space-y-6 xl:col-span-2">
                 <form onSubmit={submit} className="space-y-6">
-                    {upload ? (
+                    {!git ? (
                         <Card title={t('Name')}>
                             <Input
                                 label={t('App name')}
@@ -84,9 +85,9 @@ export function SettingsTab({
             </div>
             <div className="min-w-0 space-y-6">
                 <AlertsCard app={app} />
-                {upload ? (
+                {app.source_type === 'upload' ? (
                     <UploadSourceCard slug={app.slug} />
-                ) : (
+                ) : git ? (
                     <>
                         <DeployKeyCard
                             slug={app.slug}
@@ -97,7 +98,7 @@ export function SettingsTab({
                             <WebhookCard slug={app.slug} webhook={webhook} />
                         )}
                     </>
-                )}
+                ) : null}
             </div>
         </div>
     );

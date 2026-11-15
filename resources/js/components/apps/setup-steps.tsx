@@ -62,16 +62,25 @@ export function SetupSteps({
     source: string;
 }) {
     const { t } = useT();
-    const steps: { id: Step; label: string }[] = [
-        { id: 'basics', label: t('Basics') },
-        {
-            id: 'source',
-            label:
-                source === 'upload' ? t('Upload code') : t('Repository access'),
-        },
-        { id: 'settings', label: t('Settings') },
-        { id: 'domain', label: t('Domain') },
-    ];
+    // A ready-made app has no code to reach and no settings to ask for: just the basics and the domain.
+    const steps: { id: Step; label: string }[] =
+        source === 'template'
+            ? [
+                  { id: 'basics', label: t('Basics') },
+                  { id: 'domain', label: t('Domain') },
+              ]
+            : [
+                  { id: 'basics', label: t('Basics') },
+                  {
+                      id: 'source',
+                      label:
+                          source === 'upload'
+                              ? t('Upload code')
+                              : t('Repository access'),
+                  },
+                  { id: 'settings', label: t('Settings') },
+                  { id: 'domain', label: t('Domain') },
+              ];
     return (
         <Stepper
             steps={steps}

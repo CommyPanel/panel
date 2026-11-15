@@ -509,7 +509,11 @@ function DomainStep({ app, server }: { app: AppSetup; server: ServerAddress }) {
     return (
         <div className="space-y-6">
             <Card
-                title={t('4. Domain')}
+                title={
+                    app.source_type === 'template'
+                        ? t('2. Domain')
+                        : t('4. Domain')
+                }
                 description={t(
                     'Optional: point a domain at this app. You can also do it after the first deployment; the app is reachable only through its domains.',
                 )}
@@ -537,14 +541,33 @@ function DomainStep({ app, server }: { app: AppSetup; server: ServerAddress }) {
                 >
                     {hasDomains ? t('Create and deploy') : t('Skip and deploy')}
                 </Button>
-                <Button
-                    variant="ghost"
-                    onClick={() =>
-                        router.post(AppSetupController.back(app.slug))
-                    }
-                >
-                    {t('Back')}
-                </Button>
+                {app.source_type === 'template' ? (
+                    <Button
+                        variant="ghost"
+                        onClick={() => {
+                            if (
+                                confirm(
+                                    t('Cancel setup and delete this draft?'),
+                                )
+                            ) {
+                                router.delete(
+                                    AppSetupController.cancel(app.slug),
+                                );
+                            }
+                        }}
+                    >
+                        {t('Cancel setup')}
+                    </Button>
+                ) : (
+                    <Button
+                        variant="ghost"
+                        onClick={() =>
+                            router.post(AppSetupController.back(app.slug))
+                        }
+                    >
+                        {t('Back')}
+                    </Button>
+                )}
             </div>
         </div>
     );

@@ -24,7 +24,7 @@ final class Severity
     ];
 
     public const WARNING_ACTIONS = [
-        'database.remote_failed', 'database.credentials_viewed', 'database.password_changed', 'database.restore_started', 'database.restore_replace_failed', 'volume.restore_failed', 'backup.remote_downloaded',
+        'database.remote_failed', 'database.credentials_viewed', 'app.credentials_viewed', 'database.password_changed', 'database.restore_started', 'database.restore_replace_failed', 'volume.restore_failed', 'backup.remote_downloaded',
         'database.tool_started', 'database.tool_opened', 'database.backup_downloaded',
         'backup.downloaded', 'backup.remote_changed', 'backup.remote_removed', 'backup.deleted', 'volume.backup_downloaded',
         'app.terminal_opened', 'app.nginx_updated', 'app.volume_file_downloaded', 'app.volume_removed', 'app.git_token_saved', 'app.env_removed',
