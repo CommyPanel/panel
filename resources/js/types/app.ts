@@ -60,6 +60,7 @@ export type AppVolume = {
 export type AppSettings = AppSummary & {
     container_port: number;
     health_path: string;
+    health_timeout: number | null;
     release_command: string | null;
     /** Variables, volumes or links changed after the running container was made. */
     pending_changes: boolean;

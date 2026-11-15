@@ -174,6 +174,21 @@ it('removes the new container and keeps the old one when the health check fails'
         ->and($this->traffic->switched)->toBe([$first->id]);
 });
 
+it('waits as long as the app\'s own health timeout, or the server default without one', function () {
+    ($this->deploy)();
+    $this->shop->update(['health_timeout' => 300]);
+    ($this->deploy)();
+
+    expect($this->health->timeouts)->toBe([60, 300]);
+});
+
+it('says how long it waited when the health check fails', function () {
+    $this->shop->update(['health_timeout' => 240]);
+    $this->health->healthy = false;
+
+    expect(($this->deploy)()->error)->toContain('within 240 seconds');
+});
+
 describe('release command', function () {
     it('runs it once from the new image with the app environment before starting the container', function () {
         AppEnvVar::query()->create(['app_id' => $this->shop->id, 'key' => 'DB_HOST', 'value' => 'db']);

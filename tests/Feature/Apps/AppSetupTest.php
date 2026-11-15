@@ -150,11 +150,12 @@ it('saves settings and variables and moves on to the domain step', function () {
         'health_path' => '/healthz',
         'memory_limit_mb' => 256,
         'cpu_limit' => 0.5,
+        'health_timeout' => 180,
         'env' => "# comment\nGREETING=\"hello there\"\nexport TOKEN=abc # trailing\nPORT=1\nnot valid\n",
     ])->assertRedirect("/apps/{$app->slug}/setup");
 
     $app->refresh();
-    expect($app)->setup_step->toBe(SetupStep::Domain)->container_port->toBe(3000)->memory_limit_mb->toBe(256)
+    expect($app)->setup_step->toBe(SetupStep::Domain)->container_port->toBe(3000)->memory_limit_mb->toBe(256)->health_timeout->toBe(180)
         ->and(AppEnvVar::query()->where('app_id', $app->id)->pluck('value', 'key')->all())->toBe(['GREETING' => 'hello there', 'TOKEN' => 'abc'])
         ->and(Deployment::query()->count())->toBe(0);
 

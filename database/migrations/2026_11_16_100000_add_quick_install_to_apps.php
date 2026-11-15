@@ -12,15 +12,20 @@ return new class extends Migration
             // A quick-install app (Meilisearch, Grafana, ...): which recipe, and what is not secret of what was chosen.
             $table->string('template', 32)->nullable();
             $table->json('template_settings')->nullable();
-            // Slow starters (Elasticsearch, Kibana) get longer than the global health timeout.
-            $table->unsignedSmallInteger('health_timeout')->nullable();
         });
+
+        // 0.8.2 added this column on its own (a setting on every app); skip it when it is there.
+        if (! Schema::hasColumn('apps', 'health_timeout')) {
+            Schema::table('apps', function (Blueprint $table) {
+                $table->unsignedSmallInteger('health_timeout')->nullable();
+            });
+        }
     }
 
     public function down(): void
     {
         Schema::table('apps', function (Blueprint $table) {
-            $table->dropColumn(['template', 'template_settings', 'health_timeout']);
+            $table->dropColumn(['template', 'template_settings']);
         });
     }
 };

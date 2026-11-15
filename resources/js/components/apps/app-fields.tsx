@@ -7,6 +7,7 @@ export type AppFormData = {
     git_branch: string;
     container_port: string;
     health_path: string;
+    health_timeout: string;
     release_command: string;
     memory_limit_mb: string;
     cpu_limit: string;
@@ -83,6 +84,19 @@ export function RuntimeFields({ data, errors, setData }: Props) {
                 error={errors.health_path}
                 hint={t(
                     'A new version goes live once this path answers (anything below HTTP 500).',
+                )}
+            />
+            <Input
+                label={t('Health check timeout (seconds)')}
+                type="number"
+                min={10}
+                max={1800}
+                placeholder={t('Default')}
+                value={data.health_timeout}
+                onChange={(e) => setData('health_timeout', e.target.value)}
+                error={errors.health_timeout}
+                hint={t(
+                    'How long a new version gets to answer the health check before the deployment fails. Slow starters, such as big .NET apps, may need more. Empty uses the server default (60 seconds).',
                 )}
             />
             <ReleaseCommandInput

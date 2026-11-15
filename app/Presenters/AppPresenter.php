@@ -62,6 +62,7 @@ class AppPresenter
             ...self::summary($app),
             'container_port' => $app->container_port,
             'health_path' => $app->health_path,
+            'health_timeout' => $app->health_timeout,
             'memory_limit_mb' => $app->memory_limit_mb,
             'cpu_limit' => $app->cpu_limit === null ? null : (float) $app->cpu_limit,
             'deploy_key_public' => $app->deploy_key_public,

@@ -40,7 +40,9 @@ return [
             'connection' => env('DB_QUEUE_CONNECTION', 'queue'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
-            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
+            // Must be longer than the longest job (a deployment may run up to an hour, and the worker's
+            // --timeout is 3700): after this many seconds a job still running is handed to another worker.
+            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 3800),
             'after_commit' => false,
         ],
 
