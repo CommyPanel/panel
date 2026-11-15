@@ -125,6 +125,12 @@ const navigation = (
                 permission: 'tokens.manage',
             },
             {
+                href: '/settings/encryption-key',
+                label: t('Encryption key'),
+                icon: KeyRound,
+                permission: 'server.key',
+            },
+            {
                 href: '/settings/audit-log',
                 label: t('Audit log'),
                 icon: ScrollText,

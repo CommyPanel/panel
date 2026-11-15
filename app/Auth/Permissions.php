@@ -65,6 +65,8 @@ final class Permissions
 
     public const SERVER_MANAGE = 'server.manage';
 
+    public const SERVER_KEY = 'server.key';
+
     public const USERS_VIEW = 'users.view';
 
     public const USERS_CREATE = 'users.create';
@@ -115,6 +117,7 @@ final class Permissions
             self::NOTIFICATIONS_MANAGE => ['group' => __('Server'), 'label' => __('Manage notifications'), 'description' => __('Choose where alerts are sent (Slack, Discord, Teams, ntfy, Telegram or any webhook) and which events each target gets, send a test message and switch a target off. Addresses are stored encrypted and never shown again; messages say what happened and link to the panel, never logs or secrets.')],
             self::SERVER_VIEW => ['group' => __('Server'), 'label' => __('View the server'), 'description' => __('See host resources, service states, Docker and nginx status.')],
             self::SERVER_MANAGE => ['group' => __('Server'), 'label' => __('Manage Docker and nginx'), 'description' => __('Reload nginx, test its configuration, remove unused images and read container logs.')],
+            self::SERVER_KEY => ['group' => __('Server'), 'label' => __('See the encryption key'), 'description' => __('Show the panel\'s encryption key (APP_KEY). Anyone who holds it together with a copy of the panel\'s database can read every stored secret: environment variables, database passwords, tokens. Asks for the password unless it was confirmed recently, and every visit is recorded in the audit log as a high-risk action.')],
             self::USERS_VIEW => ['group' => __('Users'), 'label' => __('View users'), 'description' => __('See the list of user accounts and their roles.')],
             self::USERS_CREATE => ['group' => __('Users'), 'label' => __('Create users'), 'description' => __('Create accounts. A user can only be given a role that grants no more than the creator has.')],
             self::USERS_UPDATE => ['group' => __('Users'), 'label' => __('Update users'), 'description' => __('Change a user\'s name, email, password and role. Not the super user, and not users with more access than you have.')],

@@ -20,7 +20,7 @@ final class Severity
         'database.remote_opened', 'database.remote_changed',
         'database_server.deleted', 'database.dropped', 'app.deleted', 'user.deleted',
         'auth.two_factor_disabled', 'admin.reset', 'app.volume_data_deleted',
-        'database.restore_replaced', 'volume.restored',
+        'database.restore_replaced', 'volume.restored', 'server.key_viewed',
     ];
 
     public const WARNING_ACTIONS = [

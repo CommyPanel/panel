@@ -3,6 +3,7 @@ import { ExternalLink, Lock, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import DashboardController from '@/actions/App/Http/Controllers/DashboardController';
+import EncryptionKeyController from '@/actions/App/Http/Controllers/EncryptionKeyController';
 import WelcomeController from '@/actions/App/Http/Controllers/WelcomeController';
 import { RecordsTable } from '@/components/domains/domain-card';
 import { ServerAddressNote } from '@/components/domains/server-address-card';
@@ -33,9 +34,14 @@ type Panel = {
     url: string | null;
 };
 
-type Props = { https: HttpsSettings; server: ServerAddress; panel: Panel };
+type Props = {
+    https: HttpsSettings;
+    server: ServerAddress;
+    panel: Panel;
+    can_see_key: boolean;
+};
 
-export default function Welcome({ https, server, panel }: Props) {
+export default function Welcome({ https, server, panel, can_see_key }: Props) {
     const { t } = useT();
     // The page follows DNS and the certificate by itself: it re-checks DNS while that is
     // not right yet, and keeps looking until the certificate is in place or has failed.
@@ -70,12 +76,20 @@ export default function Welcome({ https, server, panel }: Props) {
             )}
             <div className="flex flex-wrap justify-end gap-2">
                 <Link
-                    href={DashboardController.url()}
+                    href={
+                        can_see_key
+                            ? EncryptionKeyController.url({
+                                  query: { setup: 1 },
+                              })
+                            : DashboardController.url()
+                    }
                     className="btn btn-primary"
                 >
-                    {https.enabled && panel.certificate.status === 'active'
-                        ? t('Finish')
-                        : t('Skip for now')}
+                    {can_see_key
+                        ? t('Continue')
+                        : https.enabled && panel.certificate.status === 'active'
+                          ? t('Finish')
+                          : t('Skip for now')}
                 </Link>
             </div>
         </SetupLayout>

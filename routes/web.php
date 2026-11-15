@@ -34,6 +34,7 @@ use App\Http\Controllers\DatabaseToolController;
 use App\Http\Controllers\DeployKeyController;
 use App\Http\Controllers\DeploymentController;
 use App\Http\Controllers\DomainController;
+use App\Http\Controllers\EncryptionKeyController;
 use App\Http\Controllers\EnvVarController;
 use App\Http\Controllers\GitHubController;
 use App\Http\Controllers\GitTokenController;
@@ -70,6 +71,11 @@ Route::middleware('auth')->group(function () {
     Route::inertia('/settings/security', 'settings/security')
         ->middleware('password.confirm')
         ->name('settings.security');
+
+    // The encryption key: a password-confirmed page, audited on every visit as a high-risk action.
+    Route::get('/settings/encryption-key', EncryptionKeyController::class)
+        ->middleware(['can:'.Permissions::SERVER_KEY, 'password.confirm'])
+        ->name('settings.encryption-key');
 
     // A person's own API tokens: they carry only what that person may do (see App\Api\TokenAccess).
     Route::middleware('can:'.Permissions::TOKENS_MANAGE)->group(function () {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Audit\AuditLogger;
+use App\Auth\Permissions;
 use App\Dns\ConfigurePanelDomain;
 use App\Dns\PanelDomain;
 use App\Dns\ServerAddress;
@@ -23,6 +24,7 @@ class WelcomeController extends Controller
         $name = $panel->name();
 
         return Inertia::render('welcome', [
+            'can_see_key' => (bool) request()->user()?->can(Permissions::SERVER_KEY),
             'https' => ['enabled' => $https->enabled(), 'email' => $https->email(), 'staging' => $https->staging()],
             'server' => $server->forPage(),
             'panel' => [

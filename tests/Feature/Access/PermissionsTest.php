@@ -131,6 +131,7 @@ describe('route protection', function () {
         'domains.settings' => [['get', '/welcome'], ['put', '/settings/https'], ['put', '/settings/server-address'], ['post', '/settings/server-address/detect']],
         'server.view' => [['get', '/server'], ['get', '/server/docker'], ['get', '/server/nginx'], ['get', '/server/usage'], ['get', '/settings/updates']],
         'server.manage' => [['post', '/server/nginx/reload'], ['post', '/server/nginx/test'], ['post', '/server/docker/prune'], ['get', '/server/docker/containers/shop-1/logs'], ['post', '/server/docker/restart'], ['post', '/settings/updates/check'], ['put', '/settings/updates']],
+        'server.key' => [['get', '/settings/encryption-key']],
         'users.view' => [['get', '/users']],
         'users.create' => [['get', '/users/create'], ['post', '/users']],
         'users.update' => [['get', '/users/1/edit'], ['put', '/users/1']],

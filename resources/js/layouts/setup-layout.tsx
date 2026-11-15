@@ -15,6 +15,7 @@ const steps = (t: (key: string) => string) => [
     { id: 'admin', label: t('Admin account') },
     { id: 'https', label: t("Let's Encrypt") },
     { id: 'domain', label: t('Panel domain') },
+    { id: 'key', label: t('Encryption key') },
 ];
 
 type Props = {
