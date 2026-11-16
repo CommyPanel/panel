@@ -133,6 +133,8 @@ class Deployer
     private function create(App $app, array $attributes): Deployment
     {
         return DB::transaction(fn () => $app->deployments()->create([
+            // The mode is fixed when the deployment is queued: changing the app later does not change it.
+            'strategy' => $app->strategy()->value,
             ...$attributes,
             'number' => $app->nextDeploymentNumber(),
             'status' => DeploymentStatus::Queued,

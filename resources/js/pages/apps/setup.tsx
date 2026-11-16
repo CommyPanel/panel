@@ -13,10 +13,16 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { useT } from '@/hooks/use-t';
 import AppLayout from '@/layouts/app-layout';
 import { postJson } from '@/lib/post-json';
-import type { AppSetup, ServerAddress, SourceAccess } from '@/types';
+import type {
+    AppSetup,
+    ServerAddress,
+    SourceAccess,
+    DeployStrategy,
+} from '@/types';
 
 type Provider = { name: string; url: string | null; steps: string[] };
 type Props = {
@@ -382,6 +388,7 @@ function SettingsStep({ app }: { app: AppSetup }) {
         container_port: String(app.container_port),
         health_path: app.health_path,
         health_timeout: app.health_timeout ? String(app.health_timeout) : '',
+        deploy_strategy: app.deploy_strategy,
         release_command: app.release_command ?? '',
         memory_limit_mb: app.memory_limit_mb ? String(app.memory_limit_mb) : '',
         cpu_limit: app.cpu_limit ? String(app.cpu_limit) : '',
@@ -473,6 +480,25 @@ function SettingsStep({ app }: { app: AppSetup }) {
                         'How long a new version gets to answer the health check before the deployment fails. Slow starters, such as big .NET apps, may need more. Empty uses the server default (60 seconds).',
                     )}
                 />
+                <Select
+                    label={t('Deploy mode')}
+                    value={form.data.deploy_strategy}
+                    onChange={(e) =>
+                        form.setData(
+                            'deploy_strategy',
+                            e.target.value as DeployStrategy,
+                        )
+                    }
+                    error={form.errors.deploy_strategy}
+                    hint={t(
+                        'Zero downtime starts the new version next to the old one and switches when it answers. Stop the old version first is for software that cannot run twice on the same data (such as Redis or Elasticsearch): the app is unavailable for a short while, and if the new version does not start the old one is started again.',
+                    )}
+                >
+                    <option value="rolling">{t('Zero downtime')}</option>
+                    <option value="stop_first">
+                        {t('Stop the old version first')}
+                    </option>
+                </Select>
                 <ReleaseCommandInput
                     value={form.data.release_command}
                     onChange={(value) => form.setData('release_command', value)}

@@ -51,7 +51,7 @@ Linking an app to a ready-made app adds `<PREFIX>_URL`, `<PREFIX>_HOST` and `<PR
 
 ## Redis and Garage: upgrade by stopping first
 
-Two Redis servers, or two Garage nodes, must never write to the same data. A normal deployment starts the new version next to the old one, so these two refuse to start while the old one still runs and the deployment fails with "Another Redis (Garage) is still using /data" in its log; the old version keeps serving. To upgrade, or to change their variables, **stop the app first** (Settings > Stop), then deploy again; the data is kept. Redis is checked with a PING instead of an HTTP request, because it does not speak HTTP.
+Two Redis servers, or two Garage nodes, must never write to the same data, and the same is true of Elasticsearch. A normal deployment starts the new version next to the old one, which these cannot do, so they use the deploy mode **Stop the old version first** (set for you, and shown on the app's Settings tab). A deploy then stops the running version, starts the new one and checks it; the app is **unavailable for a short while**, and if the new version does not start, the old one is started again. The data is kept. Redis is checked with a PING instead of an HTTP request, because it does not speak HTTP.
 
 ## Garage
 

@@ -51,6 +51,8 @@ class RunDeployment implements ShouldQueue
                 'finished_at' => now(),
             ])->save();
             DeployAlerts::dispatchFor($deployment);
+            // A stop-first deployment may have taken the old version down before it died.
+            app(DeployApp::class)->restorePrevious($deployment);
         }
     }
 }

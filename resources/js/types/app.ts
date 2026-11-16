@@ -66,6 +66,8 @@ export type AppSettings = AppSummary & {
     container_port: number;
     health_path: string;
     health_timeout: number | null;
+    /** How a new release replaces the running one. */
+    deploy_strategy: DeployStrategy;
     release_command: string | null;
     /** Variables, volumes or links changed after the running container was made. */
     pending_changes: boolean;
@@ -114,8 +116,13 @@ export type DeploymentStage =
     | 'switch'
     | 'done';
 
+/** `rolling` starts the new version beside the old one; `stop_first` stops the old one first. */
+export type DeployStrategy = 'rolling' | 'stop_first';
+
 export type DeploymentSummary = {
     number: number;
+    /** The mode this deployment used. */
+    strategy: DeployStrategy;
     status: DeploymentStatus;
     stage: DeploymentStage | null;
     finished: boolean;

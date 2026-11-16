@@ -2,6 +2,7 @@
 
 namespace App\FastApps;
 
+use App\Enums\DeployStrategy;
 use App\Models\App;
 
 /**
@@ -50,6 +51,12 @@ class Redis extends QuickApp
     public function pingHealth(): bool
     {
         return true;
+    }
+
+    public function deployStrategy(): DeployStrategy
+    {
+        // It cannot run twice on the same data, so the old version has to stop before the new one starts.
+        return DeployStrategy::StopFirst;
     }
 
     public function healthPath(): string

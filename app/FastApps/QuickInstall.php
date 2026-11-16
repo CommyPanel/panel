@@ -44,6 +44,7 @@ class QuickInstall
                 'container_port' => $template->containerPort(),
                 'health_path' => $template->healthPath(),
                 'health_timeout' => $template->healthTimeout(),
+                'deploy_strategy' => $template->deployStrategy(),
                 'memory_limit_mb' => $template->memoryLimitMb(),
                 'git_branch' => 'main',
                 // There is no repository to verify: the recipe is the source.

@@ -1,4 +1,5 @@
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { useT } from '@/hooks/use-t';
 
 export type AppFormData = {
@@ -8,6 +9,7 @@ export type AppFormData = {
     container_port: string;
     health_path: string;
     health_timeout: string;
+    deploy_strategy: string;
     release_command: string;
     memory_limit_mb: string;
     cpu_limit: string;
@@ -99,6 +101,20 @@ export function RuntimeFields({ data, errors, setData }: Props) {
                     'How long a new version gets to answer the health check before the deployment fails. Slow starters, such as big .NET apps, may need more. Empty uses the server default (60 seconds).',
                 )}
             />
+            <Select
+                label={t('Deploy mode')}
+                value={data.deploy_strategy}
+                onChange={(e) => setData('deploy_strategy', e.target.value)}
+                error={errors.deploy_strategy}
+                hint={t(
+                    'Zero downtime starts the new version next to the old one and switches when it answers. Stop the old version first is for software that cannot run twice on the same data (such as Redis or Elasticsearch): the app is unavailable for a short while, and if the new version does not start the old one is started again.',
+                )}
+            >
+                <option value="rolling">{t('Zero downtime')}</option>
+                <option value="stop_first">
+                    {t('Stop the old version first')}
+                </option>
+            </Select>
             <ReleaseCommandInput
                 value={data.release_command}
                 onChange={(value) => setData('release_command', value)}

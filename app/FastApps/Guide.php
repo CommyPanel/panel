@@ -2,6 +2,8 @@
 
 namespace App\FastApps;
 
+use App\Enums\DeployStrategy;
+
 /**
  * What a person should know about a ready-made app before choosing it, shown under the choice on the
  * create page: what CommyPanel does by itself, what is left for the person (the first account, how
@@ -56,21 +58,19 @@ final class Guide
             default => [(string) __('To use it from your app, link it on the app\'s Links tab: its address and keys arrive as environment variables.')],
         };
 
-        $upgrade = match ($id) {
-            'redis', 'garage' => [
-                (string) __('CommyPanel pins the version. When a newer CommyPanel release pins a newer one, press Deploy on the app to move to it.'),
-                $id === 'redis'
-                    ? (string) __('Redis cannot run twice on the same data. To upgrade it or change its variables, stop the app first, then deploy again.')
-                    : (string) __('Garage cannot run twice on the same data. To upgrade it or change its variables, stop the app first, then deploy again.'),
-            ],
-            'gotenberg' => [
-                (string) __('CommyPanel pins the version. When a newer CommyPanel release pins a newer one, press Deploy on the app. It keeps no data, so there is nothing to back up.'),
-            ],
-            default => [
-                (string) __('CommyPanel pins the version. When a newer CommyPanel release pins a newer one, press Deploy on the app to move to it.'),
-                (string) __('Back up its volume first (Volumes tab): a rollback brings back the old version but not the old data.'),
-            ],
-        };
+        $pinned = (string) __('CommyPanel pins the version. When a newer CommyPanel release pins a newer one, press Deploy on the app to move to it.');
+
+        if ($id === 'gotenberg') {
+            $upgrade = [(string) __('CommyPanel pins the version. When a newer CommyPanel release pins a newer one, press Deploy on the app. It keeps no data, so there is nothing to back up.')];
+        } else {
+            $upgrade = [$pinned];
+
+            if ($app->deployStrategy() === DeployStrategy::StopFirst) {
+                $upgrade[] = (string) __('It cannot run twice on the same data, so a deploy stops the old version first and the app is unavailable for a short while. If the new version does not start, the old one is started again.');
+            }
+
+            $upgrade[] = (string) __('Back up its volume first (Volumes tab): a rollback brings back the old version but not the old data.');
+        }
 
         return ['automatic' => $automatic, 'after' => $after, 'upgrade' => $upgrade];
     }

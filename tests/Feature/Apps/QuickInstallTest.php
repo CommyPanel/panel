@@ -11,6 +11,7 @@ use App\Enums\SetupStep;
 use App\Enums\SourceType;
 use App\Enums\Stack;
 use App\FastApps\FastApps;
+use App\FastApps\QuickInstall;
 use App\Host\Drivers\FakeHostDriver;
 use App\Host\HostDriver;
 use App\Models\App;
@@ -363,6 +364,21 @@ describe('the second batch', function () {
         'Garage' => ['garage', 3900, ['/data'], ['GARAGE_RPC_SECRET', 'GARAGE_ADMIN_TOKEN', 'COMMYPANEL_ACCESS_KEY_ID', 'COMMYPANEL_SECRET_ACCESS_KEY', 'COMMYPANEL_BUCKET'], null, 120],
     ]);
 
+    it('stops the old version first for the apps that cannot run twice on the same data', function (string $id, string $strategy) {
+        $recipe = FastApps::find($id);
+        $app = app(QuickInstall::class)->create($recipe, 'My '.$recipe->name(), $id === 'kibana' ? ['elasticsearch' => App::factory()->create(['slug' => 'es', 'template' => 'elasticsearch', 'setup_step' => null])->slug] : []);
+
+        expect($app->refresh()->deploy_strategy->value)->toBe($strategy);
+    })->with([
+        'Redis' => ['redis', 'stop_first'],
+        'Garage' => ['garage', 'stop_first'],
+        'Elasticsearch' => ['elasticsearch', 'stop_first'],
+        'Meilisearch' => ['meilisearch', 'rolling'],
+        'Grafana' => ['grafana', 'rolling'],
+        'Kibana' => ['kibana', 'rolling'],
+        'n8n' => ['n8n', 'rolling'],
+    ]);
+
     it('warns about what to know first', function () {
         $warnings = collect(FastApps::catalog())->mapWithKeys(fn ($app) => [$app['id'] => $app['warnings']]);
 
@@ -382,8 +398,10 @@ describe('the second batch', function () {
         expect($guides['uptime-kuma']['after'][0])->toContain('first person')
             ->and($guides['n8n']['after'][0])->toContain('first person')
             ->and($guides['redis']['after'][0])->toContain('no web interface')
-            ->and($guides['redis']['upgrade'][1])->toContain('stop the app')
-            ->and($guides['garage']['upgrade'][1])->toContain('stop the app')
+            ->and($guides['redis']['upgrade'][1])->toContain('stops the old version first')
+            ->and($guides['garage']['upgrade'][1])->toContain('stops the old version first')
+            ->and($guides['elasticsearch']['upgrade'][1])->toContain('stops the old version first')
+            ->and($guides['meilisearch']['upgrade'])->not->toContain('stops the old version first')
             ->and($guides['gotenberg']['upgrade'][0])->toContain('nothing to back up')
             ->and($guides['gotenberg']['automatic'])->not->toContain('Keeps its data in a persistent volume that survives deployments and rollbacks.')
             ->and($guides['uptime-kuma']['automatic'])->toContain('Chooses SQLite, so there is no database to set up.');

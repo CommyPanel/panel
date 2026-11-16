@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\DeploymentStage;
 use App\Enums\DeploymentStatus;
+use App\Enums\DeployStrategy;
 use Database\Factories\DeploymentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -31,6 +32,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $watch_note
  * @property bool $retry
  * @property bool $skip_watch
+ * @property DeployStrategy $strategy
  * @property string|null $container_name
  * @property int|null $host_port
  * @property string|null $log
@@ -50,6 +52,7 @@ class Deployment extends Model
         return [
             'status' => DeploymentStatus::class,
             'stage' => DeploymentStage::class,
+            'strategy' => DeployStrategy::class,
             'image_available' => 'boolean',
             'settings_only' => 'boolean',
             'retry' => 'boolean',

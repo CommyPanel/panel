@@ -63,6 +63,7 @@ class AppPresenter
             'container_port' => $app->container_port,
             'health_path' => $app->health_path,
             'health_timeout' => $app->health_timeout,
+            'deploy_strategy' => $app->strategy()->value,
             'memory_limit_mb' => $app->memory_limit_mb,
             'cpu_limit' => $app->cpu_limit === null ? null : (float) $app->cpu_limit,
             'deploy_key_public' => $app->deploy_key_public,
@@ -124,6 +125,7 @@ class AppPresenter
             'duration_seconds' => $deployment->finished_at !== null && $deployment->started_at !== null ? (int) $deployment->started_at->diffInSeconds($deployment->finished_at, true) : null,
             'is_rollback' => $deployment->rolled_back_from_id !== null && ! $deployment->settings_only && ! $deployment->retry,
             'is_apply' => (bool) $deployment->settings_only,
+            'strategy' => $deployment->strategy->value,
             'is_retry' => $deployment->retry,
             'can_retry' => $deployment->status === DeploymentStatus::RolledBack && $deployment->image_tag !== null && $deployment->image_available,
             'watch' => $deployment->watch_state === null ? null : [

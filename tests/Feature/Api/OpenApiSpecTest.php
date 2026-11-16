@@ -5,6 +5,7 @@ use App\Auth\SyncRolesAndPermissions;
 use App\Enums\AppStatus;
 use App\Enums\DeploymentStage;
 use App\Enums\DeploymentStatus;
+use App\Enums\DeployStrategy;
 use App\Enums\Stack;
 use App\Host\Data\ContainerSpec;
 use App\Host\HostDriver;
@@ -81,6 +82,8 @@ it('lists the same abilities, statuses and stacks as the code', function () {
     expect($enumOf($schemas['Token']['properties']['abilities']['items']))->toBe(collect(array_keys(TokenAccess::abilities()))->sort()->values()->all())
         ->and($enumOf($schemas['App']['properties']['status']))->toBe($values(AppStatus::class))
         ->and($enumOf($schemas['App']['properties']['stack']))->toBe($values(Stack::class))
+        ->and($enumOf($schemas['App']['properties']['deploy_strategy']))->toBe($values(DeployStrategy::class))
+        ->and($enumOf($schemas['Deployment']['properties']['strategy']))->toBe($values(DeployStrategy::class))
         ->and($enumOf($schemas['Deployment']['properties']['status']))->toBe($values(DeploymentStatus::class))
         ->and($enumOf($schemas['Deployment']['properties']['stage']))->toBe($values(DeploymentStage::class));
 });

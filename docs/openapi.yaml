@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-    title: CommyPanel API
+    title: 'CommyPanel API'
     version: '1'
     description: |
         The HTTP API of a CommyPanel server, for scripts, CI and your own apps. Everything is under
@@ -16,13 +16,13 @@ info:
     license:
         name: MIT
 servers:
-    - url: https://{panel}/api/v1
+    - url: 'https://{panel}/api/v1'
       variables:
           panel:
               default: panel.example.com
-              description: The address of your panel, without a path.
+              description: 'The address of your panel, without a path.'
 security:
-    - bearer: []
+    - bearer: {}
 tags:
     - name: Token
     - name: Apps
@@ -33,636 +33,769 @@ tags:
 paths:
     /token:
         get:
-            tags: [Token]
+            tags:
+                - Token
             operationId: getToken
-            summary: What the calling token is
-            description: Its name, abilities, the apps it is limited to and when it expires. Needs no ability.
+            summary: 'What the calling token is'
+            description: 'Its name, abilities, the apps it is limited to and when it expires. Needs no ability.'
             responses:
-                '200':
-                    description: The token.
+                200:
+                    description: 'The token.'
                     content:
                         application/json:
                             schema:
                                 type: object
-                                required: [data]
+                                required:
+                                    - data
                                 properties:
-                                    data: { $ref: '#/components/schemas/Token' }
-                '401': { $ref: '#/components/responses/Unauthorized' }
-                '429': { $ref: '#/components/responses/TooManyRequests' }
+                                    data:
+                                        $ref: '#/components/schemas/Token'
+                401:
+                    $ref: '#/components/responses/Unauthorized'
+                429:
+                    $ref: '#/components/responses/TooManyRequests'
     /apps:
         get:
-            tags: [Apps]
+            tags:
+                - Apps
             operationId: listApps
-            summary: List apps
-            x-ability: apps:read
+            summary: 'List apps'
+            x-ability: 'apps:read'
             responses:
-                '200':
-                    description: The apps the token may see.
+                200:
+                    description: 'The apps the token may see.'
                     content:
                         application/json:
                             schema:
                                 type: object
-                                required: [data]
+                                required:
+                                    - data
                                 properties:
                                     data:
                                         type: array
                                         items:
-                                            { $ref: '#/components/schemas/App' }
-                '401': { $ref: '#/components/responses/Unauthorized' }
-                '403': { $ref: '#/components/responses/Forbidden' }
-                '429': { $ref: '#/components/responses/TooManyRequests' }
-    /apps/{slug}:
+                                            $ref: '#/components/schemas/App'
+                401:
+                    $ref: '#/components/responses/Unauthorized'
+                403:
+                    $ref: '#/components/responses/Forbidden'
+                429:
+                    $ref: '#/components/responses/TooManyRequests'
+    '/apps/{slug}':
         get:
-            tags: [Apps]
+            tags:
+                - Apps
             operationId: getApp
-            summary: One app
-            x-ability: apps:read
-            parameters: [{ $ref: '#/components/parameters/Slug' }]
+            summary: 'One app'
+            x-ability: 'apps:read'
+            parameters:
+                - $ref: '#/components/parameters/Slug'
             responses:
-                '200':
-                    description: The app.
+                200:
+                    description: 'The app.'
                     content:
                         application/json:
                             schema:
                                 type: object
-                                required: [data]
+                                required:
+                                    - data
                                 properties:
-                                    data: { $ref: '#/components/schemas/App' }
-                '401': { $ref: '#/components/responses/Unauthorized' }
-                '403': { $ref: '#/components/responses/Forbidden' }
-                '404': { $ref: '#/components/responses/NotFound' }
-                '429': { $ref: '#/components/responses/TooManyRequests' }
-    /apps/{slug}/deployments:
+                                    data:
+                                        $ref: '#/components/schemas/App'
+                401:
+                    $ref: '#/components/responses/Unauthorized'
+                403:
+                    $ref: '#/components/responses/Forbidden'
+                404:
+                    $ref: '#/components/responses/NotFound'
+                429:
+                    $ref: '#/components/responses/TooManyRequests'
+    '/apps/{slug}/deployments':
         get:
-            tags: [Deployments]
+            tags:
+                - Deployments
             operationId: listDeployments
-            summary: The newest deployments of an app, newest first
-            x-ability: apps:read
+            summary: 'The newest deployments of an app, newest first'
+            x-ability: 'apps:read'
             parameters:
-                - { $ref: '#/components/parameters/Slug' }
+                - $ref: '#/components/parameters/Slug'
                 - name: limit
                   in: query
                   schema:
-                      { type: integer, minimum: 1, maximum: 50, default: 20 }
+                      type: integer
+                      minimum: 1
+                      maximum: 50
+                      default: 20
             responses:
-                '200':
-                    description: The deployments.
+                200:
+                    description: 'The deployments.'
                     content:
                         application/json:
                             schema:
                                 type: object
-                                required: [data]
+                                required:
+                                    - data
                                 properties:
                                     data:
                                         type: array
                                         items:
-                                            {
-                                                $ref: '#/components/schemas/Deployment',
-                                            }
-                '401': { $ref: '#/components/responses/Unauthorized' }
-                '403': { $ref: '#/components/responses/Forbidden' }
-                '404': { $ref: '#/components/responses/NotFound' }
-                '429': { $ref: '#/components/responses/TooManyRequests' }
+                                            $ref: '#/components/schemas/Deployment'
+                401:
+                    $ref: '#/components/responses/Unauthorized'
+                403:
+                    $ref: '#/components/responses/Forbidden'
+                404:
+                    $ref: '#/components/responses/NotFound'
+                429:
+                    $ref: '#/components/responses/TooManyRequests'
         post:
-            tags: [Deployments]
+            tags:
+                - Deployments
             operationId: startDeployment
-            summary: Start a deployment
-            description: Answers at once with 202; follow it with `getDeployment` until `finished` is true.
-            x-ability: apps:deploy
-            parameters: [{ $ref: '#/components/parameters/Slug' }]
+            summary: 'Start a deployment'
+            description: 'Answers at once with 202; follow it with `getDeployment` until `finished` is true.'
+            x-ability: 'apps:deploy'
+            parameters:
+                - $ref: '#/components/parameters/Slug'
             responses:
-                '202':
-                    description: The deployment was queued.
+                202:
+                    description: 'The deployment was queued.'
                     content:
                         application/json:
                             schema:
                                 type: object
-                                required: [data]
+                                required:
+                                    - data
                                 properties:
                                     data:
-                                        {
-                                            $ref: '#/components/schemas/Deployment',
-                                        }
-                '401': { $ref: '#/components/responses/Unauthorized' }
-                '403': { $ref: '#/components/responses/Forbidden' }
-                '404': { $ref: '#/components/responses/NotFound' }
-                '409': { $ref: '#/components/responses/Conflict' }
-                '429': { $ref: '#/components/responses/TooManyRequests' }
-    /apps/{slug}/deployments/{number}:
+                                        $ref: '#/components/schemas/Deployment'
+                401:
+                    $ref: '#/components/responses/Unauthorized'
+                403:
+                    $ref: '#/components/responses/Forbidden'
+                404:
+                    $ref: '#/components/responses/NotFound'
+                409:
+                    $ref: '#/components/responses/Conflict'
+                429:
+                    $ref: '#/components/responses/TooManyRequests'
+    '/apps/{slug}/deployments/{number}':
         get:
-            tags: [Deployments]
+            tags:
+                - Deployments
             operationId: getDeployment
-            summary: One deployment
-            x-ability: apps:read
+            summary: 'One deployment'
+            x-ability: 'apps:read'
             parameters:
-                - { $ref: '#/components/parameters/Slug' }
+                - $ref: '#/components/parameters/Slug'
                 - name: number
                   in: path
                   required: true
-                  schema: { type: integer, minimum: 1 }
+                  schema:
+                      type: integer
+                      minimum: 1
                 - name: log
                   in: query
-                  description: Set to 1 to include the build log.
-                  schema: { type: integer, enum: [0, 1] }
+                  description: 'Set to 1 to include the build log.'
+                  schema:
+                      type: integer
+                      enum:
+                          - 0
+                          - 1
             responses:
-                '200':
-                    description: The deployment.
+                200:
+                    description: 'The deployment.'
                     content:
                         application/json:
                             schema:
                                 type: object
-                                required: [data]
+                                required:
+                                    - data
                                 properties:
                                     data:
-                                        {
-                                            $ref: '#/components/schemas/Deployment',
-                                        }
-                '401': { $ref: '#/components/responses/Unauthorized' }
-                '403': { $ref: '#/components/responses/Forbidden' }
-                '404': { $ref: '#/components/responses/NotFound' }
-                '429': { $ref: '#/components/responses/TooManyRequests' }
-    /apps/{slug}/apply:
+                                        $ref: '#/components/schemas/Deployment'
+                401:
+                    $ref: '#/components/responses/Unauthorized'
+                403:
+                    $ref: '#/components/responses/Forbidden'
+                404:
+                    $ref: '#/components/responses/NotFound'
+                429:
+                    $ref: '#/components/responses/TooManyRequests'
+    '/apps/{slug}/apply':
         post:
-            tags: [Deployments]
+            tags:
+                - Deployments
             operationId: applyChanges
-            summary: Apply changed variables, volumes and links
-            description: Makes a new container from the version that is already running, with the new settings and no build (the "Apply changes" button).
-            x-ability: apps:deploy
-            parameters: [{ $ref: '#/components/parameters/Slug' }]
+            summary: 'Apply changed variables, volumes and links'
+            description: 'Makes a new container from the version that is already running, with the new settings and no build (the "Apply changes" button).'
+            x-ability: 'apps:deploy'
+            parameters:
+                - $ref: '#/components/parameters/Slug'
             responses:
-                '202':
-                    description: The change was queued as a deployment.
+                202:
+                    description: 'The change was queued as a deployment.'
                     content:
                         application/json:
                             schema:
                                 type: object
-                                required: [data]
+                                required:
+                                    - data
                                 properties:
                                     data:
-                                        {
-                                            $ref: '#/components/schemas/Deployment',
-                                        }
-                '401': { $ref: '#/components/responses/Unauthorized' }
-                '403': { $ref: '#/components/responses/Forbidden' }
-                '404': { $ref: '#/components/responses/NotFound' }
-                '409': { $ref: '#/components/responses/Conflict' }
-                '429': { $ref: '#/components/responses/TooManyRequests' }
-    /apps/{slug}/start:
+                                        $ref: '#/components/schemas/Deployment'
+                401:
+                    $ref: '#/components/responses/Unauthorized'
+                403:
+                    $ref: '#/components/responses/Forbidden'
+                404:
+                    $ref: '#/components/responses/NotFound'
+                409:
+                    $ref: '#/components/responses/Conflict'
+                429:
+                    $ref: '#/components/responses/TooManyRequests'
+    '/apps/{slug}/start':
         post:
-            tags: [Control]
+            tags:
+                - Control
             operationId: startApp
-            summary: Start a stopped app
-            x-ability: apps:control
-            parameters: [{ $ref: '#/components/parameters/Slug' }]
-            responses:
-                '200': { $ref: '#/components/responses/AppState' }
-                '401': { $ref: '#/components/responses/Unauthorized' }
-                '403': { $ref: '#/components/responses/Forbidden' }
-                '404': { $ref: '#/components/responses/NotFound' }
-                '409': { $ref: '#/components/responses/Conflict' }
-                '429': { $ref: '#/components/responses/TooManyRequests' }
-    /apps/{slug}/stop:
-        post:
-            tags: [Control]
-            operationId: stopApp
-            summary: Stop a running app
-            description: Visitors see an error until it is started again.
-            x-ability: apps:control
-            parameters: [{ $ref: '#/components/parameters/Slug' }]
-            responses:
-                '200': { $ref: '#/components/responses/AppState' }
-                '401': { $ref: '#/components/responses/Unauthorized' }
-                '403': { $ref: '#/components/responses/Forbidden' }
-                '404': { $ref: '#/components/responses/NotFound' }
-                '409': { $ref: '#/components/responses/Conflict' }
-                '429': { $ref: '#/components/responses/TooManyRequests' }
-    /apps/{slug}/restart:
-        post:
-            tags: [Control]
-            operationId: restartApp
-            summary: Restart a running app
-            x-ability: apps:control
-            parameters: [{ $ref: '#/components/parameters/Slug' }]
-            responses:
-                '200': { $ref: '#/components/responses/AppState' }
-                '401': { $ref: '#/components/responses/Unauthorized' }
-                '403': { $ref: '#/components/responses/Forbidden' }
-                '404': { $ref: '#/components/responses/NotFound' }
-                '409': { $ref: '#/components/responses/Conflict' }
-                '429': { $ref: '#/components/responses/TooManyRequests' }
-    /apps/{slug}/logs:
-        get:
-            tags: [Logs]
-            operationId: getLogs
-            summary: The output of the running container
-            description: Logs often hold secrets, so this has its own ability and every read is recorded in the audit log.
-            x-ability: apps:logs
+            summary: 'Start a stopped app'
+            x-ability: 'apps:control'
             parameters:
-                - { $ref: '#/components/parameters/Slug' }
+                - $ref: '#/components/parameters/Slug'
+            responses:
+                200:
+                    $ref: '#/components/responses/AppState'
+                401:
+                    $ref: '#/components/responses/Unauthorized'
+                403:
+                    $ref: '#/components/responses/Forbidden'
+                404:
+                    $ref: '#/components/responses/NotFound'
+                409:
+                    $ref: '#/components/responses/Conflict'
+                429:
+                    $ref: '#/components/responses/TooManyRequests'
+    '/apps/{slug}/stop':
+        post:
+            tags:
+                - Control
+            operationId: stopApp
+            summary: 'Stop a running app'
+            description: 'Visitors see an error until it is started again.'
+            x-ability: 'apps:control'
+            parameters:
+                - $ref: '#/components/parameters/Slug'
+            responses:
+                200:
+                    $ref: '#/components/responses/AppState'
+                401:
+                    $ref: '#/components/responses/Unauthorized'
+                403:
+                    $ref: '#/components/responses/Forbidden'
+                404:
+                    $ref: '#/components/responses/NotFound'
+                409:
+                    $ref: '#/components/responses/Conflict'
+                429:
+                    $ref: '#/components/responses/TooManyRequests'
+    '/apps/{slug}/restart':
+        post:
+            tags:
+                - Control
+            operationId: restartApp
+            summary: 'Restart a running app'
+            x-ability: 'apps:control'
+            parameters:
+                - $ref: '#/components/parameters/Slug'
+            responses:
+                200:
+                    $ref: '#/components/responses/AppState'
+                401:
+                    $ref: '#/components/responses/Unauthorized'
+                403:
+                    $ref: '#/components/responses/Forbidden'
+                404:
+                    $ref: '#/components/responses/NotFound'
+                409:
+                    $ref: '#/components/responses/Conflict'
+                429:
+                    $ref: '#/components/responses/TooManyRequests'
+    '/apps/{slug}/logs':
+        get:
+            tags:
+                - Logs
+            operationId: getLogs
+            summary: 'The output of the running container'
+            description: 'Logs often hold secrets, so this has its own ability and every read is recorded in the audit log.'
+            x-ability: 'apps:logs'
+            parameters:
+                - $ref: '#/components/parameters/Slug'
                 - name: tail
                   in: query
-                  description: How many of the last lines (10 to 5000).
+                  description: 'How many of the last lines (10 to 5000).'
                   schema:
-                      {
-                          type: integer,
-                          minimum: 10,
-                          maximum: 5000,
-                          default: 200,
-                      }
+                      type: integer
+                      minimum: 10
+                      maximum: 5000
+                      default: 200
             responses:
-                '200':
-                    description: The log lines.
+                200:
+                    description: 'The log lines.'
                     content:
                         application/json:
                             schema:
                                 type: object
-                                required: [data]
-                                properties:
-                                    data: { $ref: '#/components/schemas/Logs' }
-                '401': { $ref: '#/components/responses/Unauthorized' }
-                '403': { $ref: '#/components/responses/Forbidden' }
-                '404': { $ref: '#/components/responses/NotFound' }
-                '429': { $ref: '#/components/responses/TooManyRequests' }
-                '502': { $ref: '#/components/responses/BadGateway' }
-    /apps/{slug}/env:
-        get:
-            tags: [Environment]
-            operationId: listEnv
-            summary: The names of an app's variables
-            description: Names only. Values are never returned.
-            x-ability: apps:env
-            parameters: [{ $ref: '#/components/parameters/Slug' }]
-            responses:
-                '200':
-                    description: The names.
-                    content:
-                        application/json:
-                            schema:
-                                type: object
-                                required: [data]
+                                required:
+                                    - data
                                 properties:
                                     data:
-                                        { $ref: '#/components/schemas/EnvKeys' }
-                '401': { $ref: '#/components/responses/Unauthorized' }
-                '403': { $ref: '#/components/responses/Forbidden' }
-                '404': { $ref: '#/components/responses/NotFound' }
-                '429': { $ref: '#/components/responses/TooManyRequests' }
-    /apps/{slug}/env/{key}:
-        put:
-            tags: [Environment]
-            operationId: setEnv
-            summary: Set a variable
-            description: Creates it (201) or replaces it (200). The value is never echoed back. It takes effect with `applyChanges`.
-            x-ability: apps:env
+                                        $ref: '#/components/schemas/Logs'
+                401:
+                    $ref: '#/components/responses/Unauthorized'
+                403:
+                    $ref: '#/components/responses/Forbidden'
+                404:
+                    $ref: '#/components/responses/NotFound'
+                429:
+                    $ref: '#/components/responses/TooManyRequests'
+                502:
+                    $ref: '#/components/responses/BadGateway'
+    '/apps/{slug}/env':
+        get:
+            tags:
+                - Environment
+            operationId: listEnv
+            summary: "The names of an app's variables"
+            description: 'Names only. Values are never returned.'
+            x-ability: 'apps:env'
             parameters:
-                - { $ref: '#/components/parameters/Slug' }
-                - { $ref: '#/components/parameters/EnvKey' }
+                - $ref: '#/components/parameters/Slug'
+            responses:
+                200:
+                    description: 'The names.'
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required:
+                                    - data
+                                properties:
+                                    data:
+                                        $ref: '#/components/schemas/EnvKeys'
+                401:
+                    $ref: '#/components/responses/Unauthorized'
+                403:
+                    $ref: '#/components/responses/Forbidden'
+                404:
+                    $ref: '#/components/responses/NotFound'
+                429:
+                    $ref: '#/components/responses/TooManyRequests'
+    '/apps/{slug}/env/{key}':
+        put:
+            tags:
+                - Environment
+            operationId: setEnv
+            summary: 'Set a variable'
+            description: 'Creates it (201) or replaces it (200). The value is never echoed back. It takes effect with `applyChanges`.'
+            x-ability: 'apps:env'
+            parameters:
+                - $ref: '#/components/parameters/Slug'
+                - $ref: '#/components/parameters/EnvKey'
             requestBody:
                 required: true
                 content:
                     application/json:
                         schema:
                             type: object
-                            required: [value]
+                            required:
+                                - value
                             properties:
                                 value:
-                                    {
-                                        type: string,
-                                        nullable: true,
-                                        maxLength: 32768,
-                                    }
+                                    type: string
+                                    nullable: true
+                                    maxLength: 32768
             responses:
-                '200':
-                    description: The variable was replaced.
+                200:
+                    description: 'The variable was replaced.'
                     content:
                         application/json:
                             schema:
                                 type: object
-                                required: [data]
+                                required:
+                                    - data
                                 properties:
                                     data:
-                                        {
-                                            $ref: '#/components/schemas/EnvChange',
-                                        }
-                '201':
-                    description: The variable was created.
+                                        $ref: '#/components/schemas/EnvChange'
+                201:
+                    description: 'The variable was created.'
                     content:
                         application/json:
                             schema:
                                 type: object
-                                required: [data]
+                                required:
+                                    - data
                                 properties:
                                     data:
-                                        {
-                                            $ref: '#/components/schemas/EnvChange',
-                                        }
-                '401': { $ref: '#/components/responses/Unauthorized' }
-                '403': { $ref: '#/components/responses/Forbidden' }
-                '404': { $ref: '#/components/responses/NotFound' }
-                '422': { $ref: '#/components/responses/Invalid' }
-                '429': { $ref: '#/components/responses/TooManyRequests' }
+                                        $ref: '#/components/schemas/EnvChange'
+                401:
+                    $ref: '#/components/responses/Unauthorized'
+                403:
+                    $ref: '#/components/responses/Forbidden'
+                404:
+                    $ref: '#/components/responses/NotFound'
+                422:
+                    $ref: '#/components/responses/Invalid'
+                429:
+                    $ref: '#/components/responses/TooManyRequests'
         delete:
-            tags: [Environment]
+            tags:
+                - Environment
             operationId: unsetEnv
-            summary: Remove a variable
-            x-ability: apps:env
+            summary: 'Remove a variable'
+            x-ability: 'apps:env'
             parameters:
-                - { $ref: '#/components/parameters/Slug' }
-                - { $ref: '#/components/parameters/EnvKey' }
+                - $ref: '#/components/parameters/Slug'
+                - $ref: '#/components/parameters/EnvKey'
             responses:
-                '200':
-                    description: The variable was removed.
+                200:
+                    description: 'The variable was removed.'
                     content:
                         application/json:
                             schema:
                                 type: object
-                                required: [data]
+                                required:
+                                    - data
                                 properties:
                                     data:
-                                        {
-                                            $ref: '#/components/schemas/EnvChange',
-                                        }
-                '401': { $ref: '#/components/responses/Unauthorized' }
-                '403': { $ref: '#/components/responses/Forbidden' }
-                '404': { $ref: '#/components/responses/NotFound' }
-                '429': { $ref: '#/components/responses/TooManyRequests' }
+                                        $ref: '#/components/schemas/EnvChange'
+                401:
+                    $ref: '#/components/responses/Unauthorized'
+                403:
+                    $ref: '#/components/responses/Forbidden'
+                404:
+                    $ref: '#/components/responses/NotFound'
+                429:
+                    $ref: '#/components/responses/TooManyRequests'
 components:
     securitySchemes:
         bearer:
             type: http
             scheme: bearer
-            description: A token from Settings > API tokens (it starts with `<id>|cpt_`). Send it only over HTTPS.
+            description: 'A token from Settings > API tokens (it starts with `<id>|cpt_`). Send it only over HTTPS.'
     parameters:
         Slug:
             name: slug
             in: path
             required: true
-            description: The app's short name.
-            schema: { type: string }
+            description: "The app's short name."
+            schema:
+                type: string
         EnvKey:
             name: key
             in: path
             required: true
-            description: Letters, digits and underscores, not starting with a digit. `PORT` is set by CommyPanel and cannot be changed.
+            description: 'Letters, digits and underscores, not starting with a digit. `PORT` is set by CommyPanel and cannot be changed.'
             schema:
-                {
-                    type: string,
-                    maxLength: 128,
-                    pattern: '^[A-Za-z_][A-Za-z0-9_]*$',
-                }
+                type: string
+                maxLength: 128
+                pattern: '^[A-Za-z_][A-Za-z0-9_]*$'
     responses:
         AppState:
-            description: The app after the change.
+            description: 'The app after the change.'
             content:
                 application/json:
                     schema:
                         type: object
-                        required: [data]
+                        required:
+                            - data
                         properties:
-                            data: { $ref: '#/components/schemas/App' }
+                            data:
+                                $ref: '#/components/schemas/App'
         Unauthorized:
-            description: No token, or an invalid, revoked or expired one.
+            description: 'No token, or an invalid, revoked or expired one.'
             content:
                 application/json:
-                    schema: { $ref: '#/components/schemas/Error' }
+                    schema:
+                        $ref: '#/components/schemas/Error'
         Forbidden:
-            description: The token lacks the ability, or its owner lacks the permission.
+            description: 'The token lacks the ability, or its owner lacks the permission.'
             content:
                 application/json:
-                    schema: { $ref: '#/components/schemas/Error' }
+                    schema:
+                        $ref: '#/components/schemas/Error'
         NotFound:
-            description: No such thing, or an app the token may not use (the two look the same).
+            description: 'No such thing, or an app the token may not use (the two look the same).'
             content:
                 application/json:
-                    schema: { $ref: '#/components/schemas/Error' }
+                    schema:
+                        $ref: '#/components/schemas/Error'
         Conflict:
-            description: The state does not allow it (a deployment is running, the app is stopped, nothing is running to apply to). The reason is in `error`.
+            description: 'The state does not allow it (a deployment is running, the app is stopped, nothing is running to apply to). The reason is in `error`.'
             content:
                 application/json:
                     schema:
                         allOf:
-                            - { $ref: '#/components/schemas/Error' }
+                            - $ref: '#/components/schemas/Error'
                             - type: object
                               properties:
                                   deployment:
-                                      description: The deployment that is already running, when that is the reason.
+                                      description: 'The deployment that is already running, when that is the reason.'
                                       allOf:
-                                          - {
-                                                $ref: '#/components/schemas/Deployment',
-                                            }
+                                          - $ref: '#/components/schemas/Deployment'
         Invalid:
-            description: A field was not valid.
+            description: 'A field was not valid.'
             content:
                 application/json:
                     schema:
                         allOf:
-                            - { $ref: '#/components/schemas/Error' }
+                            - $ref: '#/components/schemas/Error'
                             - type: object
-                              required: [errors]
+                              required:
+                                  - errors
                               properties:
                                   errors:
                                       type: object
                                       additionalProperties:
                                           type: array
-                                          items: { type: string }
+                                          items:
+                                              type: string
         TooManyRequests:
-            description: Too many calls (60 a minute per token) or too many failed attempts. Wait for the number of seconds in `Retry-After`.
+            description: 'Too many calls (60 a minute per token) or too many failed attempts. Wait for the number of seconds in `Retry-After`.'
             headers:
                 Retry-After:
-                    schema: { type: integer }
+                    schema:
+                        type: integer
             content:
                 application/json:
-                    schema: { $ref: '#/components/schemas/Error' }
+                    schema:
+                        $ref: '#/components/schemas/Error'
         BadGateway:
-            description: The server could not read the container's output.
+            description: "The server could not read the container's output."
             content:
                 application/json:
-                    schema: { $ref: '#/components/schemas/Error' }
+                    schema:
+                        $ref: '#/components/schemas/Error'
     schemas:
         Error:
             type: object
-            required: [error]
+            required:
+                - error
             properties:
-                error: { type: string }
-                message: { type: string }
+                error:
+                    type: string
+                message:
+                    type: string
         Token:
             type: object
-            required: [name, abilities, apps, expires_at, last_used_at, owner]
+            required:
+                - name
+                - abilities
+                - apps
+                - expires_at
+                - last_used_at
+                - owner
             properties:
-                name: { type: string }
+                name:
+                    type: string
                 abilities:
                     type: array
                     items:
-                        {
-                            type: string,
-                            enum:
-                                [
-                                    apps:read,
-                                    apps:deploy,
-                                    apps:control,
-                                    apps:logs,
-                                    apps:env,
-                                ],
-                        }
+                        type: string
+                        enum:
+                            - 'apps:read'
+                            - 'apps:deploy'
+                            - 'apps:control'
+                            - 'apps:logs'
+                            - 'apps:env'
                 apps:
                     type: array
                     nullable: true
-                    description: The apps the token is limited to, or null for every app its owner may use.
-                    items: { type: string }
-                expires_at: { type: string, format: date-time, nullable: true }
+                    description: 'The apps the token is limited to, or null for every app its owner may use.'
+                    items:
+                        type: string
+                expires_at:
+                    type: string
+                    format: date-time
+                    nullable: true
                 last_used_at:
-                    { type: string, format: date-time, nullable: true }
-                owner: { type: string, description: "The owner's name." }
+                    type: string
+                    format: date-time
+                    nullable: true
+                owner:
+                    type: string
+                    description: "The owner's name."
         App:
             type: object
             required:
-                [
-                    slug,
-                    name,
-                    status,
-                    stack,
-                    domains,
-                    live_deployment,
-                    latest_deployment,
-                    created_at,
-                ]
+                - slug
+                - name
+                - status
+                - stack
+                - deploy_strategy
+                - domains
+                - live_deployment
+                - latest_deployment
+                - created_at
             properties:
-                slug: { type: string }
-                name: { type: string }
+                slug:
+                    type: string
+                name:
+                    type: string
                 status:
-                    {
-                        type: string,
-                        enum:
-                            [
-                                setup,
-                                new,
-                                deploying,
-                                running,
-                                failed,
-                                stopped,
-                                deactivated,
-                            ],
-                    }
+                    type: string
+                    enum:
+                        - setup
+                        - new
+                        - deploying
+                        - running
+                        - failed
+                        - stopped
+                        - deactivated
                 stack:
-                    {
-                        type: string,
-                        nullable: true,
-                        enum: [dockerfile, dotnet, go, node, template],
-                    }
+                    type: string
+                    nullable: true
+                    enum:
+                        - dockerfile
+                        - dotnet
+                        - go
+                        - node
+                        - template
+                deploy_strategy:
+                    type: string
+                    enum:
+                        - rolling
+                        - stop_first
+                    description: 'rolling starts the new version beside the old one (no downtime); stop_first stops the old one first, for software that cannot run twice on the same data.'
                 domains:
                     type: array
-                    items: { type: string }
+                    items:
+                        type: string
                 live_deployment:
-                    {
-                        type: integer,
-                        nullable: true,
-                        description: 'The number of the deployment that is live.',
-                    }
+                    type: integer
+                    nullable: true
+                    description: 'The number of the deployment that is live.'
                 latest_deployment:
                     nullable: true
                     allOf:
-                        - { $ref: '#/components/schemas/Deployment' }
-                created_at: { type: string, format: date-time }
+                        - $ref: '#/components/schemas/Deployment'
+                created_at:
+                    type: string
+                    format: date-time
         Deployment:
             type: object
             required:
-                [
-                    number,
-                    status,
-                    stage,
-                    finished,
-                    succeeded,
-                    commit,
-                    commit_message,
-                    is_rollback,
-                    error,
-                    created_at,
-                    finished_at,
-                    url,
-                ]
+                - number
+                - status
+                - stage
+                - finished
+                - succeeded
+                - commit
+                - commit_message
+                - strategy
+                - is_rollback
+                - error
+                - created_at
+                - finished_at
+                - url
             properties:
-                number: { type: integer }
+                number:
+                    type: integer
                 status:
-                    {
-                        type: string,
-                        enum:
-                            [
-                                queued,
-                                building,
-                                starting,
-                                active,
-                                superseded,
-                                failed,
-                                stopped,
-                                rollout,
-                                rolled_back,
-                            ],
-                    }
+                    type: string
+                    enum:
+                        - queued
+                        - building
+                        - starting
+                        - active
+                        - superseded
+                        - failed
+                        - stopped
+                        - rollout
+                        - rolled_back
                 stage:
-                    {
-                        type: string,
-                        nullable: true,
-                        enum:
-                            [
-                                fetch,
-                                build,
-                                release,
-                                start,
-                                health,
-                                switch,
-                                done,
-                            ],
-                    }
+                    type: string
+                    nullable: true
+                    enum:
+                        - fetch
+                        - build
+                        - release
+                        - start
+                        - health
+                        - switch
+                        - done
                 finished:
-                    { type: boolean, description: 'Poll until this is true.' }
+                    type: boolean
+                    description: 'Poll until this is true.'
                 succeeded:
-                    {
-                        type: boolean,
-                        description: 'Only meaningful once finished. A watched release can still be rolled back later (status rolled_back).',
-                    }
-                commit: { type: string, nullable: true }
-                commit_message: { type: string, nullable: true }
-                is_rollback: { type: boolean }
-                error: { type: string, nullable: true }
-                created_at: { type: string, format: date-time, nullable: true }
-                finished_at: { type: string, format: date-time, nullable: true }
+                    type: boolean
+                    description: 'Only meaningful once finished. A watched release can still be rolled back later (status rolled_back).'
+                commit:
+                    type: string
+                    nullable: true
+                commit_message:
+                    type: string
+                    nullable: true
+                strategy:
+                    type: string
+                    enum:
+                        - rolling
+                        - stop_first
+                    description: 'How this deployment replaced the running version.'
+                is_rollback:
+                    type: boolean
+                error:
+                    type: string
+                    nullable: true
+                created_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                finished_at:
+                    type: string
+                    format: date-time
+                    nullable: true
                 url:
-                    {
-                        type: string,
-                        format: uri,
-                        description: 'The address of this deployment in the API.',
-                    }
+                    type: string
+                    format: uri
+                    description: 'The address of this deployment in the API.'
                 log:
-                    {
-                        type: string,
-                        description: 'The build log, only with ?log=1.',
-                    }
+                    type: string
+                    description: 'The build log, only with ?log=1.'
         Logs:
             type: object
-            required: [live, lines, logs]
+            required:
+                - live
+                - lines
+                - logs
             properties:
                 live:
-                    {
-                        type: boolean,
-                        description: 'False when the app has no running container.',
-                    }
-                lines: { type: integer }
-                logs: { type: string }
+                    type: boolean
+                    description: 'False when the app has no running container.'
+                lines:
+                    type: integer
+                logs:
+                    type: string
         EnvKeys:
             type: object
-            required: [keys, pending_changes]
+            required:
+                - keys
+                - pending_changes
             properties:
                 keys:
                     type: array
-                    items: { type: string }
+                    items:
+                        type: string
                 pending_changes:
-                    {
-                        type: boolean,
-                        description: 'True when variables, volumes or links changed after the running container was made; apply them.',
-                    }
+                    type: boolean
+                    description: 'True when variables, volumes or links changed after the running container was made; apply them.'
         EnvChange:
             type: object
-            required: [key, pending_changes]
+            required:
+                - key
+                - pending_changes
             properties:
-                key: { type: string }
-                pending_changes: { type: boolean }
+                key:
+                    type: string
+                pending_changes:
+                    type: boolean
