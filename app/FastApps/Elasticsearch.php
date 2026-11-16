@@ -57,6 +57,12 @@ class Elasticsearch extends QuickApp
         return 240;
     }
 
+    public function minimumMemoryMb(): ?int
+    {
+        // its Java heap is 1 GB: below this the system kills it for lack of memory.
+        return 1536;
+    }
+
     public function memoryLimitMb(): ?int
     {
         return 2048;

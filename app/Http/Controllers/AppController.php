@@ -65,7 +65,7 @@ class AppController extends Controller
             abort_if($template === null, 422);
 
             try {
-                $app = $quick->create($template, $data['name'], array_map('strval', $data['settings'] ?? []));
+                $app = $quick->create($template, $data['name'], array_map('strval', $data['settings'] ?? []), isset($data['memory_limit_mb']) ? (int) $data['memory_limit_mb'] : null);
             } catch (DatabaseException $e) {
                 return back()->withErrors(['settings' => $e->getMessage()]);
             }

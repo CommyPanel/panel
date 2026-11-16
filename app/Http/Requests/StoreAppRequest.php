@@ -50,6 +50,13 @@ class StoreAppRequest extends FormRequest
             'source' => ['required', Rule::in([SourceType::Git->value, SourceType::Upload->value, SourceType::Template->value, 'github'])],
             'template' => ['exclude_unless:source,template', 'required', Rule::in(array_keys(FastApps::all()))],
             'settings' => ['exclude_unless:source,template', 'nullable', 'array'],
+            'memory_limit_mb' => ['exclude_unless:source,template', 'nullable', 'integer', 'between:16,65536', function (string $attribute, mixed $value, Closure $fail) {
+                $floor = FastApps::find((string) $this->input('template'))?->minimumMemoryMb();
+
+                if ($value !== null && $floor !== null && (int) $value < $floor) {
+                    $fail(__('This app needs at least :mb MB of memory to run.', ['mb' => $floor]));
+                }
+            }],
             ...$this->templateRules(),
             'github_repo' => ['exclude_unless:source,github', 'required', 'string', function (string $attribute, mixed $value, Closure $fail) {
                 // Only a repository the installation was given, as GitHub lists it now.

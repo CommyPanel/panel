@@ -24,6 +24,10 @@ type FastApp = {
     name: string;
     description: string;
     warnings: string[];
+    /** The recipe's own memory limit in MB, or null for the server default. */
+    memory_mb: number | null;
+    /** The least memory the app can run in, or null. */
+    min_memory_mb: number | null;
     guide: { automatic: string[]; after: string[]; upgrade: string[] };
     fields: {
         key: string;
@@ -85,6 +89,7 @@ export default function Create({
     const form = useForm({
         template: '',
         settings: { elasticsearch: '' } as Record<string, string>,
+        memory_limit_mb: '',
         name: '',
         stack_hint: '',
         source: 'git',
@@ -140,6 +145,9 @@ export default function Create({
         form.setData((data) => ({
             ...data,
             template: app.id,
+            // Each app starts from the memory its recipe is made for, which the person can change.
+            memory_limit_mb:
+                app.memory_mb === null ? '' : String(app.memory_mb),
             name:
                 data.name === '' ||
                 fast_apps.some((other) => other.name === data.name)
@@ -398,6 +406,48 @@ export default function Create({
                                     ))}
                                 </Select>
                             ))}
+                            {chosen && (
+                                <Input
+                                    label={t('Memory limit (MB)')}
+                                    type="number"
+                                    min={chosen.min_memory_mb ?? 16}
+                                    placeholder={t('Default')}
+                                    value={form.data.memory_limit_mb}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'memory_limit_mb',
+                                            e.target.value,
+                                        )
+                                    }
+                                    error={form.errors.memory_limit_mb}
+                                    hint={
+                                        chosen.memory_mb === null
+                                            ? t(
+                                                  "The most memory the app may use. Empty uses the server default (512 MB). You can change it later on the app's Settings tab.",
+                                              )
+                                            : chosen.min_memory_mb === null
+                                              ? t(
+                                                    'The most memory the app may use. The recommended amount is :mb MB; empty uses it.',
+                                                    {
+                                                        mb: String(
+                                                            chosen.memory_mb,
+                                                        ),
+                                                    },
+                                                )
+                                              : t(
+                                                    'The most memory the app may use. The recommended amount is :mb MB and it needs at least :min MB; empty uses the recommended amount.',
+                                                    {
+                                                        mb: String(
+                                                            chosen.memory_mb,
+                                                        ),
+                                                        min: String(
+                                                            chosen.min_memory_mb,
+                                                        ),
+                                                    },
+                                                )
+                                    }
+                                />
+                            )}
                         </>
                     )}
                     {form.data.source === 'git' && (

@@ -58,6 +58,12 @@ interface FastApp
     public function memoryLimitMb(): ?int;
 
     /**
+     * The least memory the app can run in, or null when it has no hard floor. Below it the app is killed
+     * for lack of memory (its own Java or Node heap alone may be bigger), so the create page refuses it.
+     */
+    public function minimumMemoryMb(): ?int;
+
+    /**
      * Container paths kept in persistent volumes.
      *
      * @return list<string>

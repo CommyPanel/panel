@@ -52,6 +52,11 @@ abstract class QuickApp implements FastApp
         return null;
     }
 
+    public function minimumMemoryMb(): ?int
+    {
+        return null;
+    }
+
     public function warnings(): array
     {
         return [];
