@@ -9,6 +9,7 @@ use App\Deploy\ReleaseSwitcher;
 use App\Deploy\Traffic\AppRouting;
 use App\Enums\DeploymentStage;
 use App\Enums\DeploymentStatus;
+use App\Enums\DeployStrategy;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
 use App\Jobs\AdvanceRolloutJob;
@@ -73,7 +74,9 @@ class RolloutService
      */
     public function shouldRoll(App $app, Deployment $new, ?Deployment $previous): bool
     {
+        // A gradual rollout needs both versions running; a stop-first release has stopped the old one.
         return $app->rollout_enabled
+            && $new->strategy === DeployStrategy::Rolling
             && $previous !== null
             && $previous->container_name !== null
             && $new->rolled_back_from_id === null

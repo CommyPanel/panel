@@ -73,6 +73,12 @@ export default function Deployment({ app, deployment, safe }: Props) {
         [t('Finished'), formatDate(deployment.finished_at)],
         [t('Commit'), deployment.commit ?? '-'],
         [
+            t('Mode'),
+            deployment.strategy === 'stop_first'
+                ? t('Stop the old version first')
+                : t('Zero downtime'),
+        ],
+        [
             t('Type'),
             deployment.is_rollback
                 ? t('Rollback')

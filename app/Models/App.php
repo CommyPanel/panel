@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Dns\PanelDomain;
 use App\Enums\AppStatus;
 use App\Enums\DeploymentStatus;
+use App\Enums\DeployStrategy;
 use App\Enums\SetupStep;
 use App\Enums\SourceType;
 use App\Enums\Stack;
@@ -29,6 +30,7 @@ use Illuminate\Support\Str;
  * @property string|null $template
  * @property array<string, string>|null $template_settings
  * @property int|null $health_timeout
+ * @property DeployStrategy $deploy_strategy
  * @property string|null $git_url
  * @property string $git_branch
  * @property string|null $deploy_key_private
@@ -94,6 +96,7 @@ class App extends Model
             'rollout_auto' => 'boolean',
             'locked_at' => 'datetime',
             'source_type' => SourceType::class,
+            'deploy_strategy' => DeployStrategy::class,
             'template_settings' => 'array',
             'deploy_key_private' => 'encrypted',
             'git_token' => 'encrypted',
@@ -140,6 +143,12 @@ class App extends Model
     /**
      * Whether a deployment is queued or in progress.
      */
+    /** How a new release replaces the running one (zero downtime unless the app says otherwise). */
+    public function strategy(): DeployStrategy
+    {
+        return $this->deploy_strategy ?? DeployStrategy::Rolling;
+    }
+
     public function isDeploying(): bool
     {
         return $this->deployments()

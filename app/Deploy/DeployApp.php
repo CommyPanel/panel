@@ -13,6 +13,7 @@ use App\Deploy\Stacks\DetectionFailed;
 use App\Deploy\Stacks\StackDetector;
 use App\Enums\DeploymentStage;
 use App\Enums\DeploymentStatus;
+use App\Enums\DeployStrategy;
 use App\Enums\SourceType;
 use App\Enums\Stack;
 use App\FastApps\QuickInstall;
@@ -57,6 +58,7 @@ class DeployApp
         $log = new DeployLogger($deployment);
         $workDir = null;
         $started = false;
+        $restart = null;
 
         try {
             $deployment->forceFill(['status' => DeploymentStatus::Building, 'started_at' => now()])->save();
@@ -80,10 +82,16 @@ class DeployApp
             }
 
             $deployment->forceFill(['status' => DeploymentStatus::Starting])->save();
-            $started = $this->start($app, $deployment, $log);
-            $this->checkHealth($app, $deployment, $log);
 
             $previous = $app->activeDeployment;
+            $stopFirst = $deployment->strategy === DeployStrategy::StopFirst;
+
+            if ($stopFirst && $previous !== null) {
+                $restart = $this->stopPrevious($app, $previous, $log);
+            }
+
+            $started = $this->start($app, $deployment, $log);
+            $this->checkHealth($app, $deployment, $log);
 
             if ($this->rollouts->shouldRoll($app, $deployment, $previous) && $previous !== null) {
                 // The release is running and healthy but not live: the rollout carries on in the queue.
@@ -92,7 +100,7 @@ class DeployApp
                 return;
             }
 
-            $this->switcher->goLive($app, $deployment, $previous, $log);
+            $this->switcher->goLive($app, $deployment, $previous, $log, mayWatch: ! $stopFirst, previousStopped: $stopFirst && $previous !== null);
 
             // A quick-install app's first-start answers (Kibana's one-time password) have done their job.
             if ($app->template !== null) {
@@ -103,13 +111,78 @@ class DeployApp
             $this->audit->record('deploy.succeeded', null, ['app' => $app->slug, 'deployment' => $deployment->number]);
             DeployAlerts::dispatchFor($deployment);
         } catch (Throwable $e) {
-            $this->fail($deployment, $log, $e, $started);
+            $this->fail($deployment, $log, $e, $started, $restart);
         } finally {
             $log->flush();
 
             if ($workDir !== null) {
                 File::deleteDirectory($workDir);
             }
+        }
+    }
+
+    /**
+     * Stop-first: the old version goes down before the new one starts, because the two cannot run
+     * together. Returns the release to start again if this deployment fails, or null when the app
+     * was already stopped by a person (it stays stopped).
+     */
+    private function stopPrevious(App $app, Deployment $previous, DeployLogger $log): ?Deployment
+    {
+        if ($previous->container_name === null) {
+            return null;
+        }
+
+        if ($app->stopped_at !== null) {
+            $log->step("The previous version ({$previous->container_name}) is already stopped.");
+
+            return null;
+        }
+
+        $log->step("Stopping the previous version ({$previous->container_name}) first: this app cannot run two versions at once, so it is unavailable until the new one answers.");
+        $this->host->stopContainer($previous->container_name);
+
+        return $previous;
+    }
+
+    /** Starts the release that was stopped to make room, and says how that went. */
+    private function startAgain(Deployment $release, DeployLogger $log): string
+    {
+        $log->step("Starting the previous version ({$release->container_name}) again.");
+
+        try {
+            $this->host->startContainer((string) $release->container_name);
+        } catch (Throwable $e) {
+            $log->line('Could not start the previous version again: '.$e->getMessage());
+
+            return 'The previous version could not be started again; start the app from its page.';
+        }
+
+        return 'The previous version is running again.';
+    }
+
+    /**
+     * The worker died or timed out in the middle of a stop-first deployment: if the old version was
+     * stopped and the switch never happened, start it again so the app is not left down.
+     */
+    public function restorePrevious(Deployment $deployment): void
+    {
+        $app = $deployment->app;
+
+        if ($deployment->strategy !== DeployStrategy::StopFirst || $app->stopped_at !== null) {
+            return;
+        }
+
+        $live = $app->activeDeployment;
+
+        // Still the old release live (the switch did not happen) and with a container to start.
+        if ($live === null || $live->id === $deployment->id || $live->container_name === null) {
+            return;
+        }
+
+        try {
+            $this->host->startContainer($live->container_name);
+        } catch (Throwable $e) {
+            Log::warning('Could not start the previous version after an interrupted deployment.', ['error' => $e->getMessage()]);
         }
     }
 
@@ -271,7 +344,7 @@ class DeployApp
         throw new DeploymentFailed("The app did not answer on port {$app->container_port} within {$timeout} seconds. Check that it listens on the PORT environment variable.");
     }
 
-    private function fail(Deployment $deployment, DeployLogger $log, Throwable $e, bool $containerStarted): void
+    private function fail(Deployment $deployment, DeployLogger $log, Throwable $e, bool $containerStarted, ?Deployment $restart = null): void
     {
         $message = match (true) {
             $e instanceof DeploymentFailed, $e instanceof DetectionFailed => $e->getMessage(),
@@ -292,6 +365,11 @@ class DeployApp
             } catch (Throwable $cleanup) {
                 Log::warning('Could not remove the failed container.', ['error' => $cleanup->getMessage()]);
             }
+        }
+
+        // A stop-first release took the old version down: put it back, so a failed deploy ends with the app serving again.
+        if ($restart !== null) {
+            $message .= ' '.$this->startAgain($restart, $log);
         }
 
         $log->flush();

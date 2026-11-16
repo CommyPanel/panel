@@ -2,6 +2,7 @@
 
 namespace App\FastApps;
 
+use App\Enums\DeployStrategy;
 use App\Models\App;
 
 /**
@@ -42,6 +43,12 @@ interface FastApp
      * not speak HTTP).
      */
     public function pingHealth(): bool;
+
+    /**
+     * How a new release replaces the running one. Software that cannot run twice on the same data
+     * (Redis, Elasticsearch, Garage) stops the old version first.
+     */
+    public function deployStrategy(): DeployStrategy;
 
     public function healthPath(): string;
 

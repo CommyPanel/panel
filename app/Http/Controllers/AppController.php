@@ -153,8 +153,14 @@ class AppController extends Controller
 
     public function update(UpdateAppRequest $request, App $app, AuditLogger $audit): RedirectResponse
     {
+        $before = $app->strategy();
         $app->update($request->validated());
         $audit->record('app.updated', null, ['app' => $app->slug], $app);
+
+        // A mode that decides whether a deploy takes the app down for a moment is worth its own entry.
+        if ($app->refresh()->strategy() !== $before) {
+            $audit->record('app.deploy_mode_changed', null, ['app' => $app->slug, 'from' => $before->value, 'to' => $app->strategy()->value], $app);
+        }
 
         return back()->with('status', __('Settings saved. They apply from the next deployment.'));
     }

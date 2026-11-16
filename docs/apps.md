@@ -155,3 +155,14 @@ The panel runs outside Docker, so it keeps working when Docker does not. Every p
 ## Applying changes without a deployment
 
 Environment variables, volumes and links are given to a container when it is **made**; a running container cannot gain them, and a plain restart would not either. After you change any of them, the app page shows **Variables, volumes or links changed** with an **Apply changes** button (for people who may deploy). It makes a new container from the version that is **already running**, with the new settings, and swaps traffic exactly like a deployment: the new container starts next to the old one, must pass its health check, takes the traffic, and only then the old one stops. There is **no downtime**, nothing is fetched or built (your code is not updated), and if the new container is not healthy nothing changes. For a short while both containers run at once, so the app must be fine with that. It shows in the Deployments tab as "applied changes". Make as many changes as you like first and apply once.
+
+## Deploy mode
+
+By default a deployment starts the new version next to the old one, health-checks it and then moves the traffic, so there is no downtime. Some software cannot do that because it must never run twice on the same data (Redis, Elasticsearch, Garage, many databases). For these, set **Deploy mode** on the app's Settings tab (and in the new-app wizard) to **Stop the old version first**:
+
+- the image is built and the release command runs while the old version still serves;
+- then the old version is stopped, the new one starts and must answer its health check;
+- if it does not, the new container is removed and the **old version is started again**, so a failed deploy still ends with the app running (the deployment is marked failed and says so);
+- rollbacks and Apply changes use the same mode.
+
+The app is unavailable between the stop and the moment the new version answers, so use it only where you must. The mode of each deployment is shown on its page. Because the old version is stopped, a stop-first app has no gradual rollouts and no watch with an instant way back; those settings do not apply. Ready-made Redis, Garage and Elasticsearch apps use this mode from the start.

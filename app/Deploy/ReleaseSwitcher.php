@@ -6,6 +6,7 @@ use App\Databases\AppLinks;
 use App\Deploy\Traffic\TrafficSwitcher;
 use App\Enums\DeploymentStage;
 use App\Enums\DeploymentStatus;
+use App\Enums\DeployStrategy;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
 use App\Jobs\WatchDeploymentJob;
@@ -34,7 +35,7 @@ class ReleaseSwitcher
      * and the release it replaces is either retired now or, when the app watches new releases,
      * kept running for a while so traffic can go straight back to it.
      */
-    public function goLive(App $app, Deployment $new, ?Deployment $previous, DeployLogger $log, bool $mayWatch = true): void
+    public function goLive(App $app, Deployment $new, ?Deployment $previous, DeployLogger $log, bool $mayWatch = true, bool $previousStopped = false): void
     {
         $new->forceFill(['stage' => DeploymentStage::Switch])->save();
         $log->step('Switching traffic to the new version.');
@@ -46,7 +47,8 @@ class ReleaseSwitcher
         if ($mayWatch && $this->shouldWatch($app, $new, $previous)) {
             $this->beginWatch($app, $new, $previous, $log);
         } else {
-            $this->retire($previous, $log);
+            // A previous version that was stopped to make room has no open requests to wait for.
+            $this->retire($previous, $log, drain: ! $previousStopped);
         }
 
         $this->pruneImages($app, $log);
@@ -68,7 +70,9 @@ class ReleaseSwitcher
      */
     public function shouldWatch(App $app, Deployment $new, ?Deployment $previous): bool
     {
+        // The watch keeps the old version running to go back to; a stop-first release has stopped it.
         return $app->watch_enabled
+            && $new->strategy === DeployStrategy::Rolling
             && ! $new->skip_watch
             && $previous !== null
             && $previous->container_name !== null
@@ -128,15 +132,19 @@ class ReleaseSwitcher
     /**
      * Stop and remove a release's container after letting its open requests finish.
      */
-    public function retire(?Deployment $release, DeployLogger $log, DeploymentStatus $final = DeploymentStatus::Superseded): void
+    public function retire(?Deployment $release, DeployLogger $log, DeploymentStatus $final = DeploymentStatus::Superseded, bool $drain = true): void
     {
         if ($release === null || $release->container_name === null) {
             return;
         }
 
-        $drain = (int) config('commypanel.deploy.drain_seconds');
-        $log->step("Stopping the previous version ({$release->container_name}) in {$drain}s.");
-        Sleep::for($drain)->seconds();
+        if ($drain) {
+            $seconds = (int) config('commypanel.deploy.drain_seconds');
+            $log->step("Stopping the previous version ({$release->container_name}) in {$seconds}s.");
+            Sleep::for($seconds)->seconds();
+        } else {
+            $log->step("Removing the previous version ({$release->container_name}).");
+        }
 
         try {
             $this->host->stopContainer($release->container_name);

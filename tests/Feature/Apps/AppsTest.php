@@ -128,6 +128,25 @@ it('saves the health check timeout, clears it when empty and keeps it within bou
     expect($app->fresh()->health_timeout)->toBeNull();
 });
 
+it('changes the deploy mode, audits the change, and leaves it alone when the form does not send it', function () {
+    $app = App::factory()->create();
+    expect($app->refresh()->strategy()->value)->toBe('rolling');
+
+    $this->patch("/apps/{$app->slug}", validAppInput(['deploy_strategy' => 'stop_first']))->assertSessionHasNoErrors();
+    expect($app->refresh()->strategy()->value)->toBe('stop_first');
+
+    $log = AuditLog::query()->where('action', 'app.deploy_mode_changed')->sole();
+    expect($log->metadata)->toBe(['app' => $app->slug, 'from' => 'rolling', 'to' => 'stop_first']);
+
+    // The same value again, and a form without it, change nothing and log nothing more.
+    $this->patch("/apps/{$app->slug}", validAppInput(['deploy_strategy' => 'stop_first']))->assertSessionHasNoErrors();
+    $this->patch("/apps/{$app->slug}", validAppInput())->assertSessionHasNoErrors();
+    expect($app->refresh()->strategy()->value)->toBe('stop_first')
+        ->and(AuditLog::query()->where('action', 'app.deploy_mode_changed')->count())->toBe(1);
+
+    $this->patch("/apps/{$app->slug}", validAppInput(['deploy_strategy' => 'whenever']))->assertSessionHasErrors('deploy_strategy');
+});
+
 it('sends a draft app to its setup instead of its page', function () {
     $app = App::factory()->create(['setup_step' => SetupStep::Source]);
 

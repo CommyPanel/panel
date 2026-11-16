@@ -2,6 +2,7 @@
 
 namespace App\FastApps;
 
+use App\Enums\DeployStrategy;
 use App\Models\App;
 use Illuminate\Support\Str;
 
@@ -29,6 +30,11 @@ abstract class QuickApp implements FastApp
     public function pingHealth(): bool
     {
         return false;
+    }
+
+    public function deployStrategy(): DeployStrategy
+    {
+        return DeployStrategy::Rolling;
     }
 
     public function linkEnvironment(App $target, string $prefix): array
