@@ -295,6 +295,20 @@ describe('tokens and the rest of the panel', function () {
     });
 });
 
+describe('what a 404 says', function () {
+    it('never names a class or repeats what was looked up', function () {
+        ($this->live)();
+        $api = ($this->api)(($this->token)(array_keys(TokenAccess::abilities())));
+
+        foreach (['/api/v1/apps/nope', '/api/v1/apps/shop/deployments/999', '/api/v1/apps/nope/deployments', '/api/v1/apps/nope/env'] as $url) {
+            $body = $api->getJson($url)->assertNotFound()->getContent();
+
+            expect($body)->not->toContain('App\\Models')->not->toContain('nope')->not->toContain('query results')
+                ->and(json_decode($body, true)['error'])->toBe('Not Found');
+        }
+    });
+});
+
 describe('wrong addresses', function () {
     it('answers a wrong address or method with a plain JSON 404 or 405, and no cookie', function () {
         foreach (['GET', 'POST', 'PUT', 'DELETE'] as $method) {

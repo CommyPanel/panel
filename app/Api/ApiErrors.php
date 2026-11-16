@@ -20,7 +20,19 @@ final class ApiErrors
 
         $data = $response->getData(true);
 
-        if (! is_array($data) || isset($data['error'])) {
+        if (! is_array($data)) {
+            return $response;
+        }
+
+        // Laravel words a missing record with the class and the value that were looked up ("No query results
+        // for model [App\Models\App] nope"). The API says the same plain thing for "missing" and "not yours".
+        if ($response->getStatusCode() === Response::HTTP_NOT_FOUND) {
+            $response->setData(['error' => Response::$statusTexts[404], ...array_diff_key($data, ['message' => true]), 'message' => Response::$statusTexts[404]]);
+
+            return $response;
+        }
+
+        if (isset($data['error'])) {
             return $response;
         }
 
