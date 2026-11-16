@@ -68,6 +68,12 @@ class Kibana extends QuickApp
         return 400;
     }
 
+    public function minimumMemoryMb(): ?int
+    {
+        // it needs about 1 GB: below this the system kills it for lack of memory.
+        return 1024;
+    }
+
     public function memoryLimitMb(): ?int
     {
         return 2048;

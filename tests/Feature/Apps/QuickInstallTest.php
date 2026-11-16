@@ -364,6 +364,53 @@ describe('the second batch', function () {
         'Garage' => ['garage', 3900, ['/data'], ['GARAGE_RPC_SECRET', 'GARAGE_ADMIN_TOKEN', 'COMMYPANEL_ACCESS_KEY_ID', 'COMMYPANEL_SECRET_ACCESS_KEY', 'COMMYPANEL_BUCKET'], null, 120],
     ]);
 
+    describe('memory chosen on the create page', function () {
+        it('is kept for the new app, and the recipe default is used when none is given', function () {
+            $this->post('/apps', [...quickForm('meilisearch', 'Search'), 'memory_limit_mb' => 768])->assertRedirect('/apps/search/setup');
+            $this->post('/apps', quickForm('elasticsearch', 'Logs'))->assertRedirect('/apps/logs/setup');
+            $this->post('/apps', [...quickForm('elasticsearch', 'Logs Big'), 'memory_limit_mb' => 4096])->assertRedirect('/apps/logs-big/setup');
+            $this->post('/apps', [...quickForm('elasticsearch', 'Logs Empty'), 'memory_limit_mb' => ''])->assertRedirect('/apps/logs-empty/setup');
+
+            expect(App::query()->where('slug', 'search')->value('memory_limit_mb'))->toBe(768)
+                ->and(App::query()->where('slug', 'logs')->value('memory_limit_mb'))->toBe(2048)
+                ->and(App::query()->where('slug', 'logs-big')->value('memory_limit_mb'))->toBe(4096)
+                ->and(App::query()->where('slug', 'logs-empty')->value('memory_limit_mb'))->toBe(2048);
+        });
+
+        it('refuses less than an app can run in, and anything outside the usual range', function (string $template, int $memory, bool $accepted) {
+            $response = $this->post('/apps', [...quickForm($template, 'Some App'), 'memory_limit_mb' => $memory]);
+
+            if ($accepted) {
+                $response->assertSessionHasNoErrors();
+            } else {
+                $response->assertSessionHasErrors('memory_limit_mb');
+                expect(App::query()->where('slug', 'some-app')->exists())->toBeFalse();
+            }
+        })->with([
+            'Elasticsearch below its floor' => ['elasticsearch', 1024, false],
+            'Elasticsearch at its floor' => ['elasticsearch', 1536, true],
+            'n8n below its floor' => ['n8n', 1024, false],
+            'Kibana below its floor' => ['kibana', 512, false],
+            'Meilisearch has no floor' => ['meilisearch', 128, true],
+            'nothing under 16 MB' => ['meilisearch', 8, false],
+            'nothing over 64 GB' => ['meilisearch', 70000, false],
+        ]);
+
+        it('is offered to the page with each recipe\'s default and floor', function () {
+            $catalog = collect(FastApps::catalog())->keyBy('id');
+
+            expect($catalog['elasticsearch']['memory_mb'])->toBe(2048)->and($catalog['elasticsearch']['min_memory_mb'])->toBe(1536)
+                ->and($catalog['meilisearch']['memory_mb'])->toBeNull()->and($catalog['meilisearch']['min_memory_mb'])->toBeNull()
+                ->and($catalog['n8n']['min_memory_mb'])->toBe(2048);
+        });
+
+        it('is ignored for an app that is not ready-made', function () {
+            $this->post('/apps', ['name' => 'My Code', 'source' => 'git', 'git_url' => 'https://github.com/acme/shop.git', 'git_branch' => 'main', 'memory_limit_mb' => 4096])->assertRedirect();
+
+            expect(App::query()->where('slug', 'my-code')->value('memory_limit_mb'))->toBeNull();
+        });
+    });
+
     it('stops the old version first for the apps that cannot run twice on the same data', function (string $id, string $strategy) {
         $recipe = FastApps::find($id);
         $app = app(QuickInstall::class)->create($recipe, 'My '.$recipe->name(), $id === 'kibana' ? ['elasticsearch' => App::factory()->create(['slug' => 'es', 'template' => 'elasticsearch', 'setup_step' => null])->slug] : []);

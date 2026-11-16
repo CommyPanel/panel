@@ -30,9 +30,9 @@ class QuickInstall
      *
      * @throws DatabaseException when the link to the other app cannot be made
      */
-    public function create(FastApp $template, string $name, array $settings): App
+    public function create(FastApp $template, string $name, array $settings, ?int $memoryLimitMb = null): App
     {
-        return DB::transaction(function () use ($template, $name, $settings): App {
+        return DB::transaction(function () use ($template, $name, $settings, $memoryLimitMb): App {
             $app = App::query()->create([
                 'name' => $name,
                 'slug' => App::generateSlug($name),
@@ -45,7 +45,8 @@ class QuickInstall
                 'health_path' => $template->healthPath(),
                 'health_timeout' => $template->healthTimeout(),
                 'deploy_strategy' => $template->deployStrategy(),
-                'memory_limit_mb' => $template->memoryLimitMb(),
+                // What the person chose on the create page, else the recipe's own default.
+                'memory_limit_mb' => $memoryLimitMb ?? $template->memoryLimitMb(),
                 'git_branch' => 'main',
                 // There is no repository to verify: the recipe is the source.
                 'source_verified_at' => now(),

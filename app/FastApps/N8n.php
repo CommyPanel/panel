@@ -48,6 +48,12 @@ class N8n extends QuickApp
         return 180;
     }
 
+    public function minimumMemoryMb(): ?int
+    {
+        // its Node heap is 1.5 GB: below this the system kills it for lack of memory.
+        return 2048;
+    }
+
     public function memoryLimitMb(): ?int
     {
         // Its first start runs a long list of database migrations; with the default 512 MB the Node
