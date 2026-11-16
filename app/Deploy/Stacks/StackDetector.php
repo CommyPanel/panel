@@ -21,6 +21,7 @@ class StackDetector
             new DotnetStack,
             new GoStack,
             new NodeStack,
+            new PythonStack,
         ];
     }
 
@@ -39,6 +40,6 @@ class StackDetector
             }
         }
 
-        throw new DetectionFailed('Could not detect the app type. CommyPanel supports .NET, Go and Node.js projects, or any repository with a Dockerfile.');
+        throw new DetectionFailed('Could not detect the app type. CommyPanel supports .NET, Go, Node.js and Python projects, or any repository with a Dockerfile.');
     }
 }

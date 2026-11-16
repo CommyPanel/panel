@@ -9,7 +9,7 @@ export type AppStatus =
     | 'stopped'
     | 'deactivated';
 
-export type AppStack = 'dotnet' | 'go' | 'node';
+export type AppStack = 'dotnet' | 'go' | 'node' | 'python';
 
 export type SetupStep = 'source' | 'settings' | 'domain';
 

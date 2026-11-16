@@ -660,6 +660,7 @@ components:
                         - dotnet
                         - go
                         - node
+                        - python
                         - template
                 deploy_strategy:
                     type: string

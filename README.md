@@ -4,7 +4,7 @@
 
 **A self-hosted server control panel for running your own apps, domains and databases on one server.**
 
-Deploy .NET, Go and Node apps from Git with zero downtime, connect domains with automatic HTTPS, and run PostgreSQL, MySQL and MariaDB, all from one web UI on a server you own.
+Deploy .NET, Go, Node and Python apps from Git with zero downtime, connect domains with automatic HTTPS, and run PostgreSQL, MySQL and MariaDB, all from one web UI on a server you own.
 
 [![Latest release](https://img.shields.io/github/v/release/commypanel/panel?include_prereleases&label=release)](https://github.com/commypanel/panel/releases)
 [![Tests](https://github.com/commypanel/panel/actions/workflows/tests.yml/badge.svg)](https://github.com/commypanel/panel/actions/workflows/tests.yml)
@@ -38,7 +38,7 @@ Deploy .NET, Go and Node apps from Git with zero downtime, connect domains with 
 **Apps**
 
 - Connect a Git repository (any Git URL, a deploy key, an access token, or one click with a GitHub App the panel creates for itself) or upload a zip.
-- The stack is detected for you (.NET, Go, Node), a Dockerfile is generated if your repo has none, and the app is built and started in a container. A Dockerfile in your repo always wins, so any language works if you ship one.
+- The stack is detected for you (.NET, Go, Node, Python), a Dockerfile is generated if your repo has none, and the app is built and started in a container. A Dockerfile in your repo always wins, so any language works if you ship one.
 - **Zero-downtime deployments.** The new version starts next to the old one, must pass a health check, takes the traffic, and only then does the old one stop. A failed build or a failed health check changes nothing. One click rolls back to an earlier release.
 - **Safe deployments.** After going live, a release is watched against the one before it and rolled back by itself when it is clearly worse; **Go live again** overrides it. An optional **gradual rollout** gives a share of the visitors the new release first, with steps and a hold time you choose.
 - Deploy on push (optional, off by default), environment variables, persistent volumes, a release command for migrations, live build logs, resource usage, container logs and a browser terminal.
@@ -191,20 +191,20 @@ Found something? Please follow [SECURITY.md](SECURITY.md) and report it privatel
 
 [Coolify](https://coolify.io) is a mature, popular open-source platform for self-hosting apps, databases and services, with a large community and many features. **CommyPanel is not trying to replace it and is not a direct competitor.** It is a younger, much smaller project that makes different trade-offs for a narrower job. If you are choosing between them, this is the honest picture (based on their public documentation at the time of writing; please check theirs for the details):
 
-|                         | CommyPanel                                                                                       | Coolify                                                                                            |
-| ----------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| **Servers**             | One server, by design                                                                            | Many servers from one panel                                                                        |
-| **What you deploy**     | Stateless apps in .NET, Go and Node (automatic Dockerfile), or anything with your own Dockerfile | A broad range of apps, frameworks, Docker Compose stacks and a large catalog of one-click services |
-| **The panel itself**    | Runs on the host under systemd, so it keeps working when Docker does not                         | Runs as containers                                                                                 |
-| **Reverse proxy**       | nginx on the host                                                                                | A proxy in a container (Traefik or Caddy)                                                          |
-| **Panel storage**       | A few SQLite files                                                                               | A database and cache                                                                               |
-| **Preview deployments** | Not available                                                                                    | Available                                                                                          |
-| **License**             | MIT                                                                                              | Apache-2.0                                                                                         |
-| **Maturity**            | Young, pre-1.0, heavy development                                                                | Established                                                                                        |
+|                         | CommyPanel                                                                                                                | Coolify                                                                                            |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| **Servers**             | One server, by design                                                                                                     | Many servers from one panel                                                                        |
+| **What you deploy**     | Stateless apps in .NET, Go, Node and Python (automatic Dockerfile), ready-made apps, or anything with your own Dockerfile | A broad range of apps, frameworks, Docker Compose stacks and a large catalog of one-click services |
+| **The panel itself**    | Runs on the host under systemd, so it keeps working when Docker does not                                                  | Runs as containers                                                                                 |
+| **Reverse proxy**       | nginx on the host                                                                                                         | A proxy in a container (Traefik or Caddy)                                                          |
+| **Panel storage**       | A few SQLite files                                                                                                        | A database and cache                                                                               |
+| **Preview deployments** | Not available                                                                                                             | Available                                                                                          |
+| **License**             | MIT                                                                                                                       | Apache-2.0                                                                                         |
+| **Maturity**            | Young, pre-1.0, heavy development                                                                                         | Established                                                                                        |
 
 **Choose Coolify** if you need several servers, Docker Compose, preview deployments or a big catalog of ready-made services, or if you want something battle-tested today.
 
-**Consider CommyPanel** if you have a single server, mostly .NET, Go or Node services plus a database, you prefer a small panel that stays up independently of Docker, and you like the idea of a minimal, auditable privileged part. And if you want to help shape a young project.
+**Consider CommyPanel** if you have a single server, mostly .NET, Go, Node or Python services plus a database, you prefer a small panel that stays up independently of Docker, and you like the idea of a minimal, auditable privileged part. And if you want to help shape a young project.
 
 ## Known limitations
 
@@ -213,7 +213,7 @@ CommyPanel is pre-1.0. What you should know before you rely on it:
 **Scope**
 
 - **One server only.** There is no multi-server support, no Swarm and no Kubernetes, and none is planned.
-- **Stateless apps first.** .NET, Go and Node get automatic Dockerfiles. Python, PHP stacks such as Laravel and WordPress, and one-click templates are not supported yet (an app with its own Dockerfile works regardless of language). Persistent volumes exist for files that must survive deployments.
+- **Stateless apps first.** .NET, Go, Node and Python get automatic Dockerfiles. PHP stacks such as Laravel and WordPress are not supported yet (an app with its own Dockerfile works regardless of language). A few ready-made apps (search engines, Grafana, Redis and more) install from official images. Persistent volumes exist for files that must survive deployments.
 - No Docker Compose support, no preview deployments per branch.
 - Debian 13 and Ubuntu 24.04 / 26.04 only (`amd64` and `arm64`). Debian 12 and RPM-based systems are not supported.
 

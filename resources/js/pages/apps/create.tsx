@@ -193,6 +193,7 @@ export default function Create({
                             <option value="dotnet">.NET</option>
                             <option value="go">Go</option>
                             <option value="node">Node.js</option>
+                            <option value="python">Python</option>
                         </Select>
                     )}
                     <fieldset className="space-y-2">

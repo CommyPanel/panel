@@ -8,6 +8,7 @@ enum Stack: string
     case Dotnet = 'dotnet';
     case Go = 'go';
     case Node = 'node';
+    case Python = 'python';
     case Template = 'template';
 
     public function label(): string
@@ -17,6 +18,7 @@ enum Stack: string
             self::Dotnet => '.NET',
             self::Go => 'Go',
             self::Node => 'Node.js',
+            self::Python => 'Python',
             self::Template => 'Quick install',
         };
     }

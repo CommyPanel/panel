@@ -46,7 +46,7 @@ class StoreAppRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'min:2', 'max:100'],
-            'stack_hint' => ['nullable', Rule::in([Stack::Dotnet->value, Stack::Go->value, Stack::Node->value])],
+            'stack_hint' => ['nullable', Rule::in([Stack::Dotnet->value, Stack::Go->value, Stack::Node->value, Stack::Python->value])],
             'source' => ['required', Rule::in([SourceType::Git->value, SourceType::Upload->value, SourceType::Template->value, 'github'])],
             'template' => ['exclude_unless:source,template', 'required', Rule::in(array_keys(FastApps::all()))],
             'settings' => ['exclude_unless:source,template', 'nullable', 'array'],
