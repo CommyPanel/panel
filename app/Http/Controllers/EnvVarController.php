@@ -10,6 +10,7 @@ use App\Models\AppEnvVar;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class EnvVarController extends Controller
 {
@@ -67,50 +68,70 @@ class EnvVarController extends Controller
     }
 
     /**
-     * The saved values, for the app's owner to read and edit. Behind a recent
-     * password; the values are never part of a page's props.
+     * One saved value, for its owner to read and edit. Behind a recent password; values are
+     * never part of a page's props.
      */
-    public function reveal(App $app, AuditLogger $audit): JsonResponse
+    public function reveal(App $app, string $key, AuditLogger $audit): JsonResponse
     {
-        $audit->record('app.env_revealed', null, ['app' => $app->slug], $app);
+        $var = $app->envVars()->where('key', $key)->firstOrFail();
 
-        $vars = $app->envVars()->orderBy('key')->get()
-            ->map(fn (AppEnvVar $var) => ['key' => $var->key, 'value' => (string) $var->value])
-            ->values()->all();
+        $audit->record('app.env_revealed', null, ['app' => $app->slug, 'key' => $key], $app);
 
-        return response()->json(['vars' => $vars], 200, ['Cache-Control' => 'no-store, private']);
+        return response()->json(['key' => $var->key, 'value' => (string) $var->value], 200, ['Cache-Control' => 'no-store, private']);
     }
 
     /**
-     * Change the value of variables that already exist (a name that does not
-     * exist is ignored; adding goes through `store`).
+     * Change the value of one variable that already exists (adding goes through `store`).
      */
-    public function update(Request $request, App $app, AuditLogger $audit): RedirectResponse
+    public function update(Request $request, App $app, string $key, AuditLogger $audit): RedirectResponse
     {
-        $data = $request->validate([
-            'vars' => ['required', 'array', 'min:1', 'max:200'],
-            'vars.*' => ['present', 'nullable', 'string', 'max:32768'],
-        ]);
+        $data = $request->validate(['value' => ['present', 'nullable', 'string', 'max:32768']]);
+        $var = $app->envVars()->where('key', $key)->firstOrFail();
 
-        $existing = $app->envVars()->get()->keyBy('key');
-        $changed = [];
-
-        foreach ($data['vars'] as $key => $value) {
-            $var = $existing->get((string) $key);
-
-            if ($var !== null && (string) $var->value !== (string) ($value ?? '')) {
-                $var->update(['value' => (string) ($value ?? '')]);
-                $changed[] = (string) $key;
-            }
-        }
-
-        if ($changed === []) {
+        if ((string) $var->value === (string) ($data['value'] ?? '')) {
             return back()->with('status', __('Nothing changed.'));
         }
 
-        $audit->record('app.env_changed', null, ['app' => $app->slug, 'keys' => $changed], $app);
+        $var->update(['value' => (string) ($data['value'] ?? '')]);
+        $audit->record('app.env_changed', null, ['app' => $app->slug, 'key' => $key], $app);
 
-        return back()->with('status', __(':count variable(s) saved. Apply changes to use them.', ['count' => count($changed)]));
+        return back()->with('status', __(':key saved. Apply changes to use it.', ['key' => $key]));
+    }
+
+    /**
+     * Every variable as a .env file. The file holds secrets, so it needs a recent password and is
+     * audited as dangerous; it is named after the app so two apps' files cannot be mixed up.
+     */
+    public function download(Request $request, App $app, AuditLogger $audit): Response
+    {
+        $vars = $app->envVars()->orderBy('key')->get();
+        $lines = $vars->map(fn (AppEnvVar $var) => $var->key.'='.$this->quote((string) $var->value))->all();
+
+        $audit->record('app.env_downloaded', $request->user(), ['app' => $app->slug, 'keys' => $vars->pluck('key')->all()], $app);
+
+        return response($lines === [] ? '' : implode("\n", $lines)."\n", 200, [
+            'Content-Type' => 'text/plain; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename=".env.'.$app->slug.'"',
+            'Cache-Control' => 'no-store, private',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    /**
+     * A value as one .env line: plain when it is safe, single quotes (taken literally) when it has
+     * other characters, double quotes with escapes only when it has a quote or line break.
+     */
+    private function quote(string $value): string
+    {
+        if (preg_match('/^[A-Za-z0-9_@%+=:,.\/-]*$/', $value) === 1) {
+            return $value;
+        }
+
+        if (! str_contains($value, "'") && ! str_contains($value, "\n") && ! str_contains($value, "\r")) {
+            return "'".$value."'";
+        }
+
+        return '"'.strtr($value, ['\\' => '\\\\', '"' => '\\"', "\n" => '\\n', "\r" => '\\r', '$' => '\\$']).'"';
     }
 
     public function clear(App $app, AuditLogger $audit): RedirectResponse

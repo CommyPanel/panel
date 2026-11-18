@@ -1,5 +1,5 @@
 import { router, useForm } from '@inertiajs/react';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Download, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import EnvVarController from '@/actions/App/Http/Controllers/EnvVarController';
@@ -13,7 +13,7 @@ import { useConfirmedAction } from '@/hooks/use-confirmed-action';
 import { useT } from '@/hooks/use-t';
 import { jsonHeaders } from '@/lib/post-json';
 
-type Row = { key: string; value: string };
+type Editing = { key: string; value: string };
 
 type Props = { slug: string; keys: string[] };
 
@@ -22,82 +22,9 @@ export function EnvCard({ slug, keys }: Props) {
     const form = useForm({ key: '', value: '' });
     const confirmed = useConfirmedAction();
     const [clearing, setClearing] = useState(false);
-    const [editing, setEditing] = useState<Row[] | null>(null);
-    const [original, setOriginal] = useState<Row[]>([]);
+    const [editing, setEditing] = useState<Editing | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
-
-    const startEdit = () =>
-        void confirmed.run(async () => {
-            setLoadError(null);
-
-            try {
-                const response = await fetch(
-                    EnvVarController.reveal(slug).url,
-                    {
-                        credentials: 'same-origin',
-                        headers: jsonHeaders(),
-                    },
-                );
-
-                if (!response.ok) {
-                    throw new Error('failed');
-                }
-
-                const body = (await response.json()) as { vars: Row[] };
-                setOriginal(body.vars);
-                setEditing(body.vars.map((row) => ({ ...row })));
-            } catch {
-                setLoadError(
-                    t('The variables could not be loaded. Try again.'),
-                );
-            }
-        });
-
-    const stopEdit = () => {
-        // Drop the values from memory as soon as the dialog closes.
-        setEditing(null);
-        setOriginal([]);
-    };
-
-    const save = () => {
-        if (editing === null) {
-            return;
-        }
-
-        const changed: Record<string, string> = {};
-
-        editing.forEach((row, index) => {
-            if (row.value !== original[index]?.value) {
-                changed[row.key] = row.value;
-            }
-        });
-
-        if (Object.keys(changed).length === 0) {
-            stopEdit();
-
-            return;
-        }
-
-        void confirmed.run(() =>
-            router.put(
-                EnvVarController.update(slug),
-                { vars: changed },
-                {
-                    preserveScroll: true,
-                    onStart: () => setSaving(true),
-                    onFinish: () => setSaving(false),
-                    onSuccess: stopEdit,
-                },
-            ),
-        );
-    };
-
-    const clearAll = () =>
-        router.delete(EnvVarController.clear(slug), {
-            preserveScroll: true,
-            onSuccess: () => setClearing(false),
-        });
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -112,11 +39,62 @@ export function EnvCard({ slug, keys }: Props) {
             preserveScroll: true,
         });
 
+    // The value is fetched only now, after a password confirmation, and dropped again when the
+    // dialog closes. It is never part of the page.
+    const startEdit = (key: string) =>
+        void confirmed.run(async () => {
+            setLoadError(null);
+
+            try {
+                const response = await fetch(
+                    EnvVarController.reveal({ app: slug, key }).url,
+                    { credentials: 'same-origin', headers: jsonHeaders() },
+                );
+
+                if (!response.ok) {
+                    throw new Error('failed');
+                }
+
+                setEditing((await response.json()) as Editing);
+            } catch {
+                setLoadError(t('The variable could not be loaded. Try again.'));
+            }
+        });
+
+    const save = () => {
+        if (editing === null) {
+            return;
+        }
+
+        void confirmed.run(() =>
+            router.put(
+                EnvVarController.update({ app: slug, key: editing.key }),
+                { value: editing.value },
+                {
+                    preserveScroll: true,
+                    onStart: () => setSaving(true),
+                    onFinish: () => setSaving(false),
+                    onSuccess: () => setEditing(null),
+                },
+            ),
+        );
+    };
+
+    const download = () =>
+        void confirmed.run(() => {
+            window.location.assign(EnvVarController.download(slug).url);
+        });
+
+    const clearAll = () => {
+        setClearing(false);
+        router.delete(EnvVarController.clear(slug), { preserveScroll: true });
+    };
+
     return (
         <Card
             title={t('Environment variables')}
             description={t(
-                'Values are stored encrypted and never shown again. Changes reach the running app when you apply them (a button appears on the app) or deploy. PORT is set for you.',
+                'Values are stored encrypted and are only shown after you confirm your password. Changes reach the running app when you apply them (a button appears on the app) or deploy. PORT is set for you.',
             )}
         >
             {loadError && <Alert variant="error">{loadError}</Alert>}
@@ -126,9 +104,9 @@ export function EnvCard({ slug, keys }: Props) {
                         {t(':count variable(s)', { count: keys.length })}
                     </span>
                     <div className="flex flex-wrap gap-2">
-                        <Button variant="soft" size="sm" onClick={startEdit}>
-                            <Pencil className="size-4" aria-hidden />
-                            {t('View and edit values')}
+                        <Button variant="soft" size="sm" onClick={download}>
+                            <Download className="size-4" aria-hidden />
+                            {t('Download as .env file')}
                         </Button>
                         <Button
                             variant="ghost"
@@ -149,14 +127,26 @@ export function EnvCard({ slug, keys }: Props) {
                             className="flex items-center justify-between gap-2 py-1 pr-1 pl-3"
                         >
                             <code className="truncate text-sm">{key}</code>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                aria-label={t('Remove :name', { name: key })}
-                                onClick={() => remove(key)}
-                            >
-                                <Trash2 className="size-4" />
-                            </Button>
+                            <div className="flex shrink-0">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    aria-label={t('Edit :name', { name: key })}
+                                    onClick={() => startEdit(key)}
+                                >
+                                    <Pencil className="size-4" />
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    aria-label={t('Remove :name', {
+                                        name: key,
+                                    })}
+                                    onClick={() => remove(key)}
+                                >
+                                    <Trash2 className="size-4" />
+                                </Button>
+                            </div>
                         </li>
                     ))}
                 </ul>
@@ -199,12 +189,15 @@ export function EnvCard({ slug, keys }: Props) {
             </ConfirmModal>
             <Modal
                 open={editing !== null}
-                onClose={stopEdit}
-                title={t('Environment variables')}
-                size="lg"
+                onClose={() => setEditing(null)}
+                title={t('Edit :name', { name: editing?.key ?? '' })}
+                size="md"
                 footer={
                     <>
-                        <Button variant="ghost" onClick={stopEdit}>
+                        <Button
+                            variant="ghost"
+                            onClick={() => setEditing(null)}
+                        >
                             {t('Cancel')}
                         </Button>
                         <Button loading={saving} onClick={save}>
@@ -213,42 +206,34 @@ export function EnvCard({ slug, keys }: Props) {
                     </>
                 }
             >
-                <div className="space-y-3">
-                    <p className="text-sm text-base-content/70">
+                <div className="w-full">
+                    <label
+                        className="mb-1 label-text block px-0!"
+                        htmlFor="env-edit-value"
+                    >
+                        {t('Value')}
+                    </label>
+                    <textarea
+                        id="env-edit-value"
+                        className="textarea w-full font-mono text-sm"
+                        rows={editing?.value.includes('\n') ? 6 : 2}
+                        autoComplete="off"
+                        spellCheck={false}
+                        autoFocus
+                        value={editing?.value ?? ''}
+                        onChange={(e) =>
+                            setEditing((row) =>
+                                row === null
+                                    ? null
+                                    : { ...row, value: e.target.value },
+                            )
+                        }
+                    />
+                    <span className="mt-1 block text-sm text-base-content/60">
                         {t(
-                            'Change a value and save. Names stay as they are; to add a variable use the form below the list. Changes reach the running app when you apply them.',
+                            'The change reaches the running app when you apply it.',
                         )}
-                    </p>
-                    {(editing ?? []).map((row, index) => (
-                        <div key={row.key} className="w-full">
-                            <label
-                                className="mb-1 label-text block px-0!"
-                                htmlFor={`env-edit-${index}`}
-                            >
-                                {row.key}
-                            </label>
-                            <textarea
-                                id={`env-edit-${index}`}
-                                className="textarea w-full font-mono text-sm"
-                                rows={row.value.includes('\n') ? 4 : 1}
-                                autoComplete="off"
-                                spellCheck={false}
-                                value={row.value}
-                                onChange={(e) =>
-                                    setEditing((rows) =>
-                                        (rows ?? []).map((r, i) =>
-                                            i === index
-                                                ? {
-                                                      ...r,
-                                                      value: e.target.value,
-                                                  }
-                                                : r,
-                                        ),
-                                    )
-                                }
-                            />
-                        </div>
-                    ))}
+                    </span>
                 </div>
             </Modal>
         </Card>
