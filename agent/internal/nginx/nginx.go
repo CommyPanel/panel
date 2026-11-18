@@ -171,6 +171,8 @@ type Config struct {
 	// MetricsSocket is the Unix datagram socket nginx writes one line per proxied request
 	// to (see package traffic). Empty turns request statistics off.
 	MetricsSocket string
+	// ProcDir is where the kernel's /proc lives (only tests change it).
+	ProcDir string
 }
 
 type Manager struct {
@@ -223,8 +225,8 @@ map $cookie_cp_rollout ${{.Var}}_cookie {
 {{end}}
 server {
     listen 80;
-    listen [::]:80;
-    server_name {{.ServerNames}};
+{{if $.IPv6}}    listen [::]:80;
+{{end}}    server_name {{.ServerNames}};
 
     location ^~ /.well-known/acme-challenge/ {
         allow all;
@@ -238,8 +240,8 @@ server {
 
 server {
     listen 443 ssl{{if not .ModernHTTP2}} http2{{end}};
-    listen [::]:443 ssl{{if not .ModernHTTP2}} http2{{end}};
-{{if .ModernHTTP2}}    http2 on;
+{{if $.IPv6}}    listen [::]:443 ssl{{if not .ModernHTTP2}} http2{{end}};
+{{end}}{{if .ModernHTTP2}}    http2 on;
 {{end}}    server_name {{.ServerNames}};
 
     ssl_certificate {{.CertDir}}/fullchain.pem;
@@ -282,8 +284,8 @@ server {
 # only a single-use ticket and the cookie it hands out.
 server {
     listen {{.ToolsPort}} ssl;
-    listen [::]:{{.ToolsPort}} ssl;
-    server_name {{.ServerNames}};
+{{if $.IPv6}}    listen [::]:{{.ToolsPort}} ssl;
+{{end}}    server_name {{.ServerNames}};
 
     ssl_certificate {{.CertDir}}/fullchain.pem;
     ssl_certificate_key {{.CertDir}}/privkey.pem;
@@ -305,8 +307,8 @@ server {
 {{end}}{{range .Redirects}}
 server {
     listen 80;
-    listen [::]:80;
-    server_name {{.From}};
+{{if $.IPv6}}    listen [::]:80;
+{{end}}    server_name {{.From}};
 
     location ^~ /.well-known/acme-challenge/ {
         root {{$.Webroot}};
@@ -319,8 +321,8 @@ server {
 {{if $.CertDir}}
 server {
     listen 443 ssl{{if not $.ModernHTTP2}} http2{{end}};
-    listen [::]:443 ssl{{if not $.ModernHTTP2}} http2{{end}};
-{{if $.ModernHTTP2}}    http2 on;
+{{if $.IPv6}}    listen [::]:443 ssl{{if not $.ModernHTTP2}} http2{{end}};
+{{end}}{{if $.ModernHTTP2}}    http2 on;
 {{end}}    server_name {{.From}};
 
     ssl_certificate {{$.CertDir}}/fullchain.pem;
@@ -339,8 +341,8 @@ var defaultTmpl = template.Must(template.New("default").Parse(`# Managed by Comm
 # validate a domain before its app is live. Everything else gets a 404.
 server {
     listen 80 default_server;
-    listen [::]:80 default_server;
-    server_name _;
+{{if $.IPv6}}    listen [::]:80 default_server;
+{{end}}    server_name _;
 
     location /.well-known/acme-challenge/ {
         root {{.Webroot}};
@@ -357,7 +359,10 @@ server {
 // exists) the file is removed again and the error returned.
 func (m *Manager) EnsureDefaultSite(ctx context.Context) error {
 	var buf bytes.Buffer
-	if err := defaultTmpl.Execute(&buf, struct{ Webroot string }{filepath.Join(m.cfg.StateDir, "acme-webroot")}); err != nil {
+	if err := defaultTmpl.Execute(&buf, struct {
+		Webroot string
+		IPv6    bool
+	}{filepath.Join(m.cfg.StateDir, "acme-webroot"), m.ipv6()}); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(filepath.Join(m.cfg.StateDir, "acme-webroot"), 0o755); err != nil {
@@ -392,6 +397,7 @@ func (m *Manager) Render(s Site) (string, error) {
 		Name, LogFormat, MetricsSocket                                     string
 		Port, ToolsPort                                                    int
 		ModernHTTP2                                                        bool
+		IPv6                                                               bool
 		Redirects                                                          []Redirect
 		Rollout                                                            *rolloutData
 	}{
@@ -403,6 +409,7 @@ func (m *Manager) Render(s Site) (string, error) {
 		Name:          s.Name,
 		LogFormat:     "cp_" + strings.ReplaceAll(s.Name, "-", "_"),
 		MetricsSocket: m.cfg.MetricsSocket,
+		IPv6:          m.ipv6(),
 	}
 	if r := s.Rollout; r != nil {
 		data.Rollout = &rolloutData{
@@ -455,6 +462,31 @@ func bucketRegex(percent int) string {
 		parts = append(parts, strconv.Itoa(tens)+"[0-"+strconv.Itoa(ones-1)+"]")
 	}
 	return "(" + strings.Join(parts, "|") + ")"
+}
+
+func (m *Manager) ipv6() bool {
+	if m.cfg.ProcDir != "" {
+		return ipv6Usable(m.cfg.ProcDir)
+	}
+	return ipv6Usable("/proc")
+}
+
+// ipv6Usable reports whether nginx can listen on IPv6 sockets. Servers without a public
+// IPv6 address are fine (the stack still exists), but when the kernel has IPv6 switched
+// off, `listen [::]:80;` fails with "Address family not supported" and nginx would not
+// start. Only a positive sign of that turns it off: anything unclear (including no /proc,
+// as on a developer's Mac) keeps IPv6 listeners.
+func ipv6Usable(proc string) bool {
+	if raw, err := os.ReadFile(filepath.Join(proc, "sys/net/ipv6/conf/all/disable_ipv6")); err == nil {
+		return strings.TrimSpace(string(raw)) != "1"
+	}
+	if _, err := os.Stat(filepath.Join(proc, "net")); err == nil {
+		// A Linux /proc without the IPv6 sysctl or socket table: the module is not loaded.
+		if _, err := os.Stat(filepath.Join(proc, "net/if_inet6")); err != nil {
+			return false
+		}
+	}
+	return true
 }
 
 var nginxVersionRe = regexp.MustCompile(`nginx/(\d+)\.(\d+)\.(\d+)`)

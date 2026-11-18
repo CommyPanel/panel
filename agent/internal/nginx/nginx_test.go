@@ -516,3 +516,81 @@ func TestOnlyThePanelSiteServesDatabaseToolsAndOnlyOverHTTPS(t *testing.T) {
 		t.Errorf("tools are off but the site serves them:\n%s", conf)
 	}
 }
+
+func TestIPv6Usable(t *testing.T) {
+	write := func(root, rel, content string) {
+		path := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	t.Run("no /proc at all keeps IPv6 listeners", func(t *testing.T) {
+		if !ipv6Usable(filepath.Join(t.TempDir(), "missing")) {
+			t.Error("an unreadable /proc must not turn IPv6 off")
+		}
+	})
+	t.Run("sysctl says disabled", func(t *testing.T) {
+		root := t.TempDir()
+		write(root, "sys/net/ipv6/conf/all/disable_ipv6", "1\n")
+		if ipv6Usable(root) {
+			t.Error("disable_ipv6=1 must turn IPv6 off")
+		}
+	})
+	t.Run("sysctl says enabled, even without a public address", func(t *testing.T) {
+		root := t.TempDir()
+		write(root, "sys/net/ipv6/conf/all/disable_ipv6", "0\n")
+		if !ipv6Usable(root) {
+			t.Error("disable_ipv6=0 keeps IPv6")
+		}
+	})
+	t.Run("linux without the ipv6 module", func(t *testing.T) {
+		root := t.TempDir()
+		write(root, "net/dev", "")
+		if ipv6Usable(root) {
+			t.Error("no if_inet6 on Linux means no IPv6")
+		}
+		write(root, "net/if_inet6", "")
+		if !ipv6Usable(root) {
+			t.Error("if_inet6 present keeps IPv6")
+		}
+	})
+}
+
+func TestRenderIPv6Listeners(t *testing.T) {
+	m, _ := newManager(t, &fakeRunner{version: "nginx/1.26.0"}, false)
+	conf, err := m.Render(Site{Name: "demo", Domains: []string{"demo.example.com"}, UpstreamPort: 20001, Certificate: "demo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// On a machine with IPv6 (or an unreadable /proc) both families are served.
+	if !strings.Contains(conf, "listen [::]:80;") || !strings.Contains(conf, "listen [::]:443 ssl") {
+		t.Errorf("IPv6 listeners missing:\n%s", conf)
+	}
+}
+
+func TestRenderWithoutIPv6(t *testing.T) {
+	m, _ := newManager(t, &fakeRunner{version: "nginx/1.26.0"}, false)
+	proc := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(proc, "sys/net/ipv6/conf/all"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(proc, "sys/net/ipv6/conf/all/disable_ipv6"), []byte("1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m.cfg.ProcDir = proc
+
+	conf, err := m.Render(Site{Name: "demo", Domains: []string{"demo.example.com", "www.demo.example.com"}, UpstreamPort: 20001, Certificate: "demo", Redirects: []Redirect{{From: "www.demo.example.com", To: "demo.example.com"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(conf, "[::]") {
+		t.Errorf("a server without IPv6 must not get IPv6 listeners:\n%s", conf)
+	}
+	if !strings.Contains(conf, "listen 80;") || !strings.Contains(conf, "listen 443 ssl") {
+		t.Errorf("IPv4 listeners missing:\n%s", conf)
+	}
+}
