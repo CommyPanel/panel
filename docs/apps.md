@@ -158,7 +158,6 @@ Environment variables, volumes and links are given to a container when it is **m
 
 **Looking at and changing variables.** The Environment tab lists the names; **View and edit values** shows the values after you confirm your password (if you confirmed it recently it asks nothing) and lets you change them in one go. Opening the values is written to the audit log and the values are never part of the page itself. **Delete all** removes every variable of the app after a confirmation. Changes still need **Apply changes** (or a deployment) to reach the running app.
 
-
 ## Deploy mode
 
 By default a deployment starts the new version next to the old one, health-checks it and then moves the traffic, so there is no downtime. Some software cannot do that because it must never run twice on the same data (Redis, Elasticsearch, Garage, many databases). For these, set **Deploy mode** on the app's Settings tab (and in the new-app wizard) to **Stop the old version first**:
