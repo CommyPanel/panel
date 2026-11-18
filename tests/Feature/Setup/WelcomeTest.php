@@ -142,9 +142,99 @@ describe('panel domain', function () {
     it('clears the domain and its site', function () {
         $this->panel->set('panel.example.com');
 
-        $this->delete('/welcome/domain')->assertRedirect('/welcome');
+        $this->delete('/welcome/domain')->assertStatus(302);
+        expect($this->panel->name())->toBe('panel.example.com');
+
+        $this->withSession(['auth.password_confirmed_at' => time()])->delete('/welcome/domain')->assertRedirect('/welcome');
 
         expect($this->panel->name())->toBeNull();
+    });
+});
+
+describe('moving the panel to another domain', function () {
+    beforeEach(function () {
+        app(HttpsSettings::class)->enable('ops@example.com');
+        $this->dns->records['panel.example.com'] = ['a' => ['203.0.113.7']];
+        $this->panel->set('panel.example.com');
+        $this->panel->recordDns('verified', []);
+        app(IssuePanelCertificate::class)();
+        $this->confirmed = fn () => $this->withSession(['auth.password_confirmed_at' => time()]);
+    });
+
+    it('leaves the current domain, certificate and site alone while a new one is only entered', function () {
+        $this->post('/welcome/domain', ['domain' => 'new.example.com'])->assertRedirect('/welcome');
+
+        expect($this->panel->name())->toBe('panel.example.com')
+            ->and($this->panel->certificateUsable())->toBeTrue()
+            ->and($this->panel->next())->toBe('new.example.com')
+            ->and($this->host->sites()['panel']->domains)->toBe(['panel.example.com']);
+
+        $this->artisan('commypanel:sync-panel-site')->assertSuccessful();
+        expect($this->host->sites()['panel']->domains)->toBe(['panel.example.com']);
+    });
+
+    it('can drop the candidate without touching anything', function () {
+        $this->post('/welcome/domain', ['domain' => 'new.example.com']);
+
+        $this->delete('/welcome/domain/next')->assertRedirect('/welcome');
+
+        expect($this->panel->next())->toBeNull()->and($this->panel->name())->toBe('panel.example.com')
+            ->and($this->panel->certificateUsable())->toBeTrue();
+    });
+
+    it('refuses to switch before the new DNS is verified, and needs a password', function () {
+        Queue::fake();
+        $this->post('/welcome/domain', ['domain' => 'new.example.com']);
+
+        $this->post('/welcome/domain/switch')->assertStatus(302);
+        ($this->confirmed)()->post('/welcome/domain/switch')->assertSessionHasErrors('domain');
+
+        Queue::assertNothingPushed();
+        expect($this->panel->name())->toBe('panel.example.com');
+    });
+
+    it('takes over only after the new certificate exists', function () {
+        $this->dns->records['new.example.com'] = ['a' => ['203.0.113.7']];
+        $this->post('/welcome/domain', ['domain' => 'new.example.com']);
+        expect($this->panel->nextDnsVerified())->toBeTrue();
+
+        Queue::fake();
+        ($this->confirmed)()->post('/welcome/domain/switch')->assertRedirect('/welcome');
+        Queue::assertPushed(IssuePanelCertificateJob::class, fn ($job) => $job->moving === true);
+        expect($this->panel->name())->toBe('panel.example.com');
+
+        app(IssuePanelCertificate::class)->issueNext();
+
+        expect($this->panel->name())->toBe('new.example.com')->and($this->panel->next())->toBeNull()
+            ->and($this->panel->certificateUsable())->toBeTrue()
+            ->and($this->host->sites()['panel']->domains)->toBe(['new.example.com']);
+    });
+
+    it('keeps the current domain serving when the new certificate fails', function () {
+        $this->dns->records['new.example.com'] = ['a' => ['203.0.113.7']];
+        $this->post('/welcome/domain', ['domain' => 'new.example.com']);
+        Queue::fake();
+        ($this->confirmed)()->post('/welcome/domain/switch');
+
+        $host = new class extends FakeHostDriver
+        {
+            public function issueCertificate(CertificateRequest $request): CertificateInfo
+            {
+                throw new HostOperationFailed('Rate limited');
+            }
+        };
+        app()->instance(HostDriver::class, $host);
+        app()->forgetInstance(IssuePanelCertificate::class);
+        app(IssuePanelCertificate::class)->issueNext();
+
+        expect($this->panel->name())->toBe('panel.example.com')->and($this->panel->certificateUsable())->toBeTrue()
+            ->and($this->panel->nextStatus())->toBe('failed')->and($this->panel->nextError())->toBe('Rate limited');
+    });
+
+    it('does not treat the current name as a new one', function () {
+        $this->post('/welcome/domain', ['domain' => 'panel.example.com'])->assertSessionHasErrors('domain');
+
+        expect($this->panel->next())->toBeNull();
     });
 });
 

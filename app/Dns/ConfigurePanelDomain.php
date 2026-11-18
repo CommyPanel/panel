@@ -40,9 +40,73 @@ class ConfigurePanelDomain
             throw ValidationException::withMessages(['domain' => "{$name} is already connected to an app. Use a different name for the panel."]);
         }
 
+        // While the panel is served on a domain, a new name only becomes a candidate:
+        // the current domain, its certificate and its nginx site stay exactly as they
+        // are until the new one has verified DNS and its own certificate.
+        if ($this->panel->certificateUsable()) {
+            if ($name === $this->panel->name()) {
+                throw ValidationException::withMessages(['domain' => "The panel is already served on {$name}."]);
+            }
+
+            $this->panel->setNext($name);
+            $this->audit->record('panel.domain_candidate_set', null, ['domain' => $name]);
+            $this->checkNext();
+
+            return;
+        }
+
         $this->panel->set($name);
         $this->audit->record('panel.domain_set', null, ['domain' => $name]);
         $this->check();
+    }
+
+    public function checkNext(): void
+    {
+        $name = $this->panel->next();
+
+        if ($name === null) {
+            return;
+        }
+
+        $result = $this->verifier->check($name);
+        $this->panel->recordNextDns($result->status->value, $result->toArray());
+    }
+
+    /**
+     * Start getting the certificate for the candidate domain. Only a verified
+     * candidate qualifies, and only when HTTPS is on.
+     *
+     * @throws ValidationException
+     */
+    public function switchToNext(): void
+    {
+        $this->checkNext();
+
+        if ($this->panel->next() === null || ! $this->panel->nextDnsVerified()) {
+            throw ValidationException::withMessages(['domain' => 'The new domain\'s DNS is not verified yet.']);
+        }
+
+        if (! $this->https->enabled()) {
+            throw ValidationException::withMessages(['domain' => 'Turn on HTTPS first.']);
+        }
+
+        if ($this->panel->nextStatus() === 'issuing') {
+            return;
+        }
+
+        $this->panel->markNextIssuing();
+        $this->audit->record('panel.domain_switch_started', null, ['domain' => $this->panel->next()]);
+        IssuePanelCertificateJob::dispatch(true);
+    }
+
+    public function cancelNext(): void
+    {
+        if ($this->panel->next() === null || $this->panel->nextStatus() === 'issuing') {
+            return;
+        }
+
+        $this->panel->setNext(null);
+        $this->audit->record('panel.domain_candidate_removed');
     }
 
     public function check(bool $retry = false): void
@@ -79,6 +143,7 @@ class ConfigurePanelDomain
 
     public function clear(): void
     {
+        $this->panel->setNext(null);
         $this->panel->set(null);
         $this->routing->sync();
         $this->audit->record('panel.domain_removed');

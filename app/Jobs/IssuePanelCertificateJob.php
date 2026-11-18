@@ -26,14 +26,24 @@ class IssuePanelCertificateJob implements ShouldQueue
         return [(new WithoutOverlapping('certificate-panel'))->releaseAfter(30)->expireAfter(1000)];
     }
 
+    public function __construct(public bool $moving = false) {}
+
     public function handle(IssuePanelCertificate $issue): void
     {
-        $issue();
+        $this->moving ? $issue->issueNext() : $issue();
     }
 
     public function failed(?Throwable $exception): void
     {
         $panel = app(PanelDomain::class);
+
+        if ($this->moving) {
+            if ($panel->nextStatus() === 'issuing') {
+                $panel->markNextFailed('The attempt was interrupted.');
+            }
+
+            return;
+        }
 
         if ($panel->certificateStatus() === 'issuing') {
             $panel->markFailed('The attempt was interrupted.', false);
