@@ -2,7 +2,7 @@ import { useForm, usePage } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useDomainProgress } from '@/hooks/use-domain-progress';
 import { ServerAddressNote } from '@/components/domains/server-address-card';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import AppDomainController from '@/actions/App/Http/Controllers/AppDomainController';
 import { DomainCard } from '@/components/domains/domain-card';
@@ -65,7 +65,15 @@ function redirectOptions(
 }
 
 /** Add a domain to one app, with its optional www/bare redirect. */
-export function AddAppDomainCard({ slug }: { slug: string }) {
+export type DomainDraft = { name: string; redirect: string };
+
+export function AddAppDomainCard({
+    slug,
+    onDraft,
+}: {
+    slug: string;
+    onDraft?: (draft: DomainDraft) => void;
+}) {
     const { t } = useT();
     const free =
         (usePage().props as { free_domains?: string[] }).free_domains ?? [];
@@ -73,6 +81,15 @@ export function AddAppDomainCard({ slug }: { slug: string }) {
     const form = useForm({ name: '', redirect: 'none' });
     const options = redirectOptions(form.data.name, t);
     const choosing = mode === 'free' && free.length > 0;
+    const typed = form.data.name.trim() !== '';
+
+    // Lets a parent (the setup wizard) know about a domain that was typed but not added.
+    useEffect(() => {
+        onDraft?.({
+            name: form.data.name.trim(),
+            redirect: form.data.redirect,
+        });
+    }, [form.data.name, form.data.redirect]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const switchTo = (next: 'type' | 'free') => {
         setMode(next);
@@ -197,6 +214,17 @@ export function AddAppDomainCard({ slug }: { slug: string }) {
                     <Plus className="size-4" aria-hidden />
                     {t('Add domain')}
                 </Button>
+                {typed && !form.processing && (
+                    <p
+                        className="text-sm font-medium text-warning"
+                        role="status"
+                    >
+                        {t(
+                            ':domain is not added yet. Press "Add domain" to save it.',
+                            { domain: form.data.name.trim() },
+                        )}
+                    </p>
+                )}
             </form>
         </Card>
     );
@@ -207,10 +235,12 @@ export function AppDomains({
     slug,
     domains,
     server,
+    onDraft,
 }: {
     slug: string;
     domains: DomainRow[];
     server: ServerAddress;
+    onDraft?: (draft: DomainDraft) => void;
 }) {
     const { t } = useT();
     const progress = useDomainProgress(domains, ['app']);
@@ -232,7 +262,7 @@ export function AppDomains({
                     )}
                 </p>
             )}
-            <AddAppDomainCard slug={slug} />
+            <AddAppDomainCard slug={slug} onDraft={onDraft} />
             {domains.map((domain) => (
                 <DomainCard key={domain.id} domain={domain} server={server} />
             ))}

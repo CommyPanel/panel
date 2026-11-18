@@ -6,6 +6,7 @@ use App\Audit\AuditLogger;
 use App\Deploy\EnvParser;
 use App\Models\App;
 use App\Models\AppEnvVar;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -58,5 +59,61 @@ class EnvVarController extends Controller
         $audit->record('app.env_removed', null, ['app' => $app->slug, 'key' => $key], $app);
 
         return back()->with('status', __(':key removed. Apply the changes to stop using it.', ['key' => $key]));
+    }
+
+    /**
+     * The saved values, for the app's owner to read and edit. Behind a recent
+     * password; the values are never part of a page's props.
+     */
+    public function reveal(App $app, AuditLogger $audit): JsonResponse
+    {
+        $audit->record('app.env_revealed', null, ['app' => $app->slug], $app);
+
+        $vars = $app->envVars()->orderBy('key')->get()
+            ->map(fn (AppEnvVar $var) => ['key' => $var->key, 'value' => (string) $var->value])
+            ->values()->all();
+
+        return response()->json(['vars' => $vars], 200, ['Cache-Control' => 'no-store, private']);
+    }
+
+    /**
+     * Change the value of variables that already exist (a name that does not
+     * exist is ignored; adding goes through `store`).
+     */
+    public function update(Request $request, App $app, AuditLogger $audit): RedirectResponse
+    {
+        $data = $request->validate([
+            'vars' => ['required', 'array', 'min:1', 'max:200'],
+            'vars.*' => ['present', 'nullable', 'string', 'max:32768'],
+        ]);
+
+        $existing = $app->envVars()->get()->keyBy('key');
+        $changed = [];
+
+        foreach ($data['vars'] as $key => $value) {
+            $var = $existing->get((string) $key);
+
+            if ($var !== null && (string) $var->value !== (string) ($value ?? '')) {
+                $var->update(['value' => (string) ($value ?? '')]);
+                $changed[] = (string) $key;
+            }
+        }
+
+        if ($changed === []) {
+            return back()->with('status', __('Nothing changed.'));
+        }
+
+        $audit->record('app.env_changed', null, ['app' => $app->slug, 'keys' => $changed], $app);
+
+        return back()->with('status', __(':count variable(s) saved. Apply changes to use them.', ['count' => count($changed)]));
+    }
+
+    public function clear(App $app, AuditLogger $audit): RedirectResponse
+    {
+        $keys = $app->envVars()->pluck('key')->all();
+        $app->envVars()->delete();
+        $audit->record('app.env_cleared', null, ['app' => $app->slug, 'keys' => $keys], $app);
+
+        return back()->with('status', __('All :count variable(s) removed. Apply the changes to stop using them.', ['count' => count($keys)]));
     }
 }
