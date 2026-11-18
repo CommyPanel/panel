@@ -1,5 +1,6 @@
 <?php
 
+use App\Audit\Severity;
 use App\Deploy\Source\UploadStorage;
 use App\Enums\AppStatus;
 use App\Enums\DeploymentStatus;
@@ -259,15 +260,16 @@ describe('upload apps', function () {
 });
 
 describe('env values', function () {
-    it('shows the values only after a password and writes an audit entry', function () {
+    it('shows one value only after a password and writes an audit entry', function () {
         $app = App::factory()->create(['slug' => 'shop']);
-        AppEnvVar::query()->create(['app_id' => $app->id, 'key' => 'B', 'value' => 'two']);
         AppEnvVar::query()->create(['app_id' => $app->id, 'key' => 'A', 'value' => 'one']);
+        AppEnvVar::query()->create(['app_id' => $app->id, 'key' => 'B', 'value' => 'two']);
 
-        $this->getJson('/apps/shop/env/values')->assertStatus(423);
+        $this->getJson('/apps/shop/env/A/value')->assertStatus(423);
 
-        $this->withSession(['auth.password_confirmed_at' => time()])->getJson('/apps/shop/env/values')
-            ->assertOk()->assertJsonPath('vars.0.key', 'A')->assertJsonPath('vars.0.value', 'one')->assertJsonPath('vars.1.value', 'two');
+        $this->withSession(['auth.password_confirmed_at' => time()])->getJson('/apps/shop/env/A/value')
+            ->assertOk()->assertExactJson(['key' => 'A', 'value' => 'one']);
+        $this->withSession(['auth.password_confirmed_at' => time()])->getJson('/apps/shop/env/NOPE/value')->assertNotFound();
 
         expect(AuditLog::query()->where('action', 'app.env_revealed')->count())->toBe(1);
     });
@@ -279,17 +281,38 @@ describe('env values', function () {
         expect($this->get('/apps/shop')->getContent())->not->toContain('topsecret');
     });
 
-    it('changes existing values only, and needs a password', function () {
+    it('changes one existing variable, needs a password and adds nothing new', function () {
         $app = App::factory()->create(['slug' => 'shop']);
         AppEnvVar::query()->create(['app_id' => $app->id, 'key' => 'A', 'value' => 'old']);
 
-        $this->put('/apps/shop/env/values', ['vars' => ['A' => 'new']])->assertRedirect();
+        $this->put('/apps/shop/env/A', ['value' => 'new'])->assertRedirect();
         expect(AppEnvVar::query()->where('key', 'A')->first()->value)->toBe('old');
 
-        $this->withSession(['auth.password_confirmed_at' => time()])
-            ->put('/apps/shop/env/values', ['vars' => ['A' => 'new', 'GHOST' => 'x']])->assertSessionHasNoErrors();
+        $this->withSession(['auth.password_confirmed_at' => time()])->put('/apps/shop/env/A', ['value' => 'new'])->assertSessionHasNoErrors();
+        $this->withSession(['auth.password_confirmed_at' => time()])->put('/apps/shop/env/GHOST', ['value' => 'x'])->assertNotFound();
 
         expect(AppEnvVar::query()->where('app_id', $app->id)->pluck('value', 'key')->all())->toBe(['A' => 'new']);
+        expect(AuditLog::query()->where('action', 'app.env_changed')->count())->toBe(1);
+    });
+
+    it('downloads a .env file named after the app, after a password, audited as dangerous', function () {
+        $app = App::factory()->create(['slug' => 'dotnet']);
+        $other = App::factory()->create(['slug' => 'blog']);
+        AppEnvVar::query()->create(['app_id' => $app->id, 'key' => 'B', 'value' => 'two words']);
+        AppEnvVar::query()->create(['app_id' => $app->id, 'key' => 'A', 'value' => 'plain-1']);
+        AppEnvVar::query()->create(['app_id' => $app->id, 'key' => 'C', 'value' => 'it\'s "q"'."\n".'$x']);
+        AppEnvVar::query()->create(['app_id' => $other->id, 'key' => 'OTHER', 'value' => 'no']);
+
+        $this->get('/apps/dotnet/env/download')->assertStatus(302);
+        expect(AuditLog::query()->where('action', 'app.env_downloaded')->count())->toBe(0);
+
+        $response = $this->withSession(['auth.password_confirmed_at' => time()])->get('/apps/dotnet/env/download');
+
+        $response->assertOk()->assertHeader('Content-Disposition', 'attachment; filename=".env.dotnet"');
+        expect($response->headers->get('Cache-Control'))->toContain('no-store');
+        expect($response->getContent())->toBe("A=plain-1\nB='two words'\nC=\"it's \\\"q\\\"\\n".'\\$x'."\"\n");
+        expect(AuditLog::query()->where('action', 'app.env_downloaded')->count())->toBe(1);
+        expect(Severity::of('app.env_downloaded'))->toBe('danger');
     });
 
     it('removes every variable of this app and no other', function () {

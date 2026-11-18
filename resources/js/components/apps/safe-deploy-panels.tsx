@@ -162,18 +162,20 @@ export function RetryModal({
     const [watch, setWatch] = useState(true);
     const [busy, setBusy] = useState(false);
 
-    const go = () =>
+    // The dialog closes at once. This page refreshes itself while a release is watched, and
+    // that refresh can cancel the request in flight, which would leave a dialog that waits
+    // for the request to finish open for good.
+    const go = () => {
+        onClose();
         router.post(
             DeploymentController.retry({ app: slug, deployment: number }).url,
             { watch },
             {
                 onStart: () => setBusy(true),
-                onFinish: () => {
-                    setBusy(false);
-                    onClose();
-                },
+                onFinish: () => setBusy(false),
             },
         );
+    };
 
     return (
         <Modal
@@ -297,15 +299,19 @@ export function WatchPanel({
     const watching = watch.state === 'watching';
     const left = minutesLeft(watch.until, now, t);
 
-    const endWatch = () =>
+    // Close first: this page refreshes itself, and that refresh can cancel the request in
+    // flight, so waiting for it to finish could leave the dialog open after the watch ended.
+    const endWatch = () => {
+        setAsking(false);
         router.post(
             DeploymentController.endWatch({
                 app: slug,
                 deployment: deployment.number,
             }).url,
             {},
-            { preserveScroll: true, onFinish: () => setAsking(false) },
+            { preserveScroll: true },
         );
+    };
 
     return (
         <Card
@@ -453,12 +459,14 @@ export function RolloutPanel({
     const now = useNow();
     const [ask, setAsk] = useState<'promote' | 'abort' | null>(null);
     const active = rollout.state === 'running' || rollout.state === 'waiting';
-    const post = (action: 'advance' | 'promote' | 'abort') =>
+    const post = (action: 'advance' | 'promote' | 'abort') => {
+        setAsk(null);
         router.post(
             RolloutController[action](slug).url,
             {},
-            { preserveScroll: true, onFinish: () => setAsk(null) },
+            { preserveScroll: true },
         );
+    };
 
     const stepParams = {
         step: Math.min(rollout.step, rollout.steps.length),

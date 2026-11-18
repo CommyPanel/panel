@@ -149,8 +149,9 @@ Route::middleware('auth')->group(function () {
             Route::delete('env/{key}', [EnvVarController::class, 'destroy'])->where('key', '[A-Za-z_][A-Za-z0-9_]*')->name('env.destroy');
             Route::post('env/import', [EnvVarController::class, 'import'])->name('env.import');
             Route::delete('env', [EnvVarController::class, 'clear'])->name('env.clear');
-            Route::get('env/values', [EnvVarController::class, 'reveal'])->middleware('password.confirm')->name('env.reveal');
-            Route::put('env/values', [EnvVarController::class, 'update'])->middleware('password.confirm')->name('env.update');
+            Route::get('env/download', [EnvVarController::class, 'download'])->middleware('password.confirm')->name('env.download');
+            Route::get('env/{key}/value', [EnvVarController::class, 'reveal'])->where('key', '[A-Za-z_][A-Za-z0-9_]*')->middleware('password.confirm')->name('env.reveal');
+            Route::put('env/{key}', [EnvVarController::class, 'update'])->where('key', '[A-Za-z_][A-Za-z0-9_]*')->middleware('password.confirm')->name('env.update');
         });
 
         Route::middleware('can:'.Permissions::APPS_UPDATE)->group(function () {
