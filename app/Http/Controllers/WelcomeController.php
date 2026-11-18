@@ -36,6 +36,12 @@ class WelcomeController extends Controller
                     'error' => $panel->certificateError(),
                 ],
                 'url' => $name !== null && $panel->certificateUsable() ? "https://{$name}" : null,
+                'next' => $panel->next() === null ? null : [
+                    'domain' => $panel->next(),
+                    'dns' => $panel->nextDns(),
+                    'status' => $panel->nextStatus(),
+                    'error' => $panel->nextError(),
+                ],
             ],
         ]);
     }
@@ -68,6 +74,21 @@ class WelcomeController extends Controller
         // The page checks by itself while it waits (`auto`); only a person asking
         // again retries a certificate that failed.
         $configure->check(retry: ! $request->boolean('auto'));
+        $configure->checkNext();
+
+        return redirect()->route('welcome');
+    }
+
+    public function switch(ConfigurePanelDomain $configure): RedirectResponse
+    {
+        $configure->switchToNext();
+
+        return redirect()->route('welcome');
+    }
+
+    public function cancel(ConfigurePanelDomain $configure): RedirectResponse
+    {
+        $configure->cancelNext();
 
         return redirect()->route('welcome');
     }

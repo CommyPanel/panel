@@ -81,4 +81,39 @@ class IssuePanelCertificate
         return $status !== 'active' || $expires === null
             || $expires->isBefore(now()->addDays((int) config('commypanel.https.renew_before_days')));
     }
+
+    /**
+     * Issue the certificate for the domain the panel is moving to. Nothing about
+     * the current domain changes unless it succeeds; then the new domain takes
+     * over and nginx is rewritten for it.
+     */
+    public function issueNext(): void
+    {
+        $domain = $this->panel->next();
+
+        if ($domain === null || ! $this->https->enabled() || ! $this->panel->nextDnsVerified() || $this->panel->nextStatus() !== 'issuing') {
+            return;
+        }
+
+        try {
+            $info = $this->host->issueCertificate(new CertificateRequest(PanelDomain::SLUG, [$domain], $this->https->email(), $this->https->staging()));
+        } catch (HostOperationFailed $e) {
+            $this->panel->markNextFailed($e->getMessage());
+            $this->audit->record('tls.failed', null, ['app' => PanelDomain::SLUG, 'reason' => $e->getMessage(), 'domain' => $domain]);
+
+            return;
+        }
+
+        $this->panel->promoteNext(Carbon::instance($info->notAfter));
+        $this->alerts->issued(null);
+        $this->audit->record('tls.issued', null, ['app' => PanelDomain::SLUG, 'domains' => $info->domains, 'staging' => $this->https->staging()]);
+        $this->audit->record('panel.domain_switched', null, ['domain' => $domain]);
+
+        try {
+            $this->routing->sync();
+        } catch (HostOperationFailed $e) {
+            Log::warning('The panel certificate was issued but nginx could not be updated.', ['error' => $e->getMessage()]);
+            $this->panel->markFailed('The certificate was issued, but nginx could not use it: '.$e->getMessage(), true);
+        }
+    }
 }

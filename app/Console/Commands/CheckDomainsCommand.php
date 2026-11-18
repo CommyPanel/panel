@@ -33,6 +33,11 @@ class CheckDomainsCommand extends Command
             $configure->check();
         }
 
+        // A domain the panel is being moved to, until it is verified.
+        if ($panel->next() !== null && ! $panel->nextDnsVerified()) {
+            $configure->checkNext();
+        }
+
         $this->components->info("Checked {$domains->count()} domain(s).");
 
         return self::SUCCESS;

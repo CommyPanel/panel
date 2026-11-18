@@ -1,5 +1,5 @@
 import { Link, router, useForm } from '@inertiajs/react';
-import { ExternalLink, Lock, RefreshCw } from 'lucide-react';
+import { ArrowRight, ExternalLink, Lock, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import DashboardController from '@/actions/App/Http/Controllers/DashboardController';
@@ -10,7 +10,9 @@ import { ServerAddressNote } from '@/components/domains/server-address-card';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { Input } from '@/components/ui/input';
+import { useConfirmedAction } from '@/hooks/use-confirmed-action';
 import { useProgress } from '@/hooks/use-progress';
 import { useT } from '@/hooks/use-t';
 import SetupLayout from '@/layouts/setup-layout';
@@ -32,6 +34,16 @@ type Panel = {
         error: string | null;
     };
     url: string | null;
+    next: {
+        domain: string;
+        dns: {
+            status: string;
+            problems?: string[];
+            checked_at?: string;
+        } | null;
+        status: 'none' | 'issuing' | 'failed';
+        error: string | null;
+    } | null;
 };
 
 type Props = {
@@ -46,13 +58,15 @@ export default function Welcome({ https, server, panel, can_see_key }: Props) {
     // The page follows DNS and the certificate by itself: it re-checks DNS while that is
     // not right yet, and keeps looking until the certificate is in place or has failed.
     const waitingForDns =
-        panel.domain !== null && panel.dns?.status !== 'verified';
+        (panel.domain !== null && panel.dns?.status !== 'verified') ||
+        (panel.next !== null && panel.next.dns?.status !== 'verified');
     const waitingForCertificate =
-        panel.domain !== null &&
-        https.enabled &&
-        panel.dns?.status === 'verified' &&
-        (panel.certificate.status === 'none' ||
-            panel.certificate.status === 'issuing');
+        panel.next?.status === 'issuing' ||
+        (panel.domain !== null &&
+            https.enabled &&
+            panel.dns?.status === 'verified' &&
+            (panel.certificate.status === 'none' ||
+                panel.certificate.status === 'issuing'));
     const progress = useProgress({
         active: waitingForDns || waitingForCertificate,
         only: ['panel'],
@@ -189,25 +203,46 @@ function DomainStep({
         <>
             <ServerAddressNote server={server} />
             <DomainStatus panel={panel} server={server} progress={progress} />
+            {panel.next && (
+                <NextDomain panel={panel} next={panel.next} server={server} />
+            )}
         </>
     );
 }
 
-function ChooseDomain() {
+function ChooseDomain({
+    moving = false,
+    onDone,
+}: {
+    moving?: boolean;
+    onDone?: () => void;
+}) {
     const { t } = useT();
     const form = useForm({ domain: '' });
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        form.submit(WelcomeController.domain());
+        form.submit(WelcomeController.domain(), {
+            onSuccess: () => onDone?.(),
+        });
     };
 
     return (
         <Card
-            title={t('Panel domain')}
-            description={t(
-                'Serve this panel on a domain of your own, on the normal HTTPS port. Until then it stays reachable on its current address.',
-            )}
+            title={
+                moving
+                    ? t('Move the panel to another domain')
+                    : t('Panel domain')
+            }
+            description={
+                moving
+                    ? t(
+                          'The panel keeps working on its current domain, unchanged, until the new one has correct DNS and a certificate and you choose to switch.',
+                      )
+                    : t(
+                          'Serve this panel on a domain of your own, on the normal HTTPS port. Until then it stays reachable on its current address.',
+                      )
+            }
         >
             <form onSubmit={submit} className="space-y-4">
                 <Input
@@ -221,9 +256,16 @@ function ChooseDomain() {
                         'A domain or subdomain you control. The next screen shows the DNS records to create.',
                     )}
                 />
-                <Button type="submit" loading={form.processing}>
-                    {t('Continue')}
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                    <Button type="submit" loading={form.processing}>
+                        {t('Continue')}
+                    </Button>
+                    {onDone && (
+                        <Button variant="ghost" onClick={onDone}>
+                            {t('Cancel')}
+                        </Button>
+                    )}
+                </div>
             </form>
         </Card>
     );
@@ -240,6 +282,9 @@ function DomainStatus({
 }) {
     const { t } = useT();
     const [checking, setChecking] = useState(false);
+    const [changing, setChanging] = useState(false);
+    const [removing, setRemoving] = useState(false);
+    const confirmed = useConfirmedAction();
     const { certificate, dns } = panel;
     const verified = dns?.status === 'verified';
 
@@ -258,19 +303,54 @@ function DomainStatus({
         <Card
             title={panel.domain ?? t('Panel domain')}
             actions={
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                        router.delete(WelcomeController.clear(), {
-                            preserveScroll: true,
-                        })
-                    }
-                >
-                    {t('Use another domain')}
-                </Button>
+                <div className="flex flex-wrap gap-1">
+                    {!panel.next && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setChanging((open) => !open)}
+                        >
+                            {t('Use another domain')}
+                        </Button>
+                    )}
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setRemoving(true)}
+                    >
+                        {t('Remove domain')}
+                    </Button>
+                </div>
             }
         >
+            {changing && !panel.next && (
+                <ChooseDomain
+                    moving={certificate.status === 'active'}
+                    onDone={() => setChanging(false)}
+                />
+            )}
+            <ConfirmModal
+                open={removing}
+                title={t('Remove the panel domain?')}
+                confirmLabel={t('Remove domain')}
+                onConfirm={() => {
+                    setRemoving(false);
+                    void confirmed.run(() =>
+                        router.delete(WelcomeController.clear(), {
+                            preserveScroll: true,
+                        }),
+                    );
+                }}
+                onClose={() => setRemoving(false)}
+            >
+                <p className="text-sm text-base-content/80">
+                    {t(
+                        'The panel stops being served on :domain and is reachable only on its server address again. Nothing else changes. To move to a different domain, use "Use another domain" instead: it keeps this one working until the new one is ready.',
+                        { domain: panel.domain ?? '' },
+                    )}
+                </p>
+            </ConfirmModal>
+            {confirmed.modal}
             {certificate.status === 'active' && panel.url ? (
                 <div className="space-y-3">
                     <Alert variant="success">
@@ -384,6 +464,139 @@ function DomainStatus({
                     </div>
                 </div>
             )}
+        </Card>
+    );
+}
+
+function NextDomain({
+    panel,
+    next,
+    server,
+}: {
+    panel: Panel;
+    next: NonNullable<Panel['next']>;
+    server: ServerAddress;
+}) {
+    const { t } = useT();
+    const confirmed = useConfirmedAction();
+    const [busy, setBusy] = useState(false);
+    const verified = next.dns?.status === 'verified';
+
+    const post = (url: string, method: 'post' | 'delete') =>
+        router[method](
+            url,
+            {},
+            {
+                preserveScroll: true,
+                onStart: () => setBusy(true),
+                onFinish: () => setBusy(false),
+            },
+        );
+
+    return (
+        <Card
+            title={t('Moving to :domain', { domain: next.domain })}
+            description={t(
+                'The panel stays on :current, unchanged, until you switch.',
+                { current: panel.domain ?? '' },
+            )}
+            actions={
+                next.status !== 'issuing' ? (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                            post(WelcomeController.cancel().url, 'delete')
+                        }
+                    >
+                        {t('Cancel the move')}
+                    </Button>
+                ) : undefined
+            }
+        >
+            {confirmed.modal}
+            <div className="space-y-4">
+                {!verified && (
+                    <>
+                        {next.dns?.problems && next.dns.problems.length > 0 && (
+                            <Alert variant="warning">
+                                <ul className="space-y-1">
+                                    {next.dns.problems.map((problem) => (
+                                        <li key={problem}>{problem}</li>
+                                    ))}
+                                </ul>
+                            </Alert>
+                        )}
+                        <RecordsTable domain={next.domain} server={server} />
+                        <p
+                            className="text-sm text-base-content/70"
+                            role="status"
+                        >
+                            {t(
+                                'This page checks the new DNS by itself. When it is right, a Switch button appears.',
+                            )}
+                        </p>
+                    </>
+                )}
+                {verified && next.status === 'none' && (
+                    <>
+                        <Alert variant="success">
+                            {t(
+                                'DNS for :domain is correct. Switching gets its certificate first; only when that works does the panel move, and :current keeps working until then.',
+                                {
+                                    domain: next.domain,
+                                    current: panel.domain ?? '',
+                                },
+                            )}
+                        </Alert>
+                        <Button
+                            loading={busy}
+                            onClick={() =>
+                                void confirmed.run(() =>
+                                    post(
+                                        WelcomeController.switch().url,
+                                        'post',
+                                    ),
+                                )
+                            }
+                        >
+                            <ArrowRight className="size-4" aria-hidden />
+                            {t('Switch the panel to :domain', {
+                                domain: next.domain,
+                            })}
+                        </Button>
+                    </>
+                )}
+                {next.status === 'issuing' && (
+                    <Alert variant="info">
+                        {t("Getting the certificate from Let's Encrypt…")}
+                    </Alert>
+                )}
+                {next.status === 'failed' && (
+                    <>
+                        <Alert variant="error">
+                            {next.error ??
+                                t('The certificate could not be issued.')}{' '}
+                            {t('The panel is still served on :current.', {
+                                current: panel.domain ?? '',
+                            })}
+                        </Alert>
+                        <Button
+                            loading={busy}
+                            onClick={() =>
+                                void confirmed.run(() =>
+                                    post(
+                                        WelcomeController.switch().url,
+                                        'post',
+                                    ),
+                                )
+                            }
+                        >
+                            {t('Try again')}
+                        </Button>
+                    </>
+                )}
+            </div>
         </Card>
     );
 }
