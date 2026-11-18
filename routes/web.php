@@ -149,6 +149,9 @@ Route::middleware('auth')->group(function () {
             Route::post('env', [EnvVarController::class, 'store'])->name('env.store');
             Route::delete('env/{key}', [EnvVarController::class, 'destroy'])->where('key', '[A-Za-z_][A-Za-z0-9_]*')->name('env.destroy');
             Route::post('env/import', [EnvVarController::class, 'import'])->name('env.import');
+            Route::delete('env', [EnvVarController::class, 'clear'])->name('env.clear');
+            Route::get('env/values', [EnvVarController::class, 'reveal'])->middleware('password.confirm')->name('env.reveal');
+            Route::put('env/values', [EnvVarController::class, 'update'])->middleware('password.confirm')->name('env.update');
         });
 
         Route::middleware('can:'.Permissions::APPS_UPDATE)->group(function () {
@@ -289,7 +292,9 @@ Route::middleware('auth')->group(function () {
         Route::post('welcome/terms', [WelcomeController::class, 'terms'])->name('welcome.terms');
         Route::post('welcome/domain', [WelcomeController::class, 'domain'])->name('welcome.domain');
         Route::post('welcome/domain/check', [WelcomeController::class, 'check'])->name('welcome.check');
-        Route::delete('welcome/domain', [WelcomeController::class, 'clear'])->name('welcome.clear');
+        Route::post('welcome/domain/switch', [WelcomeController::class, 'switch'])->middleware('password.confirm')->name('welcome.switch');
+        Route::delete('welcome/domain/next', [WelcomeController::class, 'cancel'])->name('welcome.cancel');
+        Route::delete('welcome/domain', [WelcomeController::class, 'clear'])->middleware('password.confirm')->name('welcome.clear');
         Route::put('settings/https', [HttpsController::class, 'update'])->name('settings.https.update');
         Route::put('settings/server-address', [ServerAddressController::class, 'update'])->name('settings.server-address.update');
         Route::post('settings/server-address/detect', [ServerAddressController::class, 'detect'])->name('settings.server-address.detect');

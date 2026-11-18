@@ -27,7 +27,7 @@ final class Severity
         'database.remote_failed', 'database.credentials_viewed', 'app.credentials_viewed', 'database.password_changed', 'database.restore_started', 'database.restore_replace_failed', 'volume.restore_failed', 'backup.remote_downloaded',
         'database.tool_started', 'database.tool_opened', 'database.backup_downloaded',
         'backup.downloaded', 'backup.remote_changed', 'backup.remote_removed', 'backup.deleted', 'volume.backup_downloaded',
-        'api.logs_read', 'app.terminal_opened', 'app.nginx_updated', 'app.volume_file_downloaded', 'app.volume_removed', 'app.git_token_saved', 'app.env_removed',
+        'api.logs_read', 'app.terminal_opened', 'app.nginx_updated', 'app.volume_file_downloaded', 'app.volume_removed', 'app.git_token_saved', 'app.env_removed', 'app.env_revealed', 'app.env_changed', 'app.env_cleared',
         'token.created', 'user.created', 'user.updated', 'role.created', 'role.updated', 'role.deleted',
         'auth.password_changed', 'auth.two_factor_failed', 'auth.login_failed', 'auth.recovery_codes_generated', 'auth.recovery_code_used', 'user.sessions_viewed', 'user.session_revoked', 'user.sessions_revoked', 'audit.exported',
         'https.disabled', 'panel.domain_removed', 'panel.domain_set', 'github.disconnected', 'github.connected', 'notifications.removed',

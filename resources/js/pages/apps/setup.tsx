@@ -6,6 +6,9 @@ import AppSetupController from '@/actions/App/Http/Controllers/AppSetupControlle
 import DeployKeyController from '@/actions/App/Http/Controllers/DeployKeyController';
 import { AccessTokenCard } from '@/components/apps/access-token-card';
 import { AppDomains } from '@/components/apps/app-domains';
+import type { DomainDraft } from '@/components/apps/app-domains';
+import AppDomainController from '@/actions/App/Http/Controllers/AppDomainController';
+import { Modal } from '@/components/ui/modal';
 import { ReleaseCommandInput } from '@/components/apps/app-fields';
 import { SetupSteps } from '@/components/apps/setup-steps';
 import { PageHeader } from '@/components/page-header';
@@ -548,6 +551,46 @@ function DomainStep({ app, server }: { app: AppSetup; server: ServerAddress }) {
     const [busy, setBusy] = useState(false);
     const hasDomains = app.domains.length > 0;
     const hidden = app.template?.private === true;
+    const [draft, setDraft] = useState<DomainDraft>({
+        name: '',
+        redirect: 'none',
+    });
+    const [asking, setAsking] = useState(false);
+    const [addError, setAddError] = useState<string | null>(null);
+
+    const finish = () =>
+        router.post(
+            AppSetupController.finish(app.slug),
+            {},
+            {
+                onStart: () => setBusy(true),
+                onFinish: () => setBusy(false),
+            },
+        );
+
+    // A domain typed into the form but never added would be lost by deploying now.
+    const deploy = () => (draft.name !== '' ? setAsking(true) : finish());
+
+    const addAndDeploy = () => {
+        setAddError(null);
+        router.post(
+            AppDomainController.store(app.slug),
+            { name: draft.name, redirect: draft.redirect },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setAsking(false);
+                    finish();
+                },
+                onError: (errors) =>
+                    setAddError(
+                        errors.name ??
+                            errors.redirect ??
+                            t('The domain could not be added.'),
+                    ),
+            },
+        );
+    };
 
     return (
         <div className="space-y-6">
@@ -581,23 +624,52 @@ function DomainStep({ app, server }: { app: AppSetup; server: ServerAddress }) {
                         slug={app.slug}
                         domains={app.domains}
                         server={server}
+                        onDraft={setDraft}
                     />
                 </>
             )}
+            <Modal
+                open={asking}
+                onClose={() => setAsking(false)}
+                title={t('You typed a domain but did not add it')}
+                size="sm"
+                footer={
+                    <>
+                        <Button
+                            variant="ghost"
+                            onClick={() => setAsking(false)}
+                        >
+                            {t('Go back')}
+                        </Button>
+                        <Button
+                            variant="soft"
+                            onClick={() => {
+                                setAsking(false);
+                                finish();
+                            }}
+                        >
+                            {t('Deploy without it')}
+                        </Button>
+                        <Button onClick={addAndDeploy}>
+                            {t('Add :domain and deploy', {
+                                domain: draft.name,
+                            })}
+                        </Button>
+                    </>
+                }
+            >
+                <p className="text-sm text-base-content/80">
+                    {t(
+                        ':domain is only typed in the form; it has not been added to this app, so deploying now would leave the app without it.',
+                        { domain: draft.name },
+                    )}
+                </p>
+                {addError && (
+                    <p className="mt-2 text-sm text-error">{addError}</p>
+                )}
+            </Modal>
             <div className="flex flex-wrap gap-2">
-                <Button
-                    loading={busy}
-                    onClick={() =>
-                        router.post(
-                            AppSetupController.finish(app.slug),
-                            {},
-                            {
-                                onStart: () => setBusy(true),
-                                onFinish: () => setBusy(false),
-                            },
-                        )
-                    }
-                >
+                <Button loading={busy} onClick={deploy}>
                     {hasDomains
                         ? t('Create and deploy')
                         : hidden

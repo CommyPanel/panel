@@ -257,3 +257,51 @@ describe('upload apps', function () {
         $this->post('/apps/gitty/source', ['archive' => UploadedFile::fake()->create('a.zip', 1)])->assertNotFound();
     });
 });
+
+describe('env values', function () {
+    it('shows the values only after a password and writes an audit entry', function () {
+        $app = App::factory()->create(['slug' => 'shop']);
+        AppEnvVar::query()->create(['app_id' => $app->id, 'key' => 'B', 'value' => 'two']);
+        AppEnvVar::query()->create(['app_id' => $app->id, 'key' => 'A', 'value' => 'one']);
+
+        $this->getJson('/apps/shop/env/values')->assertStatus(423);
+
+        $this->withSession(['auth.password_confirmed_at' => time()])->getJson('/apps/shop/env/values')
+            ->assertOk()->assertJsonPath('vars.0.key', 'A')->assertJsonPath('vars.0.value', 'one')->assertJsonPath('vars.1.value', 'two');
+
+        expect(AuditLog::query()->where('action', 'app.env_revealed')->count())->toBe(1);
+    });
+
+    it('never puts values in the page props', function () {
+        $app = App::factory()->create(['slug' => 'shop']);
+        AppEnvVar::query()->create(['app_id' => $app->id, 'key' => 'A', 'value' => 'topsecret']);
+
+        expect($this->get('/apps/shop')->getContent())->not->toContain('topsecret');
+    });
+
+    it('changes existing values only, and needs a password', function () {
+        $app = App::factory()->create(['slug' => 'shop']);
+        AppEnvVar::query()->create(['app_id' => $app->id, 'key' => 'A', 'value' => 'old']);
+
+        $this->put('/apps/shop/env/values', ['vars' => ['A' => 'new']])->assertRedirect();
+        expect(AppEnvVar::query()->where('key', 'A')->first()->value)->toBe('old');
+
+        $this->withSession(['auth.password_confirmed_at' => time()])
+            ->put('/apps/shop/env/values', ['vars' => ['A' => 'new', 'GHOST' => 'x']])->assertSessionHasNoErrors();
+
+        expect(AppEnvVar::query()->where('app_id', $app->id)->pluck('value', 'key')->all())->toBe(['A' => 'new']);
+    });
+
+    it('removes every variable of this app and no other', function () {
+        $app = App::factory()->create(['slug' => 'shop']);
+        $other = App::factory()->create(['slug' => 'blog']);
+        AppEnvVar::query()->create(['app_id' => $app->id, 'key' => 'A', 'value' => '1']);
+        AppEnvVar::query()->create(['app_id' => $app->id, 'key' => 'B', 'value' => '2']);
+        AppEnvVar::query()->create(['app_id' => $other->id, 'key' => 'A', 'value' => '1']);
+
+        $this->delete('/apps/shop/env')->assertSessionHasNoErrors();
+
+        expect($app->envVars()->count())->toBe(0)->and($other->envVars()->count())->toBe(1);
+        expect(AuditLog::query()->where('action', 'app.env_cleared')->count())->toBe(1);
+    });
+});
