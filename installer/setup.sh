@@ -269,7 +269,24 @@ php85_only() {
     printf ';'
 }
 
+# ipv6_usable: can nginx listen on IPv6? A server without a public IPv6 address is fine
+# (the stack still exists); only a kernel with IPv6 switched off refuses `listen [::]:..`.
+# Anything unclear counts as usable.
+ipv6_usable() {
+    local flag
+    flag="$(cat /proc/sys/net/ipv6/conf/all/disable_ipv6 2>/dev/null || true)"
+    if [ -n "$flag" ]; then
+        [ "$flag" != "1" ]
+        return
+    fi
+    if [ -d /proc/net ] && [ ! -e /proc/net/if_inet6 ]; then
+        return 1
+    fi
+    return 0
+}
+
 # render SRC DEST MODE: fill in the @@PLACEHOLDERS@@ of a template.
+# Lines ending in "# ipv6" are dropped when the kernel has no IPv6.
 render() {
     local src=$1 dest=$2 mode=$3
     mkdir -p "$(dirname "$dest")"
@@ -286,6 +303,10 @@ render() {
         -e "s#@@APP_KEY@@#$(sed_escape "${APP_KEY:-}")#g" \
         -e "s#@@APP_URL@@#$(sed_escape "${APP_URL:-}")#g" \
         "$src" > "$dest.tmp"
+    if ! ipv6_usable; then
+        grep -v ' # ipv6$' "$dest.tmp" > "$dest.tmp2" || true
+        mv "$dest.tmp2" "$dest.tmp"
+    fi
     if grep -q '@@' "$dest.tmp"; then
         rm -f "$dest.tmp"
         die "Template $src still has unfilled placeholders."
