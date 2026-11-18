@@ -632,7 +632,7 @@ function DomainStep({ app, server }: { app: AppSetup; server: ServerAddress }) {
                 open={asking}
                 onClose={() => setAsking(false)}
                 title={t('You typed a domain but did not add it')}
-                size="sm"
+                size="md"
                 footer={
                     <>
                         <Button

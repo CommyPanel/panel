@@ -96,7 +96,9 @@ export function Modal({
                         </button>
                     </div>
                     <div className="modal-body">{children}</div>
-                    {footer && <div className="modal-footer">{footer}</div>}
+                    {footer && (
+                        <div className="modal-footer flex-wrap">{footer}</div>
+                    )}
                 </div>
             </div>
         </div>,
