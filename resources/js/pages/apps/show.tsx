@@ -17,6 +17,7 @@ import {
     Variable,
 } from 'lucide-react';
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import AppController from '@/actions/App/Http/Controllers/AppController';
 import DeploymentController from '@/actions/App/Http/Controllers/DeploymentController';
 import { AppPower } from '@/components/apps/app-power';
@@ -38,8 +39,8 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { LockIcon } from '@/components/ui/lock-icon';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { Tabs, tabPanelProps } from '@/components/ui/tabs';
-import type { TabItem } from '@/components/ui/tabs';
+import { GroupedTabs } from '@/components/ui/grouped-tabs';
+import type { GroupedTab, TabEntry } from '@/components/ui/grouped-tabs';
 import { useT } from '@/hooks/use-t';
 import AppLayout from '@/layouts/app-layout';
 import { useCan } from '@/lib/permissions';
@@ -183,91 +184,128 @@ export default function Show({
             },
         );
 
-    const tabs: TabItem<TabId>[] = [
+    const item = (
+        id: TabId,
+        label: string,
+        icon: ReactNode,
+        badge?: ReactNode,
+    ): GroupedTab<TabId> => ({ id, label, icon, badge });
+
+    const groups: {
+        id: string;
+        label: string;
+        icon: ReactNode;
+        items: (GroupedTab<TabId> | null)[];
+    }[] = [
         {
-            id: 'deployments',
-            label: t('Deployments'),
-            icon: <Layers className="size-4" aria-hidden />,
-        },
-        {
-            id: 'usage',
-            label: t('Usage'),
+            id: 'runtime',
+            label: t('Runtime'),
             icon: <Activity className="size-4" aria-hidden />,
+            items: [
+                item(
+                    'usage',
+                    t('Usage'),
+                    <Activity className="size-4" aria-hidden />,
+                ),
+                canLogs
+                    ? item(
+                          'logs',
+                          t('Logs'),
+                          <ScrollText className="size-4" aria-hidden />,
+                      )
+                    : null,
+                canTerminal
+                    ? item(
+                          'terminal',
+                          t('Terminal'),
+                          <SquareTerminal className="size-4" aria-hidden />,
+                      )
+                    : null,
+            ],
         },
         {
-            id: 'safe',
-            label: t('Safe deploys'),
-            icon: <ShieldCheck className="size-4" aria-hidden />,
-        },
-        ...(canLogs
-            ? [
-                  {
-                      id: 'logs' as const,
-                      label: t('Logs'),
-                      icon: <ScrollText className="size-4" aria-hidden />,
-                  },
-              ]
-            : []),
-        ...(canVolumes
-            ? [
-                  {
-                      id: 'volumes' as const,
-                      label: t('Volumes'),
-                      icon: <HardDrive className="size-4" aria-hidden />,
-                      badge: <Count value={app.volumes.length} />,
-                  },
-              ]
-            : []),
-        ...(canLinks
-            ? [
-                  {
-                      id: 'links' as const,
-                      label: t('Links'),
-                      icon: <Link2 className="size-4" aria-hidden />,
-                  },
-              ]
-            : []),
-        ...(canTerminal
-            ? [
-                  {
-                      id: 'terminal' as const,
-                      label: t('Terminal'),
-                      icon: <SquareTerminal className="size-4" aria-hidden />,
-                  },
-              ]
-            : []),
-        {
-            id: 'domains',
-            label: t('Domains & SSL'),
+            id: 'networking',
+            label: t('Networking'),
             icon: <Globe className="size-4" aria-hidden />,
-            badge: <Count value={app.domains.length} />,
+            items: [
+                item(
+                    'domains',
+                    t('Domains & SSL'),
+                    <Globe className="size-4" aria-hidden />,
+                    <Count value={app.domains.length} />,
+                ),
+                canNginx
+                    ? item(
+                          'nginx',
+                          t('Nginx'),
+                          <FileCode className="size-4" aria-hidden />,
+                      )
+                    : null,
+                canLinks
+                    ? item(
+                          'links',
+                          t('Links'),
+                          <Link2 className="size-4" aria-hidden />,
+                      )
+                    : null,
+            ],
         },
         {
-            id: 'environment',
-            label: t('Environment'),
-            icon: <Variable className="size-4" aria-hidden />,
-            badge: <Count value={env_keys.length} />,
-        },
-        ...(canNginx
-            ? [
-                  {
-                      id: 'nginx' as const,
-                      label: t('Nginx'),
-                      icon: <FileCode className="size-4" aria-hidden />,
-                  },
-              ]
-            : []),
-        {
-            id: 'settings',
-            label: t('Settings'),
+            id: 'configuration',
+            label: t('Configuration'),
             icon: <Settings className="size-4" aria-hidden />,
-        },
-        {
-            id: 'advanced',
-            label: t('Advanced'),
-            icon: <SlidersHorizontal className="size-4" aria-hidden />,
+            items: [
+                item(
+                    'environment',
+                    t('Environment'),
+                    <Variable className="size-4" aria-hidden />,
+                    <Count value={env_keys.length} />,
+                ),
+                canVolumes
+                    ? item(
+                          'volumes',
+                          t('Volumes'),
+                          <HardDrive className="size-4" aria-hidden />,
+                          <Count value={app.volumes.length} />,
+                      )
+                    : null,
+                item(
+                    'safe',
+                    t('Safe deploys'),
+                    <ShieldCheck className="size-4" aria-hidden />,
+                ),
+                item(
+                    'settings',
+                    t('Settings'),
+                    <Settings className="size-4" aria-hidden />,
+                ),
+            ],
         },
     ];
+
+    const entries: TabEntry<TabId>[] = [
+        item(
+            'deployments',
+            t('Deployments'),
+            <Layers className="size-4" aria-hidden />,
+        ),
+        ...groups.map((group) => ({
+            ...group,
+            items: group.items.filter(
+                (entry): entry is GroupedTab<TabId> => entry !== null,
+            ),
+        })),
+        item(
+            'advanced',
+            t('Advanced'),
+            <SlidersHorizontal className="size-4" aria-hidden />,
+        ),
+    ];
+
+    const activeLabel =
+        entries
+            .flatMap((entry) => ('items' in entry ? entry.items : [entry]))
+            .find((entry) => entry.id === active)?.label ?? '';
 
     return (
         <AppLayout title={app.name}>
@@ -367,14 +405,14 @@ export default function Show({
                 />
             )}
 
-            <Tabs
-                tabs={tabs}
+            <GroupedTabs
+                entries={entries}
                 active={active}
                 onChange={select}
                 label={t('App sections')}
             />
 
-            <div {...tabPanelProps(active)} className="outline-none">
+            <div role="region" aria-label={activeLabel}>
                 {active === 'deployments' && (
                     <DeploymentsTab app={app} deployments={deployments} />
                 )}

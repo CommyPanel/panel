@@ -28,6 +28,8 @@ An optional command that runs once per deployment, for example database migratio
 
 An app, or one of its volumes, can be **locked**. A locked app cannot be deleted, and neither can its volumes' files with it; a locked volume cannot be removed from its app, and deleting the app is refused while one of its volumes is locked. The delete button stays visible but is disabled, with a note saying why, and a lock icon shows next to the name in the lists and beside the title.
 
+The app page groups its sections under five entries: **Deployments**, **Runtime** (Usage, Logs, Terminal), **Networking** (Domains & SSL, Nginx, Links), **Configuration** (Environment, Volumes, Safe deploys, Settings) and **Advanced**. Where this page says "tab", it means one of these sections.
+
 Locking is a safety catch against a slip, such as deleting the wrong app. It does not stop deployments, restarts or any other change, and anyone who may change the app (`apps.update`) can unlock it. Locking and unlocking are recorded in the audit log. Lock an app on its **Advanced** tab, and a volume on the **Volumes** tab.
 
 ## Start, stop and restart
