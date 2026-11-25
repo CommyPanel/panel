@@ -23,6 +23,7 @@ class DeactivateApp
         private readonly AppRouting $routing,
         private readonly Deployer $deployer,
         private readonly AuditLogger $audit,
+        private readonly ReleaseProcesses $processes,
     ) {}
 
     /**
@@ -42,6 +43,12 @@ class DeactivateApp
             } catch (HostOperationFailed $e) {
                 throw new DeploymentFailed(__('Could not stop the container: :error', ['error' => $e->getMessage()]));
             }
+        }
+
+        $problems = $this->processes->removeAll($live, stopFirst: true);
+
+        if ($problems !== []) {
+            throw new DeploymentFailed(__('Could not stop the container: :error', ['error' => $problems[0]]));
         }
 
         $live->forceFill(['status' => DeploymentStatus::Stopped])->save();

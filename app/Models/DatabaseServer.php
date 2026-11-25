@@ -6,6 +6,7 @@ use App\Enums\DatabaseEngine;
 use App\Enums\DatabaseServerStatus;
 use App\Host\Data\DatabaseTarget;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
@@ -21,6 +22,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $error
  * @property string $root_password
  * @property int|null $memory_limit_mb
+ * @property int|null $dedicated_app_id
  * @property bool $tls_enabled
  * @property string|null $tls_ca
  * @property int|null $remote_port
@@ -58,6 +60,16 @@ class DatabaseServer extends Model
     public function databases(): HasMany
     {
         return $this->hasMany(ManagedDatabase::class);
+    }
+
+    /**
+     * The app this server was made for, when it is one: the app's user may create and drop databases on it.
+     *
+     * @return BelongsTo<App, $this>
+     */
+    public function dedicatedApp(): BelongsTo
+    {
+        return $this->belongsTo(App::class, 'dedicated_app_id');
     }
 
     /** Whether the public port is open (or meant to be: it is re-opened if the agent lost it). */

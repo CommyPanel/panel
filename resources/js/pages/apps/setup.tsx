@@ -1,6 +1,6 @@
 import { router, useForm, usePage } from '@inertiajs/react';
 import { CheckCircle2, KeyRound, Upload, XCircle } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import AppSetupController from '@/actions/App/Http/Controllers/AppSetupController';
 import DeployKeyController from '@/actions/App/Http/Controllers/DeployKeyController';
@@ -10,6 +10,15 @@ import type { DomainDraft } from '@/components/apps/app-domains';
 import AppDomainController from '@/actions/App/Http/Controllers/AppDomainController';
 import { Modal } from '@/components/ui/modal';
 import { ReleaseCommandInput } from '@/components/apps/app-fields';
+import {
+    LaravelDatabasePage,
+    LaravelReviewPage,
+    LaravelServicesPage,
+    LaravelSettingsFields,
+    LaravelVolumesPage,
+    useInspection,
+} from '@/components/apps/setup/laravel-steps';
+import type { LaravelOptions } from '@/components/apps/setup/laravel-steps';
 import { SetupSteps } from '@/components/apps/setup-steps';
 import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
@@ -22,6 +31,7 @@ import AppLayout from '@/layouts/app-layout';
 import { postJson } from '@/lib/post-json';
 import type {
     AppSetup,
+    LaravelSetup,
     ServerAddress,
     SourceAccess,
     DeployStrategy,
@@ -33,10 +43,20 @@ type Props = {
     provider: Provider | null;
     server: ServerAddress;
     limits: { max_archive_mb: number };
+    /** Only for a Laravel app: what its code showed, the choices so far and the last look. */
+    laravel: LaravelSetup | null;
 };
 
-export default function Setup({ app, provider, server, limits }: Props) {
+export default function Setup({
+    app,
+    provider,
+    server,
+    limits,
+    laravel,
+}: Props) {
     const { t } = useT();
+
+    useInspection(laravel);
 
     return (
         <AppLayout title={t('Set up :name', { name: app.name })}>
@@ -46,7 +66,11 @@ export default function Setup({ app, provider, server, limits }: Props) {
                     'A few steps, then CommyPanel builds and starts your app.',
                 )}
             />
-            <SetupSteps current={app.setup_step} source={app.source_type} />
+            <SetupSteps
+                current={app.setup_step}
+                source={app.source_type}
+                laravel={laravel !== null}
+            />
             {app.setup_step === 'source' ? (
                 app.source_type === 'git' ? (
                     <GitStep app={app} provider={provider} />
@@ -54,9 +78,21 @@ export default function Setup({ app, provider, server, limits }: Props) {
                     <UploadStep app={app} maxMb={limits.max_archive_mb} />
                 )
             ) : app.setup_step === 'settings' ? (
-                <SettingsStep app={app} />
+                <SettingsStep app={app} laravel={laravel} />
+            ) : app.setup_step === 'database' ? (
+                <LaravelDatabasePage app={app} />
+            ) : app.setup_step === 'services' ? (
+                <LaravelServicesPage app={app} />
+            ) : app.setup_step === 'volumes' ? (
+                <LaravelVolumesPage app={app} />
+            ) : app.setup_step === 'review' && laravel !== null ? (
+                <LaravelReviewPage app={app} laravel={laravel} />
             ) : (
-                <DomainStep app={app} server={server} />
+                <DomainStep
+                    app={app}
+                    server={server}
+                    laravel={laravel !== null}
+                />
             )}
         </AppLayout>
     );
@@ -385,8 +421,22 @@ function UploadStep({ app, maxMb }: { app: AppSetup; maxMb: number }) {
     );
 }
 
-function SettingsStep({ app }: { app: AppSetup }) {
+function SettingsStep({
+    app,
+    laravel,
+}: {
+    app: AppSetup;
+    laravel: LaravelSetup | null;
+}) {
     const { t } = useT();
+    const [options, setOptions] = useState<LaravelOptions>({
+        php: laravel?.stack_options.php ?? laravel?.detected?.php ?? '8.4',
+        node_manager:
+            laravel?.stack_options.node_manager ??
+            laravel?.detected?.node_manager ??
+            (laravel?.detected?.has_build_script ? 'npm' : 'none'),
+    });
+    const touched = useRef(false);
     const form = useForm({
         container_port: String(app.container_port),
         health_path: app.health_path,
@@ -398,49 +448,84 @@ function SettingsStep({ app }: { app: AppSetup }) {
         env: '',
     });
 
+    // What the code showed fills the choices once, unless the person already touched them.
+    const detected = laravel?.detected;
+
+    useEffect(() => {
+        if (!detected || touched.current || detected.stack === null) return;
+
+        setOptions({
+            php: detected.php ?? options.php,
+            node_manager:
+                detected.node_manager ??
+                (detected.has_build_script ? 'npm' : 'none'),
+        });
+
+        if (app.health_path === '/' && detected.health_path) {
+            form.setData('health_path', detected.health_path);
+        }
+    }, [detected]); // eslint-disable-line react-hooks/exhaustive-deps
+
     const submit = (event: FormEvent) => {
         event.preventDefault();
+        form.transform((data) =>
+            laravel ? { ...data, stack_options: options } : data,
+        );
         form.post(AppSetupController.settings(app.slug).url);
     };
 
     return (
         <form onSubmit={submit} className="space-y-6">
+            {laravel && (
+                <LaravelSettingsFields
+                    laravel={laravel}
+                    value={options}
+                    onChange={(value) => {
+                        touched.current = true;
+                        setOptions(value);
+                    }}
+                />
+            )}
             <Card
                 title={t('3. Settings')}
                 description={t(
                     'You can change all of this later. Variables are encrypted and shown only by name.',
                 )}
             >
-                <div className="w-full">
-                    <label
-                        htmlFor="env"
-                        className="mb-1 label-text block px-0!"
-                    >
-                        {t('Environment variables')}
-                    </label>
-                    <textarea
-                        id="env"
-                        rows={6}
-                        className="textarea w-full font-mono text-sm"
-                        placeholder={
-                            'DATABASE_URL=postgres://...\nAPI_KEY=secret'
-                        }
-                        value={form.data.env}
-                        onChange={(e) => form.setData('env', e.target.value)}
-                        spellCheck={false}
-                        autoComplete="off"
-                    />
-                    <span className="mt-1 block text-sm text-base-content/60">
-                        {t(
-                            'Paste a .env file. One KEY=value per line; PORT is set for you.',
-                        )}
-                    </span>
-                    {form.errors.env && (
-                        <span className="block text-sm text-error">
-                            {form.errors.env}
+                {!laravel && (
+                    <div className="w-full">
+                        <label
+                            htmlFor="env"
+                            className="mb-1 label-text block px-0!"
+                        >
+                            {t('Environment variables')}
+                        </label>
+                        <textarea
+                            id="env"
+                            rows={6}
+                            className="textarea w-full font-mono text-sm"
+                            placeholder={
+                                'DATABASE_URL=postgres://...\nAPI_KEY=secret'
+                            }
+                            value={form.data.env}
+                            onChange={(e) =>
+                                form.setData('env', e.target.value)
+                            }
+                            spellCheck={false}
+                            autoComplete="off"
+                        />
+                        <span className="mt-1 block text-sm text-base-content/60">
+                            {t(
+                                'Paste a .env file. One KEY=value per line; PORT is set for you.',
+                            )}
                         </span>
-                    )}
-                </div>
+                        {form.errors.env && (
+                            <span className="block text-sm text-error">
+                                {form.errors.env}
+                            </span>
+                        )}
+                    </div>
+                )}
                 <Input
                     label={t('App port')}
                     type="number"
@@ -502,11 +587,15 @@ function SettingsStep({ app }: { app: AppSetup }) {
                         {t('Stop the old version first')}
                     </option>
                 </Select>
-                <ReleaseCommandInput
-                    value={form.data.release_command}
-                    onChange={(value) => form.setData('release_command', value)}
-                    error={form.errors.release_command}
-                />
+                {!laravel && (
+                    <ReleaseCommandInput
+                        value={form.data.release_command}
+                        onChange={(value) =>
+                            form.setData('release_command', value)
+                        }
+                        error={form.errors.release_command}
+                    />
+                )}
                 <Input
                     label={t('Memory limit (MB)')}
                     type="number"
@@ -546,7 +635,16 @@ function SettingsStep({ app }: { app: AppSetup }) {
     );
 }
 
-function DomainStep({ app, server }: { app: AppSetup; server: ServerAddress }) {
+function DomainStep({
+    app,
+    server,
+    laravel = false,
+}: {
+    app: AppSetup;
+    server: ServerAddress;
+    /** A Laravel app goes on to a last look instead of deploying from here. */
+    laravel?: boolean;
+}) {
     const { t } = useT();
     const [busy, setBusy] = useState(false);
     const hasDomains = app.domains.length > 0;
@@ -560,7 +658,9 @@ function DomainStep({ app, server }: { app: AppSetup; server: ServerAddress }) {
 
     const finish = () =>
         router.post(
-            AppSetupController.finish(app.slug),
+            laravel
+                ? AppSetupController.domainContinue(app.slug)
+                : AppSetupController.finish(app.slug),
             {},
             {
                 onStart: () => setBusy(true),
@@ -606,9 +706,11 @@ function DomainStep({ app, server }: { app: AppSetup; server: ServerAddress }) {
                 <>
                     <Card
                         title={
-                            app.source_type === 'template'
-                                ? t('2. Domain')
-                                : t('4. Domain')
+                            laravel
+                                ? t('Domain')
+                                : app.source_type === 'template'
+                                  ? t('2. Domain')
+                                  : t('4. Domain')
                         }
                         description={t(
                             'Optional: point a domain at this app. You can also do it after the first deployment; the app is reachable only through its domains.',
@@ -648,12 +750,18 @@ function DomainStep({ app, server }: { app: AppSetup; server: ServerAddress }) {
                                 finish();
                             }}
                         >
-                            {t('Deploy without it')}
+                            {laravel
+                                ? t('Continue without it')
+                                : t('Deploy without it')}
                         </Button>
                         <Button onClick={addAndDeploy}>
-                            {t('Add :domain and deploy', {
-                                domain: draft.name,
-                            })}
+                            {laravel
+                                ? t('Add :domain and continue', {
+                                      domain: draft.name,
+                                  })
+                                : t('Add :domain and deploy', {
+                                      domain: draft.name,
+                                  })}
                         </Button>
                     </>
                 }
@@ -670,11 +778,15 @@ function DomainStep({ app, server }: { app: AppSetup; server: ServerAddress }) {
             </Modal>
             <div className="flex flex-wrap gap-2">
                 <Button loading={busy} onClick={deploy}>
-                    {hasDomains
-                        ? t('Create and deploy')
-                        : hidden
-                          ? t('Deploy')
-                          : t('Skip and deploy')}
+                    {laravel
+                        ? hasDomains
+                            ? t('Continue')
+                            : t('Skip')
+                        : hasDomains
+                          ? t('Create and deploy')
+                          : hidden
+                            ? t('Deploy')
+                            : t('Skip and deploy')}
                 </Button>
                 {app.source_type === 'template' ? (
                     <Button

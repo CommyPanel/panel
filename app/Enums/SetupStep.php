@@ -10,5 +10,11 @@ enum SetupStep: string
 {
     case Source = 'source';
     case Settings = 'settings';
+    // Laravel apps only, between Settings and Domain, in this order.
+    case Database = 'database';
+    case Services = 'services';
+    case Volumes = 'volumes';
     case Domain = 'domain';
+    // Laravel apps only: the last look (variables, release script) before the first deployment.
+    case Review = 'review';
 }

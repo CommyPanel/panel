@@ -93,6 +93,14 @@ export default function Index({ servers, engines }: Props) {
                                                 />
                                                 {server.name}
                                             </Link>
+                                            {server.dedicated_app && (
+                                                <span className="mt-1 block text-xs text-base-content/70">
+                                                    {t('Made for :app', {
+                                                        app: server
+                                                            .dedicated_app.name,
+                                                    })}
+                                                </span>
+                                            )}
                                         </td>
                                         <td>
                                             {server.engine_label}{' '}

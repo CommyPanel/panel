@@ -17,9 +17,11 @@ class ManageDatabases
     public function __construct(private readonly HostDriver $host) {}
 
     /**
+     * @param  bool  $admin  the user may also create and drop databases and users on the whole server (only for a server made for one app)
+     *
      * @throws DatabaseException
      */
-    public function create(DatabaseServer $server, string $name): ManagedDatabase
+    public function create(DatabaseServer $server, string $name, bool $admin = false): ManagedDatabase
     {
         $name = DatabaseNames::database($name);
 
@@ -33,7 +35,7 @@ class ManageDatabases
 
         $password = Str::random(32);
 
-        $this->attempt(fn () => $this->host->createDatabase($server->target(), $name, $name, $password), __('Could not create the database: :reason'));
+        $this->attempt(fn () => $this->host->createDatabase($server->target(), $name, $name, $password, $admin), __('Could not create the database: :reason'));
 
         /** @var ManagedDatabase */
         return $server->databases()->create(['name' => $name, 'username' => $name, 'password' => $password]);

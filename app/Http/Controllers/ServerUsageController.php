@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Deploy\ContainerOwners;
 use App\Host\Data\ContainerUsage;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
-use App\Models\Deployment;
 use App\Presenters\UsagePresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,9 +25,7 @@ class ServerUsageController extends Controller
         }
 
         // Which app each container belongs to, from the deployments that started them.
-        $owners = Deployment::query()->with('app:id,slug,name')
-            ->whereIn('container_name', array_map(fn (ContainerUsage $c) => $c->name, $usage->containers))
-            ->get()->keyBy('container_name');
+        $owners = ContainerOwners::for(array_map(fn (ContainerUsage $c) => $c->name, $usage->containers));
 
         return response()->json([
             'interval_ms' => $usage->intervalMs,

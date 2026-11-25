@@ -33,6 +33,7 @@ export function SettingsTab({
         health_timeout: app.health_timeout?.toString() ?? '',
         deploy_strategy: app.deploy_strategy,
         release_command: app.release_command ?? '',
+        release_script: app.release_script ?? '',
         memory_limit_mb: app.memory_limit_mb?.toString() ?? '',
         cpu_limit: app.cpu_limit?.toString() ?? '',
     });
@@ -78,7 +79,10 @@ export function SettingsTab({
                             'How the app runs. Changes apply from the next deployment.',
                         )}
                     >
-                        <RuntimeFields {...fields} />
+                        <RuntimeFields
+                            {...fields}
+                            releaseScript={app.uses_processes}
+                        />
                     </Card>
                     <Button type="submit" loading={form.processing}>
                         {t('Save settings')}

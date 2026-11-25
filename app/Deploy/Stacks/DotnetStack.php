@@ -18,7 +18,7 @@ class DotnetStack implements StackDefinition
         return SourceTree::find($path, 'csproj') !== [] || SourceTree::find($path, 'sln', 0) !== [];
     }
 
-    public function plan(string $path, int $port): BuildPlan
+    public function plan(string $path, int $port, array $options = []): BuildPlan
     {
         $projects = $this->webProjects($path);
 

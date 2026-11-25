@@ -19,6 +19,7 @@ export function UsageTab({ app }: { app: AppSettings }) {
                 <AppUsageCard
                     slug={app.slug}
                     stopped={app.status === 'stopped'}
+                    containers={app.live_containers}
                 />
             ) : (
                 <Card

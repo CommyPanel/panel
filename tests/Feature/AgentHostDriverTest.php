@@ -207,6 +207,19 @@ it('asks the agent to test a Cloudflare token, and passes its sentence on when i
         ->toThrow(HostOperationFailed::class, 'cannot edit DNS');
 });
 
+it('asks for full rights on the server only when the database is for a server made for one app', function () {
+    Http::fake(['agent/v1/databases/create' => Http::response(['ok' => true])]);
+    $server = new DatabaseTarget('db-blog', 'mysql', 'rootrootrootroot');
+
+    agentDriver()->createDatabase($server, 'blog', 'blog', 'secretsecretsecret1');
+    agentDriver()->createDatabase($server, 'blog', 'blog', 'secretsecretsecret1', admin: true);
+
+    $bodies = Http::recorded()->map(fn ($pair) => $pair[0]->data())->values();
+
+    expect($bodies[0])->toBe(['container' => 'db-blog', 'engine' => 'mysql', 'root_password' => 'rootrootrootroot', 'database' => 'blog', 'user' => 'blog', 'password' => 'secretsecretsecret1'])
+        ->and($bodies[1])->toBe([...$bodies[0], 'admin' => true]);
+});
+
 it('treats a missing certificate as null', function () {
     Http::fake(['agent/v1/certificates/shop' => Http::response(['error' => 'no certificate with that name'], 404)]);
 

@@ -2,7 +2,15 @@ import { Check } from 'lucide-react';
 import { useT } from '@/hooks/use-t';
 import { cn } from '@/lib/utils';
 
-type Step = 'basics' | 'source' | 'settings' | 'domain';
+type Step =
+    | 'basics'
+    | 'source'
+    | 'settings'
+    | 'database'
+    | 'services'
+    | 'volumes'
+    | 'domain'
+    | 'review';
 
 /** A horizontal progress header; steps before `index` show as done. */
 export function Stepper({
@@ -57,9 +65,12 @@ export function Stepper({
 export function SetupSteps({
     current,
     source,
+    laravel = false,
 }: {
     current: Step;
     source: string;
+    /** A Laravel app has a database, services, volumes and a last look as well. */
+    laravel?: boolean;
 }) {
     const { t } = useT();
     // A ready-made app has no code to reach and no settings to ask for: just the basics and the domain.
@@ -79,7 +90,20 @@ export function SetupSteps({
                               : t('Repository access'),
                   },
                   { id: 'settings', label: t('Settings') },
+                  ...(laravel
+                      ? ([
+                            { id: 'database', label: t('Database') },
+                            { id: 'services', label: t('Services') },
+                            { id: 'volumes', label: t('Volumes') },
+                        ] as { id: Step; label: string }[])
+                      : []),
                   { id: 'domain', label: t('Domain') },
+                  ...(laravel
+                      ? ([{ id: 'review', label: t('Review') }] as {
+                            id: Step;
+                            label: string;
+                        }[])
+                      : []),
               ];
     return (
         <Stepper

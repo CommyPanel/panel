@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Audit\AuditLogger;
+use App\Deploy\ReleaseProcesses;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
 use App\Models\App;
@@ -18,9 +19,17 @@ use Illuminate\Http\Request;
  */
 class AppTerminalController extends Controller
 {
-    public function ticket(Request $request, App $app, HostDriver $host, AuditLogger $audit): JsonResponse
+    public function ticket(Request $request, App $app, HostDriver $host, AuditLogger $audit, ReleaseProcesses $processes): JsonResponse
     {
-        $container = $app->activeDeployment()->value('container_name');
+        // The web container, or another container of the live release when one is asked for.
+        $containers = $processes->lookable($app->activeDeployment()->first());
+        $container = $containers[0]['container'] ?? null;
+
+        foreach ($containers as $candidate) {
+            if ($candidate['container'] === $request->input('container')) {
+                $container = $candidate['container'];
+            }
+        }
 
         if ($container === null || $app->stopped_at !== null) {
             return response()->json(['error' => 'The app has no running container to open a terminal in.'], 422);
@@ -40,6 +49,7 @@ class AppTerminalController extends Controller
             'ticket' => $ticket,
             'path' => '/terminal',
             'container' => $container,
+            'containers' => $containers,
             'expires_in' => 30,
         ]);
     }

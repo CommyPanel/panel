@@ -105,7 +105,9 @@ export function useUsagePoll<T extends { interval_ms: number }>(
 
             try {
                 const response = await fetch(
-                    haveFirst ? url : `${url}?history=1`,
+                    haveFirst
+                        ? url
+                        : `${url}${url.includes('?') ? '&' : '?'}history=1`,
                     {
                         credentials: 'same-origin',
                         headers: {

@@ -141,6 +141,18 @@ func grantPattern(db string) string {
 	return strings.ReplaceAll(db, "_", `\_`)
 }
 
+// adminSQL is what makes a database user the administrator of its SERVER, so it can create, drop and list
+// databases (an app with several databases, tenancy packages). Only for a server dedicated to one app:
+// on a shared server it would let that app reach every other app's data. MySQL and MariaDB get every
+// privilege on every database, with the right to pass them on; PostgreSQL gets CREATEDB and CREATEROLE.
+// The user is still the owner of the database made for it, and still has to log in with its password.
+func adminSQL(engine, user string) string {
+	if engine == "postgres" {
+		return fmt.Sprintf("ALTER ROLE \"%s\" CREATEDB CREATEROLE;\n", user)
+	}
+	return fmt.Sprintf("GRANT ALL PRIVILEGES ON *.* TO '%[1]s'@'%%' WITH GRANT OPTION;\nFLUSH PRIVILEGES;\n", user)
+}
+
 func dropSQL(engine, db, user string) string {
 	if engine == "postgres" {
 		return fmt.Sprintf("DROP DATABASE IF EXISTS \"%s\" WITH (FORCE);\nDROP ROLE IF EXISTS \"%s\";\n", db, user)
@@ -219,6 +231,17 @@ func (m *Manager) DatabaseReady(ctx context.Context, t DatabaseTarget) (bool, er
 // CreateDatabase creates a database and a user that owns it and nothing else.
 // Running it again with the same names sets the password and changes nothing else.
 func (m *Manager) CreateDatabase(ctx context.Context, t DatabaseTarget, db, user, password string) error {
+	return m.createDatabase(ctx, t, db, user, password, false)
+}
+
+// CreateAdminDatabase is CreateDatabase for a database server dedicated to one app: the user also gets
+// the rights to create, drop and list databases on the whole server (see adminSQL). The panel only asks
+// for it on a server it made for that one app.
+func (m *Manager) CreateAdminDatabase(ctx context.Context, t DatabaseTarget, db, user, password string) error {
+	return m.createDatabase(ctx, t, db, user, password, true)
+}
+
+func (m *Manager) createDatabase(ctx context.Context, t DatabaseTarget, db, user, password string, admin bool) error {
 	if err := t.validate(); err != nil {
 		return err
 	}
@@ -232,10 +255,14 @@ func (m *Manager) CreateDatabase(ctx context.Context, t DatabaseTarget, db, user
 		return err
 	}
 	if m.cfg.DryRun {
-		slog.Info("dry-run: would create database", "container", t.Container, "database", db)
+		slog.Info("dry-run: would create database", "container", t.Container, "database", db, "admin", admin)
 		return nil
 	}
-	return m.runSQL(ctx, t, createSQL(t.Engine, db, user, password), password, t.RootPassword)
+	sql := createSQL(t.Engine, db, user, password)
+	if admin {
+		sql += adminSQL(t.Engine, user)
+	}
+	return m.runSQL(ctx, t, sql, password, t.RootPassword)
 }
 
 // DropDatabase deletes a database and its user. What does not exist is not an error.
@@ -253,7 +280,13 @@ func (m *Manager) DropDatabase(ctx context.Context, t DatabaseTarget, db, user s
 		slog.Info("dry-run: would drop database", "container", t.Container, "database", db)
 		return nil
 	}
-	return m.runSQL(ctx, t, dropSQL(t.Engine, db, user), t.RootPassword)
+	err := m.runSQL(ctx, t, dropSQL(t.Engine, db, user), t.RootPassword)
+	var input *validate.InputError
+	if asInput(err, &input) && strings.Contains(input.Msg, "some objects depend on it") {
+		// PostgreSQL: the user owns more than this database (an app with its own databases made them).
+		return &validate.InputError{Msg: "the user still owns other databases or objects, made by the app; drop those first"}
+	}
+	return err
 }
 
 // SetDatabasePassword changes the password of a database user.

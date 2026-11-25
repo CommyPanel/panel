@@ -16,7 +16,7 @@ class GoStack implements StackDefinition
         return SourceTree::has($path, 'go.mod');
     }
 
-    public function plan(string $path, int $port): BuildPlan
+    public function plan(string $path, int $port, array $options = []): BuildPlan
     {
         $goMod = (string) SourceTree::read($path, 'go.mod');
 

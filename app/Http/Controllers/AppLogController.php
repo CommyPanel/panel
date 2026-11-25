@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Audit\AuditLogger;
+use App\Deploy\ReleaseProcesses;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
 use App\Models\App;
@@ -18,13 +19,14 @@ class AppLogController extends Controller
 {
     public const MAX_LINES = 5000;
 
-    public function show(Request $request, App $app, HostDriver $host): JsonResponse
+    public function show(Request $request, App $app, HostDriver $host, ReleaseProcesses $processes): JsonResponse
     {
         $lines = $this->lines($request->integer('tail', 500));
-        $name = $app->activeDeployment()->value('container_name');
+        $containers = $processes->lookable($app->activeDeployment()->first());
+        $name = $this->pick($containers, $request->query('container'));
 
         if ($name === null) {
-            return response()->json(['live' => false, 'logs' => '', 'lines' => $lines]);
+            return response()->json(['live' => false, 'logs' => '', 'lines' => $lines, 'containers' => []]);
         }
 
         try {
@@ -34,12 +36,30 @@ class AppLogController extends Controller
         }
 
         // Programs print bytes that are not text; JSON cannot carry them, so they are replaced.
-        return response()->json(['live' => true, 'logs' => mb_scrub($logs, 'UTF-8'), 'lines' => $lines]);
+        return response()->json(['live' => true, 'logs' => mb_scrub($logs, 'UTF-8'), 'lines' => $lines, 'container' => $name, 'containers' => $containers]);
     }
 
-    public function download(Request $request, App $app, HostDriver $host, AuditLogger $audit): Response
+    /**
+     * The container asked for, if it is one of the live release's; else the web one.
+     *
+     * @param  list<array{container: string, label: string, process: string}>  $containers
+     */
+    private function pick(array $containers, mixed $requested): ?string
     {
-        $name = $app->activeDeployment()->value('container_name');
+        foreach ($containers as $c) {
+            if ($c['container'] === $requested) {
+                return $c['container'];
+            }
+        }
+
+        return $containers[0]['container'] ?? null;
+    }
+
+    public function download(Request $request, App $app, HostDriver $host, AuditLogger $audit, ReleaseProcesses $processes): Response
+    {
+        $containers = $processes->lookable($app->activeDeployment()->first());
+        $name = $this->pick($containers, $request->query('container'));
+        $process = collect($containers)->firstWhere('container', $name)['process'] ?? 'web';
 
         if ($name === null) {
             return response('This app has no running container, so there are no logs to download.', 404);
@@ -51,11 +71,11 @@ class AppLogController extends Controller
             return response($e->getMessage(), 502);
         }
 
-        $audit->record('app.logs_downloaded', $request->user(), ['app' => $app->slug], $app);
+        $audit->record('app.logs_downloaded', $request->user(), ['app' => $app->slug, 'container' => $name], $app);
 
         return response($logs, 200, [
             'Content-Type' => 'text/plain; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="'.$app->slug.'-'.now()->format('Y-m-d-His').'.log"',
+            'Content-Disposition' => 'attachment; filename="'.$app->slug.($process === 'web' ? '' : '-'.$process).'-'.now()->format('Y-m-d-His').'.log"',
             'X-Content-Type-Options' => 'nosniff',
             'Cache-Control' => 'no-store',
         ]);

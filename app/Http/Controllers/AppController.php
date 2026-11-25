@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Audit\AuditLogger;
 use App\Auth\Permissions;
+use App\Databases\AppLinks;
 use App\Databases\DatabaseException;
+use App\Deploy\AppEnvironment;
 use App\Deploy\DestroyApp;
 use App\Deploy\LockedException;
 use App\Deploy\Source\GitProvider;
@@ -21,6 +23,7 @@ use App\GitHub\GitHubFailed;
 use App\Http\Requests\StoreAppRequest;
 use App\Http\Requests\UpdateAppRequest;
 use App\Models\App;
+use App\Models\DatabaseServer;
 use App\Presenters\AppPresenter;
 use App\Tls\HttpsSettings;
 use Illuminate\Http\RedirectResponse;
@@ -113,6 +116,8 @@ class AppController extends Controller
             'deployments' => $app->deployments()->latest('number')->limit(15)->get()
                 ->map(fn ($deployment) => AppPresenter::deployment($deployment))->values(),
             'env_keys' => $app->envVars()->orderBy('key')->pluck('key')->values(),
+            // Names (never values) the app's links provide, shown next to a Laravel app's .env text.
+            'env_linked_keys' => AppEnvironment::usesText($app) ? array_keys(app(AppLinks::class)->environment($app)) : [],
             'https' => ['enabled' => $https->enabled(), 'staging' => $https->staging()],
             'cloudflare' => $cloudflare->configured(),
             'server' => $server->forPage(),
@@ -178,6 +183,8 @@ class AppController extends Controller
         ]);
 
         $slug = $app->slug;
+        // Database servers made for this app are kept (see DestroyApp); the person is told.
+        $kept = DatabaseServer::query()->where('dedicated_app_id', $app->id)->orderBy('name')->pluck('name')->all();
 
         try {
             $problems = $destroy($app);
@@ -187,7 +194,9 @@ class AppController extends Controller
 
         $audit->record('app.deleted', null, ['app' => $slug, 'cleanup_problems' => $problems]);
 
-        $redirect = redirect()->route('apps.index')->with('status', __('App :slug deleted.', ['slug' => $slug]));
+        $redirect = redirect()->route('apps.index')->with('status', $kept === []
+            ? __('App :slug deleted.', ['slug' => $slug])
+            : __('App :slug deleted. Its database server (:servers) was kept, with all its data, and is now an ordinary server under Databases.', ['slug' => $slug, 'servers' => implode(', ', $kept)]));
 
         return $problems === []
             ? $redirect

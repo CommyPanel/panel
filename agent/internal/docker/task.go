@@ -16,9 +16,11 @@ import (
 )
 
 const (
-	maxTaskArgs        = 64
-	maxTaskArgBytes    = 4 << 10
-	maxTaskCmdBytes    = 16 << 10
+	maxTaskArgs = 64
+	// One argument may be a whole script (sh -ec "<lines>"), so it may use the whole command budget.
+	maxTaskArgBytes = 16 << 10
+	// The whole command: a script of 16 KiB plus the few bytes of `sh -ec` around it.
+	maxTaskCmdBytes    = 16<<10 + 256
 	defaultTaskTimeout = 600
 	maxTaskTimeout     = 3600
 	maxTaskOutput      = 4 << 20

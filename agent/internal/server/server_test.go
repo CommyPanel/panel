@@ -285,6 +285,14 @@ func (f *fakeDocker) CreateDatabase(_ context.Context, t docker.DatabaseTarget, 
 	return f.err
 }
 
+func (f *fakeDocker) CreateAdminDatabase(_ context.Context, t docker.DatabaseTarget, db, user, _ string) error {
+	if err := validate.DatabaseIdent(db); err != nil {
+		return err
+	}
+	f.calls = append(f.calls, "create-admin "+t.Container+" "+db+" "+user)
+	return f.err
+}
+
 func (f *fakeDocker) DropDatabase(_ context.Context, t docker.DatabaseTarget, db, user string) error {
 	f.calls = append(f.calls, "drop "+t.Container+" "+db+" "+user)
 	return f.err
@@ -920,13 +928,19 @@ func TestDatabaseRoutes(t *testing.T) {
 	if rec := do(t, s, "POST", "/v1/databases/create", `{`+target+`,"database":"sh op","user":"shop","password":"x"}`); rec.Code != 400 {
 		t.Errorf("a bad name must be refused: %d", rec.Code)
 	}
+	if rec := do(t, s, "POST", "/v1/databases/create", `{`+target+`,"database":"app","user":"app","password":"abcdefghijklmnop1234","admin":true}`); rec.Code != 200 {
+		t.Errorf("create with admin: %d %s", rec.Code, rec.Body)
+	}
+	if rec := do(t, s, "POST", "/v1/databases/create", `{`+target+`,"database":"app","user":"app","password":"abcdefghijklmnop1234","admin":"yes"}`); rec.Code != 400 {
+		t.Errorf("admin must be a boolean: %d", rec.Code)
+	}
 	do(t, s, "POST", "/v1/databases/drop", `{`+target+`,"database":"shop","user":"shop"}`)
 	do(t, s, "POST", "/v1/databases/password", `{`+target+`,"user":"shop","password":"abcdefghijklmnop1234"}`)
 	do(t, s, "POST", "/v1/databases/remove-data", `{"server":"main"}`)
 	if rec := do(t, s, "POST", "/v1/databases/create", `{`+target+`,"database":"shop","extra":1}`); rec.Code != 400 {
 		t.Errorf("unknown fields must be refused: %d", rec.Code)
 	}
-	want := "pull postgres:17|create db-main shop shop|drop db-main shop shop|password db-main shop|remove-data main"
+	want := "pull postgres:17|create db-main shop shop|create-admin db-main app app|drop db-main shop shop|password db-main shop|remove-data main"
 	if got := strings.Join(f.calls, "|"); got != want {
 		t.Errorf("calls = %s", got)
 	}

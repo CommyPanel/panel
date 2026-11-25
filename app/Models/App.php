@@ -55,6 +55,10 @@ use Illuminate\Support\Str;
  * @property string $health_path
  * @property int|null $health_timeout
  * @property string|null $release_command
+ * @property string|null $release_script
+ * @property array<string, mixed>|null $detected
+ * @property array<string, mixed>|null $stack_options
+ * @property string|null $env_text
  * @property int|null $memory_limit_mb
  * @property string|null $cpu_limit
  * @property int|null $active_deployment_id
@@ -98,11 +102,34 @@ class App extends Model
             'source_type' => SourceType::class,
             'deploy_strategy' => DeployStrategy::class,
             'template_settings' => 'array',
+            'stack_options' => 'array',
+            'detected' => 'array',
+            'env_text' => 'encrypted',
             'deploy_key_private' => 'encrypted',
             'git_token' => 'encrypted',
             'webhook_secret' => 'encrypted',
             'github_auto_deploy' => 'boolean',
         ];
+    }
+
+    /**
+     * The extra processes of the app (the web process is the app itself and has no row).
+     *
+     * @return HasMany<AppProcess, $this>
+     */
+    public function processes(): HasMany
+    {
+        return $this->hasMany(AppProcess::class)->orderBy('sort')->orderBy('id');
+    }
+
+    /**
+     * Database servers made for this app alone (its user may create and drop databases on them).
+     *
+     * @return HasMany<DatabaseServer, $this>
+     */
+    public function dedicatedDatabaseServers(): HasMany
+    {
+        return $this->hasMany(DatabaseServer::class, 'dedicated_app_id');
     }
 
     /**

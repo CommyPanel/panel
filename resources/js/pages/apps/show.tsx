@@ -1,6 +1,7 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import {
     Activity,
+    Cog,
     ExternalLink,
     Globe,
     HardDrive,
@@ -22,6 +23,7 @@ import AppController from '@/actions/App/Http/Controllers/AppController';
 import DeploymentController from '@/actions/App/Http/Controllers/DeploymentController';
 import { AppPower } from '@/components/apps/app-power';
 import { QuickInstallCard } from '@/components/apps/quick-install-card';
+import { ServicesCard } from '@/components/apps/services-card';
 import { AdvancedTab } from '@/components/apps/tabs/advanced-tab';
 import { DeploymentsTab } from '@/components/apps/tabs/deployments-tab';
 import { DomainsTab } from '@/components/apps/tabs/domains-tab';
@@ -62,6 +64,7 @@ type Props = {
     app: AppSettings;
     deployments: DeploymentSummary[];
     env_keys: string[];
+    env_linked_keys: string[];
     https: { enabled: boolean; staging: boolean };
     cloudflare: boolean;
     server: ServerAddress;
@@ -78,6 +81,7 @@ type TabId =
     | 'terminal'
     | 'domains'
     | 'environment'
+    | 'services'
     | 'nginx'
     | 'settings'
     | 'advanced';
@@ -92,6 +96,7 @@ const TAB_IDS: TabId[] = [
     'terminal',
     'domains',
     'environment',
+    'services',
     'nginx',
     'settings',
     'advanced',
@@ -117,6 +122,7 @@ export default function Show({
     app,
     deployments,
     env_keys,
+    env_linked_keys,
     https,
     cloudflare,
     server,
@@ -129,6 +135,8 @@ export default function Show({
     const [tab, setTab] = useState<TabId>(initialTab);
     // The nginx editor reports unsaved changes, so switching tabs can warn first.
     const nginxDirty = useRef(false);
+    // The .env editor of a Laravel app does the same.
+    const envDirty = useRef(false);
     const canNginx = can('apps.nginx');
     const canLogs = can('apps.logs');
     const canVolumes = can('apps.volumes');
@@ -139,7 +147,8 @@ export default function Show({
         (tab === 'logs' && !canLogs) ||
         (tab === 'volumes' && !canVolumes) ||
         (tab === 'terminal' && !canTerminal) ||
-        (tab === 'links' && !canLinks)
+        (tab === 'links' && !canLinks) ||
+        (tab === 'services' && !app.uses_processes)
             ? 'deployments'
             : tab;
 
@@ -149,6 +158,16 @@ export default function Show({
             nginxDirty.current &&
             id !== 'nginx' &&
             !window.confirm(t('You have unsaved nginx changes. Discard them?'))
+        ) {
+            return;
+        }
+
+        if (
+            envDirty.current &&
+            id !== 'environment' &&
+            !window.confirm(
+                t('You have unsaved changes to the variables. Discard them?'),
+            )
         ) {
             return;
         }
@@ -269,6 +288,19 @@ export default function Show({
                           t('Volumes'),
                           <HardDrive className="size-4" aria-hidden />,
                           <Count value={app.volumes.length} />,
+                      )
+                    : null,
+                // Laravel apps run a scheduler and workers beside the web process.
+                app.uses_processes && can('apps.update')
+                    ? item(
+                          'services',
+                          t('Services'),
+                          <Cog className="size-4" aria-hidden />,
+                          <Count
+                              value={
+                                  app.processes.filter((p) => p.enabled).length
+                              }
+                          />,
                       )
                     : null,
                 item(
@@ -451,7 +483,22 @@ export default function Show({
                     />
                 )}
                 {active === 'environment' && (
-                    <EnvironmentTab slug={app.slug} keys={env_keys} />
+                    <EnvironmentTab
+                        slug={app.slug}
+                        keys={env_keys}
+                        textMode={app.env_text}
+                        linkedKeys={env_linked_keys}
+                        onDirtyChange={(dirty) => {
+                            envDirty.current = dirty;
+                        }}
+                    />
+                )}
+                {active === 'services' && (
+                    <ServicesCard
+                        slug={app.slug}
+                        processes={app.processes}
+                        variant="page"
+                    />
                 )}
                 {active === 'settings' && (
                     <SettingsTab app={app} webhook={webhook} />

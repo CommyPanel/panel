@@ -2,6 +2,8 @@ import AppUsageController from '@/actions/App/Http/Controllers/AppUsageControlle
 import { TimeSeriesChart } from '@/components/usage/time-series-chart';
 import { Alert } from '@/components/ui/alert';
 import { Card } from '@/components/ui/card';
+import { Select } from '@/components/ui/select';
+import { useState } from 'react';
 import { useT } from '@/hooks/use-t';
 import { formatBytes } from '@/lib/format';
 import {
@@ -11,6 +13,7 @@ import {
     useUsagePoll,
 } from '@/lib/usage';
 import type { AppUsage, UsagePoint } from '@/lib/usage';
+import type { LiveContainer } from '@/types';
 
 const COLOR_1 = 'var(--chart-1)';
 const COLOR_2 = 'var(--chart-2)';
@@ -40,13 +43,23 @@ function column<K extends keyof UsagePoint>(series: UsagePoint[], key: K) {
 export function AppUsageCard({
     slug,
     stopped,
+    containers = [],
 }: {
     slug: string;
     stopped: boolean;
+    /** The live release's containers (web first, then each process); a choice is shown when there are several. */
+    containers?: LiveContainer[];
 }) {
     const { t } = useT();
+    const [container, setContainer] = useState('');
+    const selected = containers.some((c) => c.container === container)
+        ? container
+        : (containers[0]?.container ?? '');
+    const base = AppUsageController.show(slug).url;
     const { first, latest, error } = useUsagePoll<AppUsage>(
-        AppUsageController.show(slug).url,
+        selected === ''
+            ? base
+            : `${base}?container=${encodeURIComponent(selected)}`,
     );
     const series = useSeries(first, latest, pickContainer);
     const times = column(series, 't');
@@ -64,6 +77,19 @@ export function AppUsageCard({
                     {t('Usage could not be read: :error', { error })}
                     {latest && ` ${t('Showing the last reading.')}`}
                 </Alert>
+            )}
+            {containers.length > 1 && (
+                <Select
+                    label={t('Process')}
+                    value={selected}
+                    onChange={(e) => setContainer(e.target.value)}
+                >
+                    {containers.map((c) => (
+                        <option key={c.container} value={c.container}>
+                            {c.label}
+                        </option>
+                    ))}
+                </Select>
             )}
             {stopped && (
                 <p className="text-sm text-base-content/70">

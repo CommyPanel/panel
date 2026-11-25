@@ -60,6 +60,7 @@ type Docker interface {
 	PruneLinkNetworks(ctx context.Context) ([]string, error)
 	DatabaseReady(ctx context.Context, t docker.DatabaseTarget) (bool, error)
 	CreateDatabase(ctx context.Context, t docker.DatabaseTarget, db, user, password string) error
+	CreateAdminDatabase(ctx context.Context, t docker.DatabaseTarget, db, user, password string) error
 	DropDatabase(ctx context.Context, t docker.DatabaseTarget, db, user string) error
 	SetDatabasePassword(ctx context.Context, t docker.DatabaseTarget, user, password string) error
 	RemoveDatabaseData(ctx context.Context, server string) error
@@ -778,8 +779,15 @@ func (s *Server) databaseCreate(w http.ResponseWriter, r *http.Request) {
 		Database string `json:"database"`
 		User     string `json:"user"`
 		Password string `json:"password"`
+		// Admin gives the user the rights to create, drop and list databases on the whole server. Only
+		// for a server made for one app.
+		Admin bool `json:"admin"`
 	}
 	if !decode(w, r, &body) {
+		return
+	}
+	if body.Admin {
+		s.respond(w, s.opts.Docker.CreateAdminDatabase(r.Context(), body.DatabaseTarget, body.Database, body.User, body.Password))
 		return
 	}
 	s.respond(w, s.opts.Docker.CreateDatabase(r.Context(), body.DatabaseTarget, body.Database, body.User, body.Password))

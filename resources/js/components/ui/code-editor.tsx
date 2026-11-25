@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 const LINE_HEIGHT = 24;
@@ -17,6 +17,11 @@ type Props = {
     /** The editor is at least this many lines tall, and at most `maxLines`. */
     minLines?: number;
     maxLines?: number;
+    /**
+     * Colours the text: gets the whole text, returns one element per line. The coloured copy is drawn
+     * behind a transparent textarea, so typing, selecting and the caret stay the browser's own.
+     */
+    highlight?: (value: string) => ReactNode[];
 };
 
 /**
@@ -35,10 +40,12 @@ export function CodeEditor({
     describedBy,
     minLines = 12,
     maxLines = 28,
+    highlight,
 }: Props) {
     const area = useRef<HTMLTextAreaElement>(null);
     const leaveOnTab = useRef(false);
     const [scroll, setScroll] = useState(0);
+    const [scrollLeft, setScrollLeft] = useState(0);
 
     const lines = value.split('\n').length;
     const height =
@@ -110,32 +117,61 @@ export function CodeEditor({
                     ))}
                 </div>
             </div>
-            <textarea
-                ref={area}
-                aria-label={label}
-                aria-invalid={invalid || undefined}
-                aria-describedby={describedBy}
-                value={value}
-                disabled={disabled}
-                wrap="off"
-                spellCheck={false}
-                autoCapitalize="off"
-                autoCorrect="off"
-                autoComplete="off"
-                className="min-w-0 flex-1 resize-none overflow-auto bg-transparent px-3 font-mono text-sm whitespace-pre outline-none"
-                style={{
-                    height,
-                    lineHeight: `${LINE_HEIGHT}px`,
-                    paddingTop: PADDING,
-                    paddingBottom: PADDING,
-                }}
-                onChange={(event) => onChange(event.target.value)}
-                onKeyDown={keyDown}
-                onBlur={() => {
-                    leaveOnTab.current = false;
-                }}
-                onScroll={(event) => setScroll(event.currentTarget.scrollTop)}
-            />
+            <div className="relative min-w-0 flex-1">
+                {highlight && (
+                    <div
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 overflow-hidden"
+                    >
+                        <pre
+                            className="m-0 px-3 font-mono text-sm whitespace-pre"
+                            style={{
+                                lineHeight: `${LINE_HEIGHT}px`,
+                                paddingTop: PADDING,
+                                transform: `translate(${-scrollLeft}px, ${-scroll}px)`,
+                            }}
+                        >
+                            {highlight(value).map((line, i) => (
+                                <div key={i} style={{ height: LINE_HEIGHT }}>
+                                    {line}
+                                </div>
+                            ))}
+                        </pre>
+                    </div>
+                )}
+                <textarea
+                    ref={area}
+                    aria-label={label}
+                    aria-invalid={invalid || undefined}
+                    aria-describedby={describedBy}
+                    value={value}
+                    disabled={disabled}
+                    wrap="off"
+                    spellCheck={false}
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    autoComplete="off"
+                    className={cn(
+                        'relative block w-full min-w-0 resize-none overflow-auto bg-transparent px-3 font-mono text-sm whitespace-pre outline-none',
+                        highlight && 'text-transparent caret-base-content',
+                    )}
+                    style={{
+                        height,
+                        lineHeight: `${LINE_HEIGHT}px`,
+                        paddingTop: PADDING,
+                        paddingBottom: PADDING,
+                    }}
+                    onChange={(event) => onChange(event.target.value)}
+                    onKeyDown={keyDown}
+                    onBlur={() => {
+                        leaveOnTab.current = false;
+                    }}
+                    onScroll={(event) => {
+                        setScroll(event.currentTarget.scrollTop);
+                        setScrollLeft(event.currentTarget.scrollLeft);
+                    }}
+                />
+            </div>
         </div>
     );
 }

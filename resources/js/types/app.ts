@@ -9,9 +9,52 @@ export type AppStatus =
     | 'stopped'
     | 'deactivated';
 
-export type AppStack = 'dotnet' | 'go' | 'node' | 'python';
+export type AppStack = 'dotnet' | 'go' | 'node' | 'python' | 'laravel';
 
-export type SetupStep = 'source' | 'settings' | 'domain';
+export type SetupStep =
+    | 'source'
+    | 'settings'
+    | 'database'
+    | 'services'
+    | 'volumes'
+    | 'domain'
+    | 'review';
+
+/** What the wizard's Laravel steps know: what the code showed, the choices so far, and the last look. */
+export type LaravelSetup = {
+    /** Null while the code is still being looked at. */
+    detected: {
+        stack: string | null;
+        error?: string;
+        laravel_major?: number;
+        php?: string;
+        health_path?: string;
+        node_manager?: string | null;
+        has_build_script?: boolean;
+        warnings?: string[];
+    } | null;
+    inspecting: boolean;
+    stack_options: {
+        php?: string;
+        node_manager?: string;
+        node?: number;
+        ssr?: boolean;
+    };
+    review: {
+        database: {
+            mode: string | null;
+            status: string | null;
+            server: string | null;
+            database: string | null;
+            linked: { server: string; database: string; engine: string } | null;
+        };
+        processes: { name: string; kind: string; replicas: number }[];
+        volumes: string[];
+        domains: string[];
+        env_count: number;
+        linked_keys: string[];
+    } | null;
+};
 
 export type SourceAccess = {
     state:
@@ -39,6 +82,8 @@ export type AppSummary = {
     slug: string;
     name: string;
     stack: string | null;
+    /** A Laravel app edits its variables as one .env text. */
+    env_text: boolean;
     source_type: 'git' | 'upload' | 'template';
     /** The quick-install recipe the app was made from, if any. */
     template: {
@@ -69,6 +114,15 @@ export type AppSettings = AppSummary & {
     /** How a new release replaces the running one. */
     deploy_strategy: DeployStrategy;
     release_command: string | null;
+    /** Laravel apps: the lines run before every release goes live. */
+    release_script: string | null;
+    /** Whether the app has extra processes (Laravel: scheduler, workers); the Services page is for these. */
+    uses_processes: boolean;
+    processes: AppProcess[];
+    /** The live release's containers a person can look at: the web one first, then each process. */
+    live_containers: LiveContainer[];
+    /** Names of database servers made for this app; deleting the app keeps them. */
+    dedicated_servers: string[];
     /** Variables, volumes or links changed after the running container was made. */
     pending_changes: boolean;
     alerts_enabled: boolean;
@@ -214,4 +268,32 @@ export type SafeDeployInfo = {
         /** The release being compared with, for a watch. */
         previous_number?: number | null;
     } | null;
+};
+
+export type LiveContainer = {
+    container: string;
+    label: string;
+    process: string;
+};
+
+/** One extra process of an app, as the Services card shows it. */
+export type AppProcess = {
+    name: string;
+    kind: 'scheduler' | 'queue' | 'horizon' | 'pulse' | 'ssr' | 'custom';
+    kind_label: string;
+    /** The person's command, or null for the usual one. */
+    command: string | null;
+    /** The usual command of its kind (for a custom one, what the inspector found). */
+    default_command: string | null;
+    enabled: boolean;
+    replicas: number;
+    may_replicate: boolean;
+    overlap: 'overlap' | 'stop_first';
+    memory_limit_mb: number | null;
+    stop_grace_seconds: number;
+    detected_by: string | null;
+    /** False for a service CommyPanel cannot run yet (listed off, with its note). */
+    supported: boolean;
+    note: string | null;
+    removable: boolean;
 };

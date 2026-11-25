@@ -50,6 +50,7 @@ type fakeDaemon struct {
 	netForeign      bool // it exists but was not created by the agent
 	netDeleteStatus int
 	upgrade         string
+	queries         map[string]string // raw query of each request by "METHOD path"
 }
 
 func (f *fakeDaemon) handler() http.Handler {
@@ -120,6 +121,10 @@ func (f *fakeDaemon) handler() http.Handler {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		f.requests = append(f.requests, r.Method+" "+r.URL.Path)
+		if f.queries == nil {
+			f.queries = map[string]string{}
+		}
+		f.queries[r.Method+" "+r.URL.Path] = r.URL.RawQuery
 		switch {
 		case r.Method == "GET" && strings.HasPrefix(r.URL.Path, "/exec/") && strings.HasSuffix(r.URL.Path, "/json"):
 			_ = json.NewEncoder(w).Encode(map[string]any{"ExitCode": f.execExit, "Running": f.execRunning})
@@ -201,6 +206,7 @@ func (f *fakeDaemon) handler() http.Handler {
 			mounts = append(mounts, map[string]any{"Source": "/etc/secret", "Destination": "/x", "RW": false})
 			_ = json.NewEncoder(w).Encode([]map[string]any{{
 				"Names": []string{"/demo-1"}, "Image": "demo:1", "State": cmpOr(f.listState, "running"), "Status": "Up 2 minutes", "Mounts": mounts,
+				"Labels": map[string]string{ManagedLabel: "true", ProcessLabel: "queue"},
 				"Ports": []map[string]any{
 					{"IP": "127.0.0.1", "PrivatePort": 8080, "PublicPort": 20001, "Type": "tcp"},
 					{"PrivatePort": 9090, "Type": "tcp"}, // exposed but not published

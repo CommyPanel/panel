@@ -664,6 +664,7 @@ components:
                         - go
                         - node
                         - python
+                        - laravel
                         - template
                 deploy_strategy:
                     type: string

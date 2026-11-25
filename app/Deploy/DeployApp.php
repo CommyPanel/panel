@@ -50,6 +50,7 @@ class DeployApp
         private readonly WatchService $watch,
         private readonly RolloutService $rollouts,
         private readonly QuickInstall $quick,
+        private readonly ReleaseProcesses $processes,
     ) {}
 
     public function __invoke(Deployment $deployment): void
@@ -70,7 +71,7 @@ class DeployApp
                 $workDir = $this->workDir($app, $deployment);
                 $this->build($app, $deployment, $workDir, $log);
 
-                if ($deployment->release_command !== null) {
+                if ($deployment->release_script !== null || $deployment->release_command !== null) {
                     $this->release($app, $deployment, $log);
                 }
             } else {
@@ -83,6 +84,10 @@ class DeployApp
 
             $deployment->forceFill(['status' => DeploymentStatus::Starting])->save();
 
+            // The containers this release will have, written down before anything starts (and before the old
+            // version is stopped to make room), so a command that cannot run fails the deployment now.
+            $this->processes->plan($app, $deployment);
+
             $previous = $app->activeDeployment;
             $stopFirst = $deployment->strategy === DeployStrategy::StopFirst;
 
@@ -91,6 +96,7 @@ class DeployApp
             }
 
             $started = $this->start($app, $deployment, $log);
+            $this->processes->startOverlap($app, $deployment, $log);
             $this->checkHealth($app, $deployment, $log);
 
             if ($this->rollouts->shouldRoll($app, $deployment, $previous) && $previous !== null) {
@@ -140,6 +146,7 @@ class DeployApp
 
         $log->step("Stopping the previous version ({$previous->container_name}) first: this app cannot run two versions at once, so it is unavailable until the new one answers.");
         $this->host->stopContainer($previous->container_name);
+        $this->processes->control($previous, 'stop');
 
         return $previous;
     }
@@ -151,6 +158,7 @@ class DeployApp
 
         try {
             $this->host->startContainer((string) $release->container_name);
+            $this->processes->control($release, 'start');
         } catch (Throwable $e) {
             $log->line('Could not start the previous version again: '.$e->getMessage());
 
@@ -181,6 +189,7 @@ class DeployApp
 
         try {
             $this->host->startContainer($live->container_name);
+            $this->processes->control($live, 'start');
         } catch (Throwable $e) {
             Log::warning('Could not start the previous version after an interrupted deployment.', ['error' => $e->getMessage()]);
         }
@@ -210,7 +219,7 @@ class DeployApp
         $log->step("Commit {$sha}.");
 
         try {
-            $plan = $this->detector->plan($workDir, $app->container_port);
+            $plan = $this->detector->plan($workDir, $app->container_port, $app->stack_options ?? []);
         } catch (DetectionFailed $e) {
             throw new DeploymentFailed($e->getMessage(), 0, $e);
         }
@@ -228,6 +237,21 @@ class DeployApp
             if ($plan->dockerignore !== null && ! File::exists("{$workDir}/.dockerignore")) {
                 File::put("{$workDir}/.dockerignore", $plan->dockerignore);
             }
+        }
+
+        // Files the stack needs next to the Dockerfile (an entrypoint script, a web server config). A repository's
+        // own .dockerignore must not hide them, so their folder is let through explicitly.
+        foreach ($plan->files as $relative => $contents) {
+            if (! preg_match('/^\.commypanel\/[A-Za-z0-9._-]+$/', $relative)) {
+                throw new DeploymentFailed("The build plan asked for a file outside the build folder: {$relative}.");
+            }
+
+            File::ensureDirectoryExists("{$workDir}/.commypanel", 0755);
+            File::put("{$workDir}/{$relative}", $contents);
+        }
+
+        if ($plan->files !== [] && File::exists("{$workDir}/.dockerignore")) {
+            File::append("{$workDir}/.dockerignore", "\n!.commypanel/\n");
         }
 
         if ($app->stack_hint !== null && $plan->stack !== $app->stack_hint && $plan->stack !== Stack::Dockerfile) {
@@ -271,21 +295,33 @@ class DeployApp
     }
 
     /**
-     * Run the release command once in a container from the new image, with the
-     * app's environment, before the new version starts. The old version keeps
-     * serving while it runs, so the command must leave the data usable by it.
+     * Run the release step once in a container from the new image, with the app's environment, before the
+     * new version starts: the release script (several lines, run by `sh -ec`, so any shell syntax works and
+     * the first failing command stops it) or the single release command. The old version keeps serving while
+     * it runs, so it must leave the data usable by it.
      */
     private function release(App $app, Deployment $deployment, DeployLogger $log): void
     {
-        try {
-            $command = CommandLine::split((string) $deployment->release_command);
-        } catch (InvalidArgumentException $e) {
-            throw new DeploymentFailed("The release command is not valid: {$e->getMessage()}", 0, $e);
+        $script = $deployment->release_script;
+
+        if ($script !== null) {
+            $command = ['sh', '-ec', $script];
+            $what = 'release script';
+            $shown = "\n".trim($script);
+        } else {
+            try {
+                $command = CommandLine::split((string) $deployment->release_command);
+            } catch (InvalidArgumentException $e) {
+                throw new DeploymentFailed("The release command is not valid: {$e->getMessage()}", 0, $e);
+            }
+
+            $what = 'release command';
+            $shown = (string) $deployment->release_command;
         }
 
         $timeout = min(3600, max(1, (int) config('commypanel.deploy.release_timeout')));
         $this->stage($deployment, DeploymentStage::Release);
-        $log->step("Running the release command: {$deployment->release_command}");
+        $log->step("Running the {$what}: {$shown}");
 
         $code = $this->host->runTask(new TaskSpec(
             name: "{$app->slug}-{$deployment->number}-release",
@@ -301,10 +337,10 @@ class DeployApp
         ), $log->line(...));
 
         if ($code !== 0) {
-            throw new DeploymentFailed("The release command failed with exit code {$code}. The new version was not started.");
+            throw new DeploymentFailed("The {$what} failed with exit code {$code}. The new version was not started.");
         }
 
-        $log->line('The release command finished.');
+        $log->line("The {$what} finished.");
     }
 
     /**
@@ -312,8 +348,7 @@ class DeployApp
      */
     private function environment(App $app): array
     {
-        // The app's own variables come last, so one with the same name wins on purpose.
-        return ['PORT' => (string) $app->container_port, ...$this->links->environment($app), ...$app->environment()];
+        return $this->processes->environment($app);
     }
 
     private function checkHealth(App $app, Deployment $deployment, DeployLogger $log): void
@@ -366,6 +401,9 @@ class DeployApp
                 Log::warning('Could not remove the failed container.', ['error' => $cleanup->getMessage()]);
             }
         }
+
+        // The extra processes this release had started or been given.
+        $this->processes->removeAll($deployment->fresh() ?? $deployment, planned: true);
 
         // A stop-first release took the old version down: put it back, so a failed deploy ends with the app serving again.
         if ($restart !== null) {

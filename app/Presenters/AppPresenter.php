@@ -2,6 +2,9 @@
 
 namespace App\Presenters;
 
+use App\Deploy\AppEnvironment;
+use App\Deploy\AppProcesses;
+use App\Deploy\ReleaseProcesses;
 use App\Deploy\Safe\RolloutService;
 use App\Deploy\Source\GitProvider;
 use App\Enums\AppStatus;
@@ -32,6 +35,8 @@ class AppPresenter
             'slug' => $app->slug,
             'name' => $app->name,
             'stack' => $app->stack?->label(),
+            // A Laravel app edits its variables as one .env text.
+            'env_text' => AppEnvironment::usesText($app),
             'status' => $app->status()->value,
             'locked' => $app->isLocked(),
             'source_type' => $app->source_type->value,
@@ -72,6 +77,14 @@ class AppPresenter
             'git_token' => $app->git_token === null ? null : ['username' => $app->git_token_username],
             'token_help' => self::tokenHelp($app),
             'release_command' => $app->release_command,
+            'release_script' => $app->release_script,
+            // Laravel apps run extra processes (scheduler, workers) beside the web one; others have none.
+            'uses_processes' => AppProcesses::isLaravel($app),
+            'processes' => app(AppProcesses::class)->present($app),
+            // The containers of the live release a person can look at (logs, terminal, usage): web, then each process.
+            'live_containers' => app(ReleaseProcesses::class)->lookable($app->activeDeployment),
+            // Database servers made for this app: deleting the app keeps them (the delete dialog says so).
+            'dedicated_servers' => $app->dedicatedDatabaseServers()->orderBy('name')->pluck('name')->all(),
             'pending_changes' => $app->hasPendingChanges(),
             'alerts_enabled' => $app->alerts_enabled,
             'safe_deploys' => [
@@ -135,7 +148,7 @@ class AppPresenter
                 'until' => $deployment->watch_until?->toIso8601String(),
                 'note' => $deployment->watch_note,
             ],
-            'has_release_command' => $deployment->release_command !== null,
+            'has_release_command' => $deployment->release_command !== null || $deployment->release_script !== null,
             'can_roll_back' => $deployment->image_tag !== null && $deployment->image_available,
             'error' => $deployment->error,
             'created_at' => $deployment->created_at?->toIso8601String(),

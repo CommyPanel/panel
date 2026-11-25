@@ -20,6 +20,8 @@ use Illuminate\Support\Carbon;
  * @property string|null $commit_sha
  * @property string|null $commit_message
  * @property string|null $release_command
+ * @property string|null $release_script
+ * @property list<array<string, mixed>>|null $processes
  * @property string|null $image_tag
  * @property bool $image_available
  * @property int|null $rolled_back_from_id
@@ -57,6 +59,7 @@ class Deployment extends Model
             'settings_only' => 'boolean',
             'retry' => 'boolean',
             'skip_watch' => 'boolean',
+            'processes' => 'array',
             'live_at' => 'datetime',
             'watch_until' => 'datetime',
             'started_at' => 'datetime',

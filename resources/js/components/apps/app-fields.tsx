@@ -1,6 +1,8 @@
+import { useId } from 'react';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { useT } from '@/hooks/use-t';
+import { cn } from '@/lib/utils';
 
 export type AppFormData = {
     name: string;
@@ -11,11 +13,15 @@ export type AppFormData = {
     health_timeout: string;
     deploy_strategy: string;
     release_command: string;
+    /** Laravel apps: several lines run before every release goes live. */
+    release_script?: string;
     memory_limit_mb: string;
     cpu_limit: string;
 };
 
 type Props = {
+    /** Show the multi-line release script instead of the single release command (Laravel apps). */
+    releaseScript?: boolean;
     data: AppFormData;
     errors: Partial<Record<keyof AppFormData, string>>;
     setData: <K extends keyof AppFormData>(
@@ -60,7 +66,12 @@ export function SourceFields({ data, errors, setData }: Props) {
 }
 
 /** How the app runs once built. */
-export function RuntimeFields({ data, errors, setData }: Props) {
+export function RuntimeFields({
+    data,
+    errors,
+    setData,
+    releaseScript = false,
+}: Props) {
     const { t } = useT();
 
     return (
@@ -115,11 +126,19 @@ export function RuntimeFields({ data, errors, setData }: Props) {
                     {t('Stop the old version first')}
                 </option>
             </Select>
-            <ReleaseCommandInput
-                value={data.release_command}
-                onChange={(value) => setData('release_command', value)}
-                error={errors.release_command}
-            />
+            {releaseScript ? (
+                <ReleaseScriptInput
+                    value={data.release_script ?? ''}
+                    onChange={(value) => setData('release_script', value)}
+                    error={errors.release_script}
+                />
+            ) : (
+                <ReleaseCommandInput
+                    value={data.release_command}
+                    onChange={(value) => setData('release_command', value)}
+                    error={errors.release_command}
+                />
+            )}
             <Input
                 label={t('Memory limit (MB)')}
                 type="number"
@@ -172,5 +191,59 @@ export function ReleaseCommandInput({
                 "Runs once per deployment in a container from the new image, before it starts. If it fails, the old version keeps serving. Runs without a shell; use sh -c '...' to chain commands.",
             )}
         />
+    );
+}
+
+/**
+ * The script a Laravel release runs before it goes live: one command per line, run by a shell, so anything a
+ * shell accepts works. It is made for you; edit it if your app needs more. Shared by the settings tab and the
+ * setup wizard.
+ */
+export function ReleaseScriptInput({
+    value,
+    onChange,
+    error,
+}: {
+    value: string;
+    onChange: (value: string) => void;
+    error?: string;
+}) {
+    const { t } = useT();
+    const id = useId();
+
+    return (
+        <div className="w-full">
+            <label className="mb-1 label-text block px-0!" htmlFor={id}>
+                {t('Release script')}
+            </label>
+            <textarea
+                id={id}
+                className={cn(
+                    'textarea w-full font-mono text-sm',
+                    error && 'is-invalid',
+                )}
+                rows={7}
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                spellCheck={false}
+                autoComplete="off"
+                autoCapitalize="off"
+                aria-invalid={error ? true : undefined}
+                aria-describedby={`${id}-help`}
+                placeholder={t('php artisan migrate --force')}
+            />
+            <span
+                id={`${id}-help`}
+                className={cn(
+                    'mt-1 block text-sm',
+                    error ? 'text-error' : 'text-base-content/60',
+                )}
+            >
+                {error ??
+                    t(
+                        'Runs before every release goes live, in a container from the new image, one command per line (any shell syntax works; the first line that fails stops the deployment and the old version keeps serving). Lines starting with # are comments.',
+                    )}
+            </span>
+        </div>
     );
 }

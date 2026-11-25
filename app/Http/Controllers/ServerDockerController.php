@@ -3,13 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Audit\AuditLogger;
+use App\Deploy\ContainerOwners;
 use App\Host\Data\ContainerInfo;
 use App\Host\Data\ImageInfo;
 use App\Host\Data\ResourceName;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
 use App\Host\HostHealth;
-use App\Models\Deployment;
 use App\Presenters\ContainerPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -44,9 +44,7 @@ class ServerDockerController extends Controller
         }
 
         // Which app each container belongs to, from the deployments that started them.
-        $owners = Deployment::query()->with('app:id,slug,name')
-            ->whereIn('container_name', array_map(fn (ContainerInfo $c) => $c->name, $containers))
-            ->get()->keyBy('container_name');
+        $owners = ContainerOwners::for(array_map(fn (ContainerInfo $c) => $c->name, $containers));
 
         return Inertia::render('server/docker', [
             'error' => $error,

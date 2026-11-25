@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Deploy\ContainerOwners;
+use App\Deploy\ReleaseProcesses;
 use App\Host\Data\ContainerInfo;
 use App\Host\Data\NetworkInfo;
 use App\Host\Exceptions\DockerUnavailable;
@@ -18,7 +20,7 @@ use Illuminate\Http\JsonResponse;
  */
 class AppContainerController extends Controller
 {
-    public function show(App $app, HostDriver $host): JsonResponse
+    public function show(App $app, HostDriver $host, ReleaseProcesses $processes): JsonResponse
     {
         try {
             $containers = $host->listContainers();
@@ -29,13 +31,26 @@ class AppContainerController extends Controller
             return response()->json(['error' => $e->getMessage()], 502);
         }
 
-        $releases = $app->deployments()->whereNotNull('container_name')->pluck('number', 'container_name');
+        // The web container of each release, and its extra processes (workers, scheduler): container => [release, process].
+        $known = [];
+
+        foreach ($app->deployments()->whereNotNull('container_name')->get() as $d) {
+            $known[$d->container_name] = ['release' => $d->number, 'process' => 'web'];
+
+            foreach ($processes->entries($d) as $entry) {
+                foreach ($entry['containers'] as $container) {
+                    $known[$container] = ['release' => $d->number, 'process' => $entry['name']];
+                }
+            }
+        }
+
+        $releases = collect($known)->map(fn (array $k) => $k['release']);
         $own = collect($containers)->filter(fn (ContainerInfo $c) => $releases->has($c->name))->values();
+        $live = array_column($processes->lookable($app->activeDeployment()->first()), 'container');
 
         // Which app every container on those networks belongs to.
-        $owners = Deployment::query()->with('app:id,slug,name')->get(['container_name', 'app_id'])
-            ->filter(fn (Deployment $d) => $d->container_name !== null)
-            ->mapWithKeys(fn (Deployment $d) => [$d->container_name => $d->app?->only(['slug', 'name'])]);
+        $owners = ContainerOwners::for(array_map(fn (ContainerInfo $c) => $c->name, $containers))
+            ->map(fn (Deployment $d) => $d->app?->only(['slug', 'name']));
 
         $onNetworks = $own->flatMap(fn (ContainerInfo $c) => array_column($c->networks, 'name'))->unique();
 
@@ -43,7 +58,8 @@ class AppContainerController extends Controller
             'containers' => $own->map(fn (ContainerInfo $c) => [
                 ...ContainerPresenter::container($c),
                 'release' => $releases->get($c->name),
-                'live' => $c->name === $app->activeDeployment()->value('container_name'),
+                'process' => $known[$c->name]['process'] ?? 'web',
+                'live' => in_array($c->name, $live, true),
             ])->all(),
             'networks' => collect($networks)
                 ->filter(fn (NetworkInfo $n) => $onNetworks->contains($n->name))

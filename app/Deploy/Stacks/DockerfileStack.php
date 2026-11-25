@@ -19,7 +19,7 @@ class DockerfileStack implements StackDefinition
         return SourceTree::has($path, 'Dockerfile');
     }
 
-    public function plan(string $path, int $port): BuildPlan
+    public function plan(string $path, int $port, array $options = []): BuildPlan
     {
         return new BuildPlan(Stack::Dockerfile, null, null, ['Using the Dockerfile from the repository.']);
     }

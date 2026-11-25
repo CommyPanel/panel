@@ -39,6 +39,12 @@ export function LogsTab({ app }: { app: AppSettings }) {
     const [wrap, setWrap] = useState(false);
     const [query, setQuery] = useState('');
     const [current, setCurrent] = useState(0);
+    // Which container of the live release: the web one, or a worker, the scheduler ...
+    const [container, setContainer] = useState('');
+    // A release that replaced the one chosen shows its web container again.
+    const selected = app.live_containers.some((c) => c.container === container)
+        ? container
+        : (app.live_containers[0]?.container ?? '');
 
     const viewer = useRef<HTMLDivElement>(null);
     const search = useRef<HTMLInputElement>(null);
@@ -51,14 +57,17 @@ export function LogsTab({ app }: { app: AppSettings }) {
             setLoading(true);
 
             try {
-                const response = await fetch(`${url}?tail=${lines}`, {
-                    credentials: 'same-origin',
-                    signal,
-                    headers: {
-                        Accept: 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
+                const response = await fetch(
+                    `${url}?tail=${lines}${selected === '' ? '' : `&container=${encodeURIComponent(selected)}`}`,
+                    {
+                        credentials: 'same-origin',
+                        signal,
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
                     },
-                });
+                );
                 const body = (await response.json()) as LogResponse;
 
                 if (!response.ok) {
@@ -87,7 +96,7 @@ export function LogsTab({ app }: { app: AppSettings }) {
                 setLoading(false);
             }
         },
-        [url, lines, t],
+        [url, lines, selected, t],
     );
 
     useEffect(() => {
@@ -193,7 +202,7 @@ export function LogsTab({ app }: { app: AppSettings }) {
                 )}
                 actions={
                     <a
-                        href={AppLogController.download(app.slug).url}
+                        href={`${AppLogController.download(app.slug).url}${selected === '' ? '' : `?container=${encodeURIComponent(selected)}`}`}
                         className="btn btn-soft btn-sm"
                     >
                         <Download className="size-4" aria-hidden />
@@ -202,6 +211,20 @@ export function LogsTab({ app }: { app: AppSettings }) {
                 }
             >
                 {error && <Alert variant="error">{error}</Alert>}
+
+                {app.live_containers.length > 1 && (
+                    <Select
+                        label={t('Process')}
+                        value={selected}
+                        onChange={(e) => setContainer(e.target.value)}
+                    >
+                        {app.live_containers.map((c) => (
+                            <option key={c.container} value={c.container}>
+                                {c.label}
+                            </option>
+                        ))}
+                    </Select>
+                )}
 
                 <div className="flex w-full items-end gap-2">
                     <div className="relative min-w-0 flex-1">

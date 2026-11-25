@@ -28,6 +28,7 @@ class ReleaseSwitcher
         private readonly TrafficSwitcher $traffic,
         private readonly AppLinks $links,
         private readonly TlsPlanner $tls,
+        private readonly ReleaseProcesses $processes,
     ) {}
 
     /**
@@ -42,6 +43,13 @@ class ReleaseSwitcher
         $this->switchTo($app, $new, $previous, $log);
         $new->forceFill(['status' => DeploymentStatus::Active, 'stage' => DeploymentStage::Done, 'finished_at' => now(), 'live_at' => now()])->save();
 
+        // The scheduler and Horizon must not run twice: the old ones stop (kept, for a rollback), then the new ones start.
+        if (! $previousStopped) {
+            $this->processes->stopSingletons($previous, $log);
+        }
+
+        $this->processes->startSingletons($app, $new, $log);
+
         $this->tls->ensure($app);
 
         if ($mayWatch && $this->shouldWatch($app, $new, $previous)) {
@@ -52,6 +60,16 @@ class ReleaseSwitcher
         }
 
         $this->pruneImages($app, $log);
+    }
+
+    /**
+     * An automatic rollback went back to `$previous`: the processes that must not run twice follow it, the new
+     * release's stop and the old release's (stopped at go-live, not removed) start again.
+     */
+    public function restoreProcesses(Deployment $new, ?Deployment $previous, DeployLogger $log): void
+    {
+        $this->processes->stopSingletons($new, $log);
+        $this->processes->startSingletonsAgain($previous, $log);
     }
 
     /**
@@ -153,6 +171,12 @@ class ReleaseSwitcher
             // The other version is already serving; do not fail over cleanup.
             Log::warning('Could not retire the previous container.', ['container' => $release->container_name, 'error' => $e->getMessage()]);
             $log->line('Warning: could not stop the previous container: '.$e->getMessage());
+        }
+
+        // Its workers and the processes stopped at go-live go with it (each gets its grace period to finish).
+        foreach ($this->processes->removeAll($release, stopFirst: true) as $problem) {
+            Log::warning('Could not retire a process of the previous release.', ['problem' => $problem]);
+            $log->line('Warning: '.$problem);
         }
 
         $release->forceFill(['status' => $final])->save();

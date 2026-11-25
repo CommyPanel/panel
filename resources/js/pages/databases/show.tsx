@@ -14,6 +14,7 @@ import {
     Trash2,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import AppController from '@/actions/App/Http/Controllers/AppController';
 import DatabaseBackupController from '@/actions/App/Http/Controllers/DatabaseBackupController';
 import DatabaseServerController from '@/actions/App/Http/Controllers/DatabaseServerController';
 import DatabaseToolController from '@/actions/App/Http/Controllers/DatabaseToolController';
@@ -365,6 +366,26 @@ export default function Show({
                 }
             />
 
+            {server.dedicated_app && (
+                <Alert variant="info">
+                    <span>
+                        <Trans
+                            text="This server was made for <link>:app</link>. Its user can create and drop databases on it by itself (for multi-database or tenancy packages), so the databases the app makes are not listed here. Only that app should use this server."
+                            values={{ app: server.dedicated_app.name }}
+                            components={{
+                                link: (
+                                    <Link
+                                        href={AppController.show(
+                                            server.dedicated_app.slug,
+                                        )}
+                                        className="link font-medium"
+                                    />
+                                ),
+                            }}
+                        />
+                    </span>
+                </Alert>
+            )}
             {errors.database && (
                 <Alert variant="error">{errors.database}</Alert>
             )}

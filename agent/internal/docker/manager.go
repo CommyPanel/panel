@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/url"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,6 +22,9 @@ import (
 // ManagedLabel marks every container the agent creates. Stop and remove
 // refuse to touch containers without it.
 const ManagedLabel = "com.commypanel.managed"
+
+// ProcessLabel names the process of an app a container runs (set from ContainerSpec.Process).
+const ProcessLabel = "com.commypanel.process"
 
 const (
 	defaultNetwork  = "commypanel"
@@ -98,6 +102,19 @@ type ContainerSpec struct {
 	// It is the only way that folder can be mounted; volumes can never name it.
 	DatabaseTLS bool `json:"database_tls,omitempty"`
 
+	// Command replaces the image's own command (Docker's Cmd): one process of an app, such as a queue
+	// worker, runs from the same image as the web process. It is an argument list, never a shell line,
+	// and only app images (commypanel/...) take one; a database server's command is the agent's own.
+	Command []string `json:"command,omitempty"`
+	// StopTimeout is how many seconds a stop or restart waits for the process to exit by itself before
+	// it is killed (a queue worker finishing its job). 0 leaves Docker's default of 10.
+	StopTimeout int `json:"stop_timeout,omitempty"`
+	// Restart is the restart policy: unless-stopped (the default), on-failure or no.
+	Restart string `json:"restart,omitempty"`
+	// Process names which process of an app this container is (queue, scheduler, ...); it becomes the
+	// label com.commypanel.process.
+	Process string `json:"process,omitempty"`
+
 	// Set only by the agent's own code (database tool sessions), never from a request.
 	extraLabels map[string]string
 	noRestart   bool
@@ -112,12 +129,23 @@ type NetworkAttach struct {
 const (
 	maxExtraNetworks = 8
 	maxAliases       = 4
+
+	// A container's command is a short argument list (a script goes through a task, whose limit is higher).
+	maxCommandArgs     = 64
+	maxCommandArgBytes = 4 << 10
+	maxStopTimeout     = 600
 )
+
+var processRe = regexp.MustCompile(`^[a-z][a-z0-9-]{0,30}$`)
+
+// restartPolicies are the policies a request may ask for; Docker's names.
+var restartPolicies = map[string]bool{"unless-stopped": true, "on-failure": true, "no": true}
 
 // ContainerInfo describes a managed container.
 type ContainerInfo struct {
 	Name     string             `json:"name"`
 	Image    string             `json:"image"`
+	Process  string             `json:"process,omitempty"` // the app process it runs, from its label
 	State    string             `json:"state"`
 	Status   string             `json:"status"`
 	Created  int64              `json:"created"`
@@ -232,7 +260,57 @@ func (m *Manager) Validate(s ContainerSpec) error {
 			return err
 		}
 	}
+	if err := validateProcess(s); err != nil {
+		return err
+	}
 	return validateAttachments(s)
+}
+
+// validateProcess checks what makes a container one process of an app: its command, how long it
+// gets to stop, its restart policy and its process name.
+func validateProcess(s ContainerSpec) error {
+	if len(s.Command) > 0 {
+		if !strings.HasPrefix(s.Image, buildNamePrefix) {
+			return &validate.InputError{Msg: "a command can only be set for images CommyPanel built (" + buildNamePrefix + ")"}
+		}
+		if err := checkCommand(s.Command, maxCommandArgBytes); err != nil {
+			return err
+		}
+	}
+	if s.StopTimeout < 0 || s.StopTimeout > maxStopTimeout {
+		return &validate.InputError{Msg: fmt.Sprintf("stop_timeout must be between 0 and %d seconds", maxStopTimeout)}
+	}
+	if s.Restart != "" && !restartPolicies[s.Restart] {
+		return &validate.InputError{Msg: "restart must be unless-stopped, on-failure or no"}
+	}
+	if s.Process != "" {
+		if !strings.HasPrefix(s.Image, buildNamePrefix) {
+			return &validate.InputError{Msg: "a process name can only be set for images CommyPanel built (" + buildNamePrefix + ")"}
+		}
+		if !processRe.MatchString(s.Process) {
+			return &validate.InputError{Msg: "invalid process name"}
+		}
+	}
+	return nil
+}
+
+// checkCommand checks an argument list: not too many, none empty, none holding a NUL, none longer than
+// maxArg bytes, and all of them together within the task limit.
+func checkCommand(cmd []string, maxArg int) error {
+	if len(cmd) > maxCommandArgs {
+		return &validate.InputError{Msg: "command has too many arguments"}
+	}
+	total := 0
+	for _, arg := range cmd {
+		if arg == "" || len(arg) > maxArg || strings.ContainsRune(arg, 0) {
+			return &validate.InputError{Msg: "invalid command argument"}
+		}
+		total += len(arg)
+	}
+	if total > maxTaskCmdBytes {
+		return &validate.InputError{Msg: "command is too long"}
+	}
+	return nil
 }
 
 // resolveMount checks that a bind mount source is where its kind of container
@@ -332,6 +410,9 @@ func (m *Manager) createBody(s ContainerSpec) map[string]any {
 		"PublishAllPorts": false,
 	}
 	labels := map[string]string{ManagedLabel: "true"}
+	if s.Process != "" {
+		labels[ProcessLabel] = s.Process
+	}
 	for k, v := range s.extraLabels {
 		labels[k] = v
 	}
@@ -348,6 +429,11 @@ func (m *Manager) createBody(s ContainerSpec) map[string]any {
 	}
 	if s.DatabaseTLS {
 		body["Cmd"] = databaseTLSCommand(s.Image)
+	} else if len(s.Command) > 0 {
+		body["Cmd"] = s.Command
+	}
+	if s.StopTimeout > 0 {
+		body["StopTimeout"] = s.StopTimeout
 	}
 	if len(s.Aliases) > 0 {
 		body["NetworkingConfig"] = map[string]any{"EndpointsConfig": map[string]any{
@@ -365,6 +451,9 @@ func (m *Manager) createBody(s ContainerSpec) map[string]any {
 func restartPolicy(s ContainerSpec) string {
 	if s.noRestart {
 		return "no"
+	}
+	if s.Restart != "" {
+		return s.Restart
 	}
 	return "unless-stopped"
 }
@@ -454,7 +543,8 @@ func (m *Manager) requireManaged(ctx context.Context, name string) (bool, error)
 	return true, nil
 }
 
-// Stop stops a managed container. Stopping a missing or stopped one succeeds.
+// Stop stops a managed container, waiting for its StopTimeout (10 seconds unless it was started with
+// another) before it is killed. Stopping a missing or stopped one succeeds.
 func (m *Manager) Stop(ctx context.Context, name string) error {
 	if err := validate.Name(name); err != nil {
 		return err
@@ -466,7 +556,7 @@ func (m *Manager) Stop(ctx context.Context, name string) error {
 	if exists, err := m.requireManaged(ctx, name); err != nil || !exists {
 		return err
 	}
-	err := m.engine.doJSON(ctx, "POST", "/containers/"+name+"/stop", url.Values{"t": {"10"}}, nil, nil)
+	err := m.engine.doJSON(ctx, "POST", "/containers/"+name+"/stop", nil, nil, nil)
 	if isStatus(err, 404) {
 		return nil
 	}
@@ -485,7 +575,8 @@ func (m *Manager) Start(ctx context.Context, name string) error {
 	return m.engine.doJSON(ctx, "POST", "/containers/"+name+"/start", nil, nil, nil)
 }
 
-// Restart stops (with a grace period) and starts a managed container.
+// Restart stops (with a grace period) and starts a managed container. The grace period is the
+// container's own StopTimeout (10 seconds unless it was started with another).
 func (m *Manager) Restart(ctx context.Context, name string) error {
 	if err := m.requireExisting(ctx, name, "restart"); err != nil {
 		return err
@@ -493,7 +584,7 @@ func (m *Manager) Restart(ctx context.Context, name string) error {
 	if m.cfg.DryRun {
 		return nil
 	}
-	return m.engine.doJSON(ctx, "POST", "/containers/"+name+"/restart", url.Values{"t": {"10"}}, nil, nil)
+	return m.engine.doJSON(ctx, "POST", "/containers/"+name+"/restart", nil, nil, nil)
 }
 
 // requireExisting validates the name and, outside dry-run, insists the
@@ -542,11 +633,12 @@ func (m *Manager) List(ctx context.Context) ([]ContainerInfo, error) {
 	}
 	filters, _ := json.Marshal(map[string][]string{"label": {ManagedLabel + "=true"}})
 	var raw []struct {
-		Names   []string `json:"Names"`
-		Image   string   `json:"Image"`
-		State   string   `json:"State"`
-		Status  string   `json:"Status"`
-		Created int64    `json:"Created"`
+		Names   []string          `json:"Names"`
+		Image   string            `json:"Image"`
+		State   string            `json:"State"`
+		Status  string            `json:"Status"`
+		Created int64             `json:"Created"`
+		Labels  map[string]string `json:"Labels"`
 		Ports   []struct {
 			IP          string `json:"IP"`
 			PrivatePort int    `json:"PrivatePort"`
@@ -574,7 +666,7 @@ func (m *Manager) List(ctx context.Context) ([]ContainerInfo, error) {
 			name = strings.TrimPrefix(c.Names[0], "/")
 		}
 		info := ContainerInfo{
-			Name: name, Image: c.Image, State: c.State, Status: c.Status, Created: c.Created,
+			Name: name, Image: c.Image, Process: c.Labels[ProcessLabel], State: c.State, Status: c.Status, Created: c.Created,
 			Networks: []ContainerNetwork{}, Ports: []ContainerPort{}, Mounts: []ContainerMount{},
 		}
 		for netName, n := range c.NetworkSettings.Networks {

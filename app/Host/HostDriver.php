@@ -245,7 +245,7 @@ interface HostDriver
      *
      * @throws HostOperationFailed
      */
-    public function createDatabase(DatabaseTarget $server, string $database, string $user, #[\SensitiveParameter] string $password): void;
+    public function createDatabase(DatabaseTarget $server, string $database, string $user, #[\SensitiveParameter] string $password, bool $admin = false): void;
 
     /**
      * Delete a database and its user. What does not exist is not an error.

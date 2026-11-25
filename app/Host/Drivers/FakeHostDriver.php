@@ -68,6 +68,8 @@ class FakeHostDriver implements HostDriver
 
     private ?string $dnsCompleteFails = null;
 
+    private ?string $exitsOnStart = null;
+
     private ?string $cloudflareFails = null;
 
     /** @var array<string, true> names of containers that are stopped */
@@ -347,6 +349,21 @@ class FakeHostDriver implements HostDriver
     {
         $this->record('runContainer', ['spec' => $spec]);
         $this->containers[$spec->name] = $spec;
+
+        // A container that dies right after it starts (tests).
+        if ($this->exitsOnStart !== null && str_ends_with($spec->name, $this->exitsOnStart)) {
+            $this->stopped[$spec->name] = true;
+        }
+    }
+
+    /**
+     * Make every container whose name ends with this exit as soon as it is started (tests).
+     */
+    public function exitContainersEndingWith(?string $suffix): static
+    {
+        $this->exitsOnStart = $suffix;
+
+        return $this;
     }
 
     public function stopContainer(string $name): void
@@ -569,15 +586,15 @@ class FakeHostDriver implements HostDriver
         return isset($this->containers[$server->container]) && ! isset($this->stopped[$server->container]);
     }
 
-    public function createDatabase(DatabaseTarget $server, string $database, string $user, #[\SensitiveParameter] string $password): void
+    public function createDatabase(DatabaseTarget $server, string $database, string $user, #[\SensitiveParameter] string $password, bool $admin = false): void
     {
-        $this->record('createDatabase', ['container' => $server->container, 'database' => $database, 'user' => $user]);
+        $this->record('createDatabase', ['container' => $server->container, 'database' => $database, 'user' => $user, 'admin' => $admin]);
 
         if (! isset($this->containers[$server->container])) {
             throw new HostOperationFailed('Agent error: container does not exist');
         }
 
-        $this->databases[$server->container][$database] = ['user' => $user, 'password' => $password];
+        $this->databases[$server->container][$database] = ['user' => $user, 'password' => $password, 'admin' => $admin];
     }
 
     public function dropDatabase(DatabaseTarget $server, string $database, string $user): void

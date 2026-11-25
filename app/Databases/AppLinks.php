@@ -3,6 +3,7 @@
 namespace App\Databases;
 
 use App\Dns\PanelDomain;
+use App\Enums\DatabaseEngine;
 use App\FastApps\FastApps;
 use App\Host\Data\NetworkAttachment;
 use App\Host\Exceptions\HostOperationFailed;
@@ -28,9 +29,9 @@ class AppLinks
     /**
      * @throws DatabaseException
      */
-    public function linkDatabase(App $app, ManagedDatabase $database, string $prefix): AppDatabaseLink
+    public function linkDatabase(App $app, ManagedDatabase $database, string $prefix, string $style = AppDatabaseLink::STYLE_PREFIX): AppDatabaseLink
     {
-        $prefix = DatabaseNames::envPrefix($prefix);
+        $prefix = $style === AppDatabaseLink::STYLE_LARAVEL ? AppDatabaseLink::LARAVEL_PREFIX : DatabaseNames::envPrefix($prefix);
         $server = $database->server;
 
         if (! $server->isRunning()) {
@@ -50,7 +51,7 @@ class AppLinks
         }
 
         /** @var AppDatabaseLink $link */
-        $link = $app->databaseLinks()->create(['managed_database_id' => $database->id, 'env_prefix' => $prefix]);
+        $link = $app->databaseLinks()->create(['managed_database_id' => $database->id, 'env_prefix' => $prefix, 'env_style' => $style]);
 
         try {
             $this->host->connectNetwork($server->containerName(), $link->networkName(), [$server->slug]);
@@ -167,6 +168,12 @@ class AppLinks
             $connection = DatabaseConnection::for($link->database);
             $p = $link->env_prefix;
 
+            if ($link->isLaravelStyle()) {
+                $env = [...$env, ...self::laravelVariables($app, $link, $connection)];
+
+                continue;
+            }
+
             $env["{$p}_URL"] = $connection->url;
             $env["{$p}_HOST"] = $connection->host;
             $env["{$p}_PORT"] = (string) $connection->port;
@@ -188,6 +195,35 @@ class AppLinks
         }
 
         return $env;
+    }
+
+    /**
+     * The variables of a Laravel-style link: the names config/database.php reads. The driver depends on
+     * the engine and, for MariaDB, on the Laravel version (the `mariadb` driver came with Laravel 11).
+     *
+     * @return array<string, string>
+     */
+    public static function laravelVariables(App $app, AppDatabaseLink $link, DatabaseConnection $connection): array
+    {
+        $engine = $link->database->server->engine;
+        $major = (int) ($app->stack_options['laravel_major'] ?? $app->detected['laravel_major'] ?? 0);
+
+        $driver = match ($engine) {
+            DatabaseEngine::Postgres => 'pgsql',
+            DatabaseEngine::Mysql => 'mysql',
+            DatabaseEngine::Mariadb => $major >= 11 ? 'mariadb' : 'mysql',
+        };
+
+        return [
+            'DB_CONNECTION' => $driver,
+            'DB_HOST' => $connection->host,
+            'DB_PORT' => (string) $connection->port,
+            'DB_DATABASE' => $connection->name,
+            'DB_USERNAME' => $connection->user,
+            'DB_PASSWORD' => $connection->password,
+            // The scheme names the driver, because Laravel lets the URL's scheme win over DB_CONNECTION.
+            'DB_URL' => preg_replace('/^[a-z]+:/', $driver.':', $connection->url) ?? $connection->url,
+        ];
     }
 
     /**

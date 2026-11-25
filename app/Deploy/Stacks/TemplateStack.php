@@ -19,7 +19,7 @@ class TemplateStack implements StackDefinition
         return is_file($path.'/'.TemplateSourceFetcher::MARKER);
     }
 
-    public function plan(string $path, int $port): BuildPlan
+    public function plan(string $path, int $port, array $options = []): BuildPlan
     {
         $id = trim((string) @file_get_contents($path.'/'.TemplateSourceFetcher::MARKER));
         $template = FastApps::find($id);

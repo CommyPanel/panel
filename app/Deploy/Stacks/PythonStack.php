@@ -38,7 +38,7 @@ class PythonStack implements StackDefinition
             || SourceTree::has($path, 'Pipfile');
     }
 
-    public function plan(string $path, int $port): BuildPlan
+    public function plan(string $path, int $port, array $options = []): BuildPlan
     {
         $version = $this->pythonVersion($path);
         $manager = $this->packageManager($path);

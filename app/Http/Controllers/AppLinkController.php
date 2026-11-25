@@ -13,6 +13,7 @@ use App\Models\ManagedDatabase;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 /**
  * Links from an app to a database or to another app. A new link applies from
@@ -29,6 +30,7 @@ class AppLinkController extends Controller
             'databases' => $app->databaseLinks()->with('database.server')->get()->map(fn (AppDatabaseLink $l) => [
                 'id' => $l->id,
                 'prefix' => $l->env_prefix,
+                'style' => $l->env_style,
                 'database' => $l->database->name,
                 'server' => $l->database->server->name,
                 'server_slug' => $l->database->server->slug,
@@ -55,12 +57,14 @@ class AppLinkController extends Controller
         $data = $request->validate([
             'database_id' => ['required', 'integer', 'exists:managed_databases,id'],
             'env_prefix' => ['required', 'string', 'max:31'],
+            // Laravel's own names (DB_HOST ...) instead of <PREFIX>_HOST, for a Laravel app.
+            'env_style' => ['sometimes', Rule::in([AppDatabaseLink::STYLE_PREFIX, AppDatabaseLink::STYLE_LARAVEL])],
         ]);
 
         $database = ManagedDatabase::query()->where('id', $data['database_id'])->with('server')->firstOrFail();
 
         try {
-            $link = $links->linkDatabase($app, $database, $data['env_prefix']);
+            $link = $links->linkDatabase($app, $database, $data['env_prefix'], $data['env_style'] ?? AppDatabaseLink::STYLE_PREFIX);
         } catch (DatabaseException $e) {
             return back()->withErrors(['link' => $e->getMessage()]);
         }

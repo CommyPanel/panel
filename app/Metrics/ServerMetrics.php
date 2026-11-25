@@ -2,13 +2,13 @@
 
 namespace App\Metrics;
 
+use App\Deploy\ContainerOwners;
 use App\Host\Data\ContainerUsage;
 use App\Host\Data\ResourceUsage;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
 use App\Models\App;
 use App\Models\DatabaseServer;
-use App\Models\Deployment;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -108,9 +108,7 @@ class ServerMetrics
      */
     private function containers(PrometheusText $text, ResourceUsage $usage, ?array $onlyApps): void
     {
-        $owners = Deployment::query()->with('app:id,slug')
-            ->whereIn('container_name', array_map(fn (ContainerUsage $c) => $c->name, $usage->containers))
-            ->get()->keyBy('container_name');
+        $owners = ContainerOwners::for(array_map(fn (ContainerUsage $c) => $c->name, $usage->containers));
 
         foreach ($usage->containers as $c) {
             $app = $owners->get($c->name)?->app?->slug;

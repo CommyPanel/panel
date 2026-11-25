@@ -390,6 +390,10 @@ class AgentHostDriver implements HostDriver
             'network' => $spec->network,
             'aliases' => $spec->aliases,
             'database_tls' => $spec->databaseTls ?: null,
+            'command' => $spec->command,
+            'stop_timeout' => $spec->stopTimeout ?: null,
+            'restart' => $spec->restart,
+            'process' => $spec->process,
             'networks' => array_map(fn (NetworkAttachment $n) => array_filter(['name' => $n->name, 'aliases' => $n->aliases], fn ($v) => $v !== []), $spec->networks),
         ], fn ($value) => $value !== null && $value !== []));
     }
@@ -608,9 +612,10 @@ class AgentHostDriver implements HostDriver
         return (bool) ($data['ready'] ?? false);
     }
 
-    public function createDatabase(DatabaseTarget $server, string $database, string $user, #[\SensitiveParameter] string $password): void
+    public function createDatabase(DatabaseTarget $server, string $database, string $user, #[\SensitiveParameter] string $password, bool $admin = false): void
     {
-        $this->send('post', '/v1/databases/create', [...$this->target($server), 'database' => $database, 'user' => $user, 'password' => $password]);
+        // `admin` gives the user full rights on the whole server: only a server made for one app.
+        $this->send('post', '/v1/databases/create', [...$this->target($server), 'database' => $database, 'user' => $user, 'password' => $password, ...($admin ? ['admin' => true] : [])]);
     }
 
     public function dropDatabase(DatabaseTarget $server, string $database, string $user): void

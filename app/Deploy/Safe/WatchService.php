@@ -126,6 +126,7 @@ class WatchService
             'watch_note' => mb_substr($reason, 0, 300),
             'finished_at' => now(),
         ])->save();
+        $this->switcher->restoreProcesses($new, $previous, $log);
         $this->switcher->retire($new, $log, DeploymentStatus::RolledBack);
         $log->line("Traffic is back on release #{$previous->number}.");
         $log->flush();

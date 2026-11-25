@@ -20,7 +20,7 @@ class NodeStack implements StackDefinition
         return SourceTree::has($path, 'package.json');
     }
 
-    public function plan(string $path, int $port): BuildPlan
+    public function plan(string $path, int $port, array $options = []): BuildPlan
     {
         $package = json_decode((string) SourceTree::read($path, 'package.json'), true);
 

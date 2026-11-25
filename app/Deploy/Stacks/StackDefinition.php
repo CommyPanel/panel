@@ -14,7 +14,9 @@ interface StackDefinition
     public function matches(string $path): bool;
 
     /**
+     * @param  array<string, mixed>  $options  the app's `stack_options` (per-stack choices such as the PHP version); a stack ignores what it does not know
+     *
      * @throws DetectionFailed when the source matches but cannot be built automatically
      */
-    public function plan(string $path, int $port): BuildPlan;
+    public function plan(string $path, int $port, array $options = []): BuildPlan;
 }

@@ -18,6 +18,7 @@ class StackDetector
         $this->stacks = $stacks ?? [
             new TemplateStack,
             new DockerfileStack,
+            new LaravelStack,
             new DotnetStack,
             new GoStack,
             new NodeStack,
@@ -26,9 +27,11 @@ class StackDetector
     }
 
     /**
+     * @param  array<string, mixed>  $options  the app's `stack_options`
+     *
      * @throws DetectionFailed
      */
-    public function plan(string $path, int $port): BuildPlan
+    public function plan(string $path, int $port, array $options = []): BuildPlan
     {
         if (! is_dir($path)) {
             throw new DetectionFailed('The source directory does not exist.');
@@ -36,10 +39,10 @@ class StackDetector
 
         foreach ($this->stacks as $stack) {
             if ($stack->matches($path)) {
-                return $stack->plan($path, $port);
+                return $stack->plan($path, $port, $options);
             }
         }
 
-        throw new DetectionFailed('Could not detect the app type. CommyPanel supports .NET, Go, Node.js and Python projects, or any repository with a Dockerfile.');
+        throw new DetectionFailed('Could not detect the app type. CommyPanel supports .NET, Go, Node.js, Python and Laravel projects, or any repository with a Dockerfile.');
     }
 }

@@ -7,6 +7,7 @@ import AppTerminalController from '@/actions/App/Http/Controllers/AppTerminalCon
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Select } from '@/components/ui/select';
 import { useConfirmedAction } from '@/hooks/use-confirmed-action';
 import { useT } from '@/hooks/use-t';
 import type { Params } from '@/lib/i18n';
@@ -27,13 +28,14 @@ const THEME = {
 
 async function requestTicket(
     slug: string,
+    container: string,
     t: (key: string, params?: Params) => string,
 ): Promise<Ticket> {
     const response = await fetch(AppTerminalController.ticket(slug).url, {
         method: 'POST',
         credentials: 'same-origin',
         headers: jsonHeaders(),
-        body: '{}',
+        body: JSON.stringify(container === '' ? {} : { container }),
     });
     const body = (await response
         .json()
@@ -70,6 +72,11 @@ export function TerminalTab({ app }: { app: AppSettings }) {
     const socket = useRef<WebSocket | null>(null);
     const [status, setStatus] = useState<Status>('idle');
     const [message, setMessage] = useState<string | null>(null);
+    // Which container of the live release: the web one, or a worker, the scheduler ...
+    const [container, setContainer] = useState('');
+    const selected = app.live_containers.some((c) => c.container === container)
+        ? container
+        : (app.live_containers[0]?.container ?? '');
 
     const running = app.status === 'running';
 
@@ -109,7 +116,7 @@ export function TerminalTab({ app }: { app: AppSettings }) {
         let ticket: Ticket;
 
         try {
-            ticket = await requestTicket(app.slug, t);
+            ticket = await requestTicket(app.slug, selected, t);
         } catch (e) {
             setStatus('idle');
             setMessage(
@@ -248,6 +255,20 @@ export function TerminalTab({ app }: { app: AppSettings }) {
                     )
                 }
             >
+                {app.live_containers.length > 1 && !active && (
+                    <Select
+                        label={t('Process')}
+                        value={selected}
+                        onChange={(e) => setContainer(e.target.value)}
+                    >
+                        {app.live_containers.map((c) => (
+                            <option key={c.container} value={c.container}>
+                                {c.label}
+                            </option>
+                        ))}
+                    </Select>
+                )}
+
                 {message && (
                     <Alert variant={status === 'idle' ? 'error' : 'info'}>
                         {message}

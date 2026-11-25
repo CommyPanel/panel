@@ -20,6 +20,8 @@ type AppContainer = {
     state: string;
     status: string;
     release: number | null;
+    /** web, or the name of the process (queue, scheduler ...) */
+    process?: string;
     live: boolean;
     networks: ContainerNetwork[];
     ports: ContainerPort[];
@@ -126,6 +128,11 @@ export function AppContainersCard({ slug }: { slug: string }) {
                                         label={c.state}
                                     />
                                     <code className="text-sm">{c.name}</code>
+                                    {c.process && c.process !== 'web' && (
+                                        <span className="badge-soft badge-neutral badge badge-sm">
+                                            {c.process}
+                                        </span>
+                                    )}
                                     {c.release !== null && (
                                         <span className="text-xs text-base-content/70">
                                             {t('release #:number', {

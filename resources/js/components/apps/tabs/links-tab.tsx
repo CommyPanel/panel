@@ -397,14 +397,25 @@ export function LinksTab({ app }: { app: AppSettings }) {
                                             }}
                                         />
                                         <span className="block text-xs text-base-content/70">
-                                            <Trans
-                                                text="Variables: <code>:url</code>, <code>:host</code>, ..."
-                                                components={{ code: <code /> }}
-                                                values={{
-                                                    url: `${link.prefix}_URL`,
-                                                    host: `${link.prefix}_HOST`,
-                                                }}
-                                            />
+                                            {link.style === 'laravel' ? (
+                                                <Trans
+                                                    text="Variables in Laravel's own names: <code>DB_CONNECTION</code>, <code>DB_HOST</code>, <code>DB_DATABASE</code>, ..."
+                                                    components={{
+                                                        code: <code />,
+                                                    }}
+                                                />
+                                            ) : (
+                                                <Trans
+                                                    text="Variables: <code>:url</code>, <code>:host</code>, ..."
+                                                    components={{
+                                                        code: <code />,
+                                                    }}
+                                                    values={{
+                                                        url: `${link.prefix}_URL`,
+                                                        host: `${link.prefix}_HOST`,
+                                                    }}
+                                                />
+                                            )}
                                             {!link.running &&
                                                 ` · ${t('The server is not running.')}`}
                                         </span>

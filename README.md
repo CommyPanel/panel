@@ -152,6 +152,8 @@ sh -c 'npm run migrate && npm run seed'
 
 **Get told when a deployment fails.** Settings → Notifications takes a Slack, Discord or generic webhook. Messages hold the app, commit and reason, never logs or secrets.
 
+**Laravel apps.** Connect a repository and a wizard asks for the database, the services (scheduler, queue worker, Horizon...), the volumes and your `.env`, then builds an image with nginx and php-fpm and runs each service in its own container: [Laravel](docs/laravel.md).
+
 **Wildcard domains.** Add `*.example.com` to an app. Connect a Cloudflare API token (Domains → HTTPS) and the certificate is made and renewed automatically; without one, CommyPanel shows the TXT record to create and asks for a new one at each renewal.
 
 **Watch the server in Grafana.** A token with the metrics ability lets any Prometheus collect CPU, memory, disk, network and app state: [metrics](docs/metrics.md).
@@ -217,7 +219,7 @@ CommyPanel is pre-1.0. What you should know before you rely on it:
 **Scope**
 
 - **One server only.** There is no multi-server support, no Swarm and no Kubernetes, and none is planned.
-- **Stateless apps first.** .NET, Go, Node and Python get automatic Dockerfiles. PHP stacks such as Laravel and WordPress are not supported yet (an app with its own Dockerfile works regardless of language). A few ready-made apps (search engines, Grafana, Redis and more) install from official images. Persistent volumes exist for files that must survive deployments.
+- **Stateless apps first.** .NET, Go, Node and Python get automatic Dockerfiles. Laravel has its own steps and services (see above); WordPress is not supported yet (an app with its own Dockerfile works regardless of language). A few ready-made apps (search engines, Grafana, Redis and more) install from official images. Persistent volumes exist for files that must survive deployments.
 - No Docker Compose support, no preview deployments per branch.
 - Debian 13 and Ubuntu 24.04 / 26.04 only (`amd64` and `arm64`). Debian 12 and RPM-based systems are not supported.
 
@@ -252,6 +254,7 @@ CommyPanel is pre-1.0. What you should know before you rely on it:
 - [API tokens and the API](docs/api.md)
 - [Deployment notifications](docs/notifications.md)
 - [Metrics for Prometheus and Grafana](docs/metrics.md)
+- [Laravel apps](docs/laravel.md)
 - [Release notes](docs/releases)
 
 ## Contributing

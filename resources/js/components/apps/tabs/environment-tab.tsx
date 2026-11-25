@@ -2,11 +2,19 @@ import { useForm } from '@inertiajs/react';
 import type { FormEvent } from 'react';
 import EnvVarController from '@/actions/App/Http/Controllers/EnvVarController';
 import { EnvCard } from '@/components/apps/env-card';
+import { EnvEditorCard } from '@/components/apps/env-editor-card';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useT } from '@/hooks/use-t';
 
-type Props = { slug: string; keys: string[] };
+type Props = {
+    slug: string;
+    keys: string[];
+    /** A Laravel app edits its variables as one .env text. */
+    textMode?: boolean;
+    linkedKeys?: string[];
+    onDirtyChange?: (dirty: boolean) => void;
+};
 
 function ImportCard({ slug }: { slug: string }) {
     const { t } = useT();
@@ -65,7 +73,24 @@ function ImportCard({ slug }: { slug: string }) {
     );
 }
 
-export function EnvironmentTab({ slug, keys }: Props) {
+export function EnvironmentTab({
+    slug,
+    keys,
+    textMode = false,
+    linkedKeys = [],
+    onDirtyChange,
+}: Props) {
+    if (textMode) {
+        return (
+            <EnvEditorCard
+                slug={slug}
+                count={keys.length}
+                linkedKeys={linkedKeys}
+                onDirtyChange={onDirtyChange}
+            />
+        );
+    }
+
     return (
         <div className="grid items-start gap-6 xl:grid-cols-2">
             <EnvCard slug={slug} keys={keys} />

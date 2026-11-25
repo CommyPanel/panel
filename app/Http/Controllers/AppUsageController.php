@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Deploy\ReleaseProcesses;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
 use App\Models\App;
@@ -14,9 +15,16 @@ use Illuminate\Http\Request;
  */
 class AppUsageController extends Controller
 {
-    public function show(Request $request, App $app, HostDriver $host): JsonResponse
+    public function show(Request $request, App $app, HostDriver $host, ReleaseProcesses $processes): JsonResponse
     {
-        $name = $app->activeDeployment()->value('container_name');
+        $containers = $processes->lookable($app->activeDeployment()->first());
+        $name = $containers[0]['container'] ?? null;
+
+        foreach ($containers as $candidate) {
+            if ($candidate['container'] === $request->query('container')) {
+                $name = $candidate['container'];
+            }
+        }
 
         if ($name === null) {
             return response()->json(['live' => false, 'container' => null, 'interval_ms' => 2000]);
@@ -32,6 +40,7 @@ class AppUsageController extends Controller
 
         return response()->json([
             'live' => true,
+            'containers' => $containers,
             'interval_ms' => $usage->intervalMs,
             // Null while the container is stopped or has not been sampled twice yet.
             'container' => $container === null ? null : UsagePresenter::container($container),

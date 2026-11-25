@@ -103,6 +103,10 @@ return [
         // Seconds the old container keeps running after traffic has moved.
         'drain_seconds' => (int) env('DEPLOY_DRAIN_SECONDS', 10),
 
+        // Seconds an extra process (worker, scheduler) of a new release must still be running after it
+        // started, or the deployment fails with its output.
+        'process_settle_seconds' => (int) env('DEPLOY_PROCESS_SETTLE', 5),
+
         // Release images kept per app so rollbacks stay possible.
         'keep_images' => (int) env('DEPLOY_KEEP_IMAGES', 3),
 

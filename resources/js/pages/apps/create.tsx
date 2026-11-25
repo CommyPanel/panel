@@ -202,6 +202,7 @@ export default function Create({
                             <option value="go">Go</option>
                             <option value="node">Node.js</option>
                             <option value="python">Python</option>
+                            <option value="laravel">Laravel</option>
                         </Select>
                     )}
                     <fieldset className="space-y-2">

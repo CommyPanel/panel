@@ -48,4 +48,22 @@ final class EnvLimits
             throw ValidationException::withMessages([$field => __('The values of an app\'s variables can add up to :size KB at most.', ['size' => intdiv(self::MAX_BYTES, 1024)])]);
         }
     }
+
+    /**
+     * Checks a complete set of variables (a whole .env text replaces what was there).
+     *
+     * @param  array<string, string>  $vars  key => value
+     *
+     * @throws ValidationException
+     */
+    public static function assertTotal(array $vars, string $field): void
+    {
+        if (count($vars) > self::MAX_VARIABLES) {
+            throw ValidationException::withMessages([$field => __('An app can have at most :max variables.', ['max' => self::MAX_VARIABLES])]);
+        }
+
+        if (array_sum(array_map('strlen', $vars)) > self::MAX_BYTES) {
+            throw ValidationException::withMessages([$field => __('The values of an app\'s variables can add up to :size KB at most.', ['size' => intdiv(self::MAX_BYTES, 1024)])]);
+        }
+    }
 }

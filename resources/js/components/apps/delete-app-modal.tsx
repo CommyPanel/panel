@@ -6,9 +6,20 @@ import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { useT } from '@/hooks/use-t';
 
-type Props = { slug: string; open: boolean; onClose: () => void };
+type Props = {
+    slug: string;
+    open: boolean;
+    onClose: () => void;
+    /** Database servers made for this app: they are kept when the app is deleted. */
+    dedicatedServers?: string[];
+};
 
-export function DeleteAppModal({ slug, open, onClose }: Props) {
+export function DeleteAppModal({
+    slug,
+    open,
+    onClose,
+    dedicatedServers = [],
+}: Props) {
     const { t } = useT();
     const form = useForm({ confirm: '' });
 
@@ -30,6 +41,14 @@ export function DeleteAppModal({ slug, open, onClose }: Props) {
                         'This stops the app, removes its containers and images and deletes its settings, variables and the files in its persistent volumes. It cannot be undone.',
                     )}
                 </p>
+                {dedicatedServers.length > 0 && (
+                    <p className="text-sm">
+                        {t(
+                            'The database server made for this app (:servers) is not deleted. It stays, with all its data, as an ordinary server under Databases.',
+                            { servers: dedicatedServers.join(', ') },
+                        )}
+                    </p>
+                )}
                 <Input
                     label={t('Type :name to confirm', { name: slug })}
                     autoComplete="off"

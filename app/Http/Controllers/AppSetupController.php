@@ -3,11 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Audit\AuditLogger;
+use App\Databases\AppLinks;
+use App\Databases\SetupAppDatabase;
+use App\Deploy\AppProcesses;
+use App\Deploy\AppVolumes;
 use App\Deploy\Deployer;
 use App\Deploy\DestroyApp;
 use App\Deploy\EnvLimits;
 use App\Deploy\EnvParser;
+use App\Deploy\LaravelEnvTemplate;
 use App\Deploy\LockedException;
+use App\Deploy\ReleaseScripts;
 use App\Deploy\Source\AccessState;
 use App\Deploy\Source\GitCredentials;
 use App\Deploy\Source\GitProvider;
@@ -15,10 +21,13 @@ use App\Deploy\Source\GitUrl;
 use App\Deploy\Source\InvalidArchive;
 use App\Deploy\Source\RepositoryAccessChecker;
 use App\Deploy\Source\UploadStorage;
+use App\Deploy\Stacks\Laravel\InspectSource;
 use App\Dns\FreeDomains;
 use App\Dns\ServerAddress;
+use App\Enums\ProcessKind;
 use App\Enums\SetupStep;
 use App\Enums\SourceType;
+use App\Enums\Stack;
 use App\GitHub\GitHubFailed;
 use App\Http\Requests\FinishSetupRequest;
 use App\Models\App;
@@ -64,7 +73,52 @@ class AppSetupController extends Controller
             'server' => $server->forPage(),
             'free_domains' => $free->names(),
             'limits' => ['max_archive_mb' => (int) config('commypanel.uploads.max_archive_mb')],
+            'laravel' => AppProcesses::isLaravel($app) ? $this->laravel($app) : null,
         ]);
+    }
+
+    /**
+     * What the Laravel steps need: what the code showed (null while it is still being looked at), the
+     * choices so far, and, for the last look, a summary.
+     *
+     * @return array<string, mixed>
+     */
+    private function laravel(App $app): array
+    {
+        $detected = $app->detected;
+        $review = null;
+
+        if ($app->setup_step === SetupStep::Review) {
+            $processes = $app->processes()->where('enabled', true)->orderBy('sort')->get();
+            $review = [
+                'database' => app(SetupAppDatabase::class)->status($app),
+                'processes' => $processes->map(fn ($p) => ['name' => $p->name, 'kind' => $p->kind->value, 'replicas' => $p->replicas])->values()->all(),
+                'volumes' => $app->volumes()->orderBy('id')->pluck('path')->all(),
+                'domains' => $app->domains()->orderBy('name')->pluck('name')->all(),
+                // For the variables editor: how many there are and which names a link provides (never values).
+                'env_count' => AppEnvVar::query()->where('app_id', $app->id)->count(),
+                'linked_keys' => array_keys(app(AppLinks::class)->environment($app)),
+            ];
+        }
+
+        return [
+            // Null while the inspection job has not answered yet.
+            'detected' => $detected,
+            'inspecting' => $detected === null,
+            'stack_options' => $app->stack_options === null ? (object) [] : $this->publicOptions($app->stack_options),
+            'review' => $review,
+        ];
+    }
+
+    /**
+     * The choices a person made, without the bookkeeping other steps keep in the same column.
+     *
+     * @param  array<string, mixed>  $options
+     * @return array<string, mixed>
+     */
+    private function publicOptions(array $options): array
+    {
+        return array_intersect_key($options, array_flip(['php', 'node_manager', 'node', 'ssr']));
     }
 
     /**
@@ -135,6 +189,9 @@ class AppSetupController extends Controller
 
         $app->forceFill(['setup_step' => SetupStep::Settings])->save();
 
+        // Look at the code (a Laravel app gets its own steps); the settings page follows the answer.
+        InspectSource::queue($app);
+
         return redirect()->route('apps.setup', $app);
     }
 
@@ -145,7 +202,11 @@ class AppSetupController extends Controller
 
         $previous = match ($app->setup_step) {
             SetupStep::Settings => SetupStep::Source,
-            SetupStep::Domain => SetupStep::Settings,
+            SetupStep::Database => SetupStep::Settings,
+            SetupStep::Services => SetupStep::Database,
+            SetupStep::Volumes => SetupStep::Services,
+            SetupStep::Domain => AppProcesses::isLaravel($app) ? SetupStep::Volumes : SetupStep::Settings,
+            SetupStep::Review => SetupStep::Domain,
             default => abort(404),
         };
 
@@ -160,12 +221,18 @@ class AppSetupController extends Controller
 
         $data = $request->validated();
         $env = $parser->parse((string) ($data['env'] ?? ''));
-        unset($data['env']);
+        $options = $data['stack_options'] ?? null;
+        unset($data['env'], $data['stack_options']);
 
         EnvLimits::assertFits($app, $env['vars'], 'env');
 
-        DB::transaction(function () use ($app, $data, $env) {
-            $app->forceFill([...$data, 'setup_step' => SetupStep::Domain])->save();
+        $laravel = AppProcesses::isLaravel($app);
+
+        DB::transaction(function () use ($app, $data, $env, $options, $laravel) {
+            // The Laravel choices keep what other steps stored beside them (the database step's progress).
+            $stackOptions = $laravel && is_array($options) ? [...($app->stack_options ?? []), ...array_filter($options, fn ($v) => $v !== null && $v !== '')] : $app->stack_options;
+
+            $app->forceFill([...$data, 'stack_options' => $stackOptions, 'setup_step' => $laravel ? SetupStep::Database : SetupStep::Domain])->save();
 
             foreach ($env['vars'] as $key => $value) {
                 AppEnvVar::query()->updateOrCreate(['app_id' => $app->id, 'key' => $key], ['value' => $value]);
@@ -175,9 +242,101 @@ class AppSetupController extends Controller
         return redirect()->route('apps.setup', $app);
     }
 
+    /** The database step is done: a database is linked, or none was wanted. */
+    public function databaseContinue(App $app, SetupAppDatabase $database): RedirectResponse
+    {
+        abort_unless($app->setup_step === SetupStep::Database && AppProcesses::isLaravel($app), 404);
+
+        $state = $database->status($app);
+
+        $done = $state['mode'] === 'none' || ($state['mode'] !== null && ! in_array($state['status'], ['pending', 'failed'], true));
+
+        if (! $done) {
+            return back()->withErrors(['setup' => $state['status'] === 'pending'
+                ? __('The database server is still starting. Wait until it is running.')
+                : __('Choose a database first, or choose not to use one.')]);
+        }
+
+        // The services a Laravel app may run: the scheduler on, what the code showed off.
+        app(AppProcesses::class)->seedFor($app, $app->detected['services'] ?? []);
+        $app->forceFill(['setup_step' => SetupStep::Services])->save();
+
+        return redirect()->route('apps.setup', $app);
+    }
+
+    public function servicesContinue(App $app, AppVolumes $volumes): RedirectResponse
+    {
+        abort_unless($app->setup_step === SetupStep::Services && AppProcesses::isLaravel($app), 404);
+
+        // The folder Laravel writes to, kept between releases; the person may remove or change it.
+        $options = $app->stack_options ?? [];
+
+        if (! ($options['volumes_seeded'] ?? false)) {
+            foreach ($app->detected['suggested_volumes'] ?? [['path' => '/app/storage']] as $suggestion) {
+                try {
+                    $volumes->add($app, (string) $suggestion['path']);
+                } catch (\InvalidArgumentException) {
+                    // A suggestion that cannot be used is skipped; the person can add their own.
+                }
+            }
+
+            $app->forceFill(['stack_options' => [...$options, 'volumes_seeded' => true]]);
+        }
+
+        $app->forceFill(['setup_step' => SetupStep::Volumes])->save();
+
+        return redirect()->route('apps.setup', $app);
+    }
+
+    public function volumesContinue(App $app): RedirectResponse
+    {
+        abort_unless($app->setup_step === SetupStep::Volumes && AppProcesses::isLaravel($app), 404);
+
+        $app->forceFill(['setup_step' => SetupStep::Domain])->save();
+
+        return redirect()->route('apps.setup', $app);
+    }
+
+    /** A Laravel app takes one more look (its variables and release script) before it is built. */
+    public function domainContinue(App $app, LaravelEnvTemplate $env): RedirectResponse
+    {
+        abort_unless($app->setup_step === SetupStep::Domain && AppProcesses::isLaravel($app), 404);
+
+        $enabled = $app->processes()->where('enabled', true)->pluck('kind')->map(fn ($kind) => $kind instanceof ProcessKind ? $kind->value : (string) $kind)->all();
+
+        // A starting set of variables, once; a person's own changes are never replaced.
+        if ($app->env_text === null) {
+            $domain = $app->domains()->orderBy('name')->value('name');
+            $domain = is_string($domain) && ! str_starts_with($domain, '*.') ? $domain : null;
+            $horizon = in_array(ProcessKind::Horizon->value, $enabled, true);
+            $queue = $horizon || in_array(ProcessKind::Queue->value, $enabled, true);
+
+            $env->apply($app, $env->generate($app, $domain, $queue, $horizon));
+        }
+
+        $app->forceFill([
+            'release_script' => $app->release_script ?? ReleaseScripts::defaultFor(Stack::Laravel),
+            // nginx refuses uploads over 1 MB unless told otherwise, which a Laravel app soon hits.
+            'nginx_custom' => $app->nginx_custom ?? "client_max_body_size 100m;\n",
+            'setup_step' => SetupStep::Review,
+        ])->save();
+
+        return redirect()->route('apps.setup', $app);
+    }
+
     public function finish(Request $request, App $app, Deployer $deployer, AuditLogger $audit): RedirectResponse
     {
-        abort_unless($app->setup_step === SetupStep::Domain && $app->source_verified_at !== null, 404);
+        $laravel = AppProcesses::isLaravel($app);
+
+        abort_unless($app->setup_step === ($laravel ? SetupStep::Review : SetupStep::Domain) && $app->source_verified_at !== null, 404);
+
+        if ($laravel) {
+            $data = $request->validate(['release_script' => ['nullable', 'string', 'max:'.ReleaseScripts::MAX_LENGTH]]);
+
+            if (array_key_exists('release_script', $data)) {
+                $app->forceFill(['release_script' => ReleaseScripts::normalize($data['release_script'])]);
+            }
+        }
 
         $app->forceFill(['setup_step' => null])->save();
 

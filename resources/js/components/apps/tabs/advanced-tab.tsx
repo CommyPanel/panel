@@ -159,6 +159,7 @@ export function AdvancedTab({ app }: { app: AppSettings }) {
             </ConfirmModal>
             <DeleteAppModal
                 slug={app.slug}
+                dedicatedServers={app.dedicated_servers}
                 open={confirmDelete}
                 onClose={() => setConfirmDelete(false)}
             />

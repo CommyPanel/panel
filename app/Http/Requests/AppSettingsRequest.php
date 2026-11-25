@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Deploy\CommandLine;
+use App\Deploy\ReleaseScripts;
 use App\Deploy\Source\GitUrl;
 use App\Enums\DeployStrategy;
 use App\Enums\SourceType;
@@ -13,6 +14,14 @@ use Illuminate\Validation\Rule;
 
 abstract class AppSettingsRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        // Line breaks as the shell wants them; an empty script is no script.
+        if ($this->has('release_script')) {
+            $this->merge(['release_script' => ReleaseScripts::normalize($this->input('release_script'))]);
+        }
+    }
+
     public function authorize(): bool
     {
         return true;
@@ -46,6 +55,12 @@ abstract class AppSettingsRequest extends FormRequest
             // `sometimes`: a form that does not send it leaves the mode as it is.
             'deploy_strategy' => ['sometimes', Rule::enum(DeployStrategy::class)],
             'release_command' => ['nullable', 'string', 'max:1000', CommandLine::rule()],
+            // Laravel apps: several lines run by `sh -ec` before a release goes live.
+            'release_script' => ['nullable', 'string', 'max:'.ReleaseScripts::MAX_LENGTH, function (string $attribute, mixed $value, Closure $fail) {
+                if (str_contains((string) $value, "\0")) {
+                    $fail(__('The script holds a character that cannot be text.'));
+                }
+            }],
             'memory_limit_mb' => ['nullable', 'integer', 'between:16,65536'],
             'cpu_limit' => ['nullable', 'numeric', 'between:0.05,64'],
         ];

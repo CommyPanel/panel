@@ -8,13 +8,14 @@ use App\Deploy\Source\UploadStorage;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
 use App\Models\App;
+use App\Models\DatabaseServer;
 
 /**
  * Removes an app's containers, images and volume data, then the app itself.
  */
 class DestroyApp
 {
-    public function __construct(private readonly HostDriver $host, private readonly UploadStorage $uploads, private readonly AppLinks $links, private readonly VolumeBackups $volumeBackups) {}
+    public function __construct(private readonly HostDriver $host, private readonly UploadStorage $uploads, private readonly AppLinks $links, private readonly VolumeBackups $volumeBackups, private readonly ReleaseProcesses $processes) {}
 
     /**
      * Deleting an app deletes the files of its volumes, so a locked volume
@@ -47,7 +48,11 @@ class DestroyApp
         $problems = [];
         $deployments = $app->deployments()->get();
 
-        foreach ($deployments->pluck('container_name')->filter()->unique() as $container) {
+        // The web containers, and the extra processes (workers, scheduler) of every release.
+        $containers = $deployments->pluck('container_name')->filter()
+            ->merge($deployments->flatMap(fn ($d) => $this->processes->plannedContainers($d)))->unique();
+
+        foreach ($containers as $container) {
             try {
                 $this->host->removeContainer($container);
             } catch (HostOperationFailed $e) {
@@ -95,6 +100,9 @@ class DestroyApp
         } catch (HostOperationFailed $e) {
             $problems[] = "Certificate: {$e->getMessage()}";
         }
+
+        // A database server made for this app stays: its data is not ours to delete with the app. It becomes an ordinary server.
+        DatabaseServer::query()->where('dedicated_app_id', $app->id)->update(['dedicated_app_id' => null]);
 
         $this->uploads->delete($app);
         $app->delete();

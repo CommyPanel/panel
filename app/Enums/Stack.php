@@ -9,6 +9,7 @@ enum Stack: string
     case Go = 'go';
     case Node = 'node';
     case Python = 'python';
+    case Laravel = 'laravel';
     case Template = 'template';
 
     public function label(): string
@@ -19,6 +20,7 @@ enum Stack: string
             self::Go => 'Go',
             self::Node => 'Node.js',
             self::Python => 'Python',
+            self::Laravel => 'Laravel',
             self::Template => 'Quick install',
         };
     }

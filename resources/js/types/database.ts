@@ -14,6 +14,8 @@ export type DatabaseServer = {
     host: string;
     port: number;
     databases_count: number;
+    /** The app this server was made for (its user may create and drop databases on it), if any. */
+    dedicated_app: { slug: string; name: string } | null;
     created_at: string | null;
 };
 
@@ -55,6 +57,8 @@ export type LinksOverview = {
         server_slug: string;
         engine: string;
         running: boolean;
+        /** prefix: <PREFIX>_URL ...; laravel: DB_HOST, DB_DATABASE ... */
+        style: 'prefix' | 'laravel';
     }[];
     apps: { id: number; prefix: string; app: string; slug: string }[];
     used_by: { app: string; slug: string }[];

@@ -4,9 +4,8 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Api\TokenAccess;
 use App\Audit\AuditLogger;
-use App\Deploy\EnvLimits;
+use App\Deploy\AppEnvironment;
 use App\Models\App;
-use App\Models\AppEnvVar;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -30,7 +29,7 @@ class EnvController extends ApiController
         ]]);
     }
 
-    public function update(Request $request, App $app, string $key, TokenAccess $access, AuditLogger $audit): JsonResponse
+    public function update(Request $request, App $app, string $key, TokenAccess $access, AppEnvironment $env, AuditLogger $audit): JsonResponse
     {
         $this->authorizeApp($request, $app, $access);
 
@@ -41,22 +40,18 @@ class EnvController extends ApiController
             ['key.not_in' => 'PORT is set by CommyPanel.', 'key.regex' => 'Use letters, digits and underscores, not starting with a digit.'],
         )->validate();
 
-        EnvLimits::assertFits($app, [$data['key'] => (string) ($data['value'] ?? '')], 'value');
-
-        $created = ! $app->envVars()->where('key', $data['key'])->exists();
-        AppEnvVar::query()->updateOrCreate(['app_id' => $app->id, 'key' => $data['key']], ['value' => (string) ($data['value'] ?? '')]);
+        $created = $env->set($app, $data['key'], (string) ($data['value'] ?? ''), 'value');
 
         $audit->record('app.env_set', $request->user(), ['app' => $app->slug, 'key' => $data['key']], $app);
 
         return response()->json(['data' => ['key' => $data['key'], 'pending_changes' => $app->refresh()->hasPendingChanges()]], $created ? 201 : 200);
     }
 
-    public function destroy(Request $request, App $app, string $key, TokenAccess $access, AuditLogger $audit): JsonResponse
+    public function destroy(Request $request, App $app, string $key, TokenAccess $access, AppEnvironment $env, AuditLogger $audit): JsonResponse
     {
         $this->authorizeApp($request, $app, $access);
 
-        $deleted = $app->envVars()->where('key', $key)->delete();
-        abort_if($deleted === 0, 404);
+        abort_unless($env->unset($app, $key), 404);
 
         $audit->record('app.env_removed', $request->user(), ['app' => $app->slug, 'key' => $key], $app);
 

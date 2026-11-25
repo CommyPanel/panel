@@ -24,6 +24,8 @@ use App\Updates\UpdateChecker;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull;
+use Illuminate\Foundation\Http\Middleware\TrimStrings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -77,6 +79,12 @@ class AppServiceProvider extends ServiceProvider
         Gate::before(fn (User $user) => $user->isSuper() ? true : null);
 
         $this->configureDefaults();
+
+        // A .env text is saved exactly as written: Laravel's trimming of request strings would drop its
+        // final line break (and an empty text would become null).
+        // (These run before routing, so the address is matched, not the route name.)
+        TrimStrings::skipWhen(fn (Request $request) => $request->isMethod('PUT') && $request->is('apps/*/env/text'));
+        ConvertEmptyStringsToNull::skipWhen(fn (Request $request) => $request->isMethod('PUT') && $request->is('apps/*/env/text'));
 
         Event::subscribe(AuditEventSubscriber::class);
 
