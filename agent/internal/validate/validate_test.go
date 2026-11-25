@@ -210,3 +210,47 @@ func TestDatabaseNamesAndPasswords(t *testing.T) {
 		}
 	}
 }
+
+func TestDomainOrWildcard(t *testing.T) {
+	good := []string{"example.com", "a.example.com", "*.example.com", "*.a.example.co.uk", "*.xn--bcher-kva.example"}
+	for _, d := range good {
+		if err := DomainOrWildcard(d); err != nil {
+			t.Errorf("%q should be valid: %v", d, err)
+		}
+	}
+	bad := []string{
+		"", "*", "*.", "*.com", "*example.com", "a.*.example.com", "**.example.com", "*.*.example.com",
+		"*..example.com", "*.-a.example.com", "*.example.com.", "*.exa mple.com", "*.Example.com", "foo*.example.com", "*.example.com;", "com",
+	}
+	for _, d := range bad {
+		if err := DomainOrWildcard(d); err == nil {
+			t.Errorf("%q should be refused", d)
+		}
+	}
+	// Plain Domain stays strict: no wildcards.
+	if err := Domain("*.example.com"); err == nil {
+		t.Error("Domain must keep refusing wildcards")
+	}
+	if !IsWildcard("*.example.com") || IsWildcard("example.com") {
+		t.Error("IsWildcard")
+	}
+}
+
+func FuzzDomainOrWildcard(f *testing.F) {
+	for _, s := range []string{"example.com", "*.example.com", "*.com", "*.*.a.b", "a.*.b.c", "*.", "", "*.a.b;rm"} {
+		f.Add(s)
+	}
+	f.Fuzz(func(t *testing.T, s string) {
+		if DomainOrWildcard(s) != nil {
+			return
+		}
+		// Whatever passes is a plain name, or "*." plus a plain name, with nothing else in it.
+		base := s
+		if IsWildcard(s) {
+			base = s[2:]
+		}
+		if Domain(base) != nil || strings.ContainsAny(base, "*;\n \"'\\{}$") {
+			t.Fatalf("%q passed but is not a clean name", s)
+		}
+	})
+}

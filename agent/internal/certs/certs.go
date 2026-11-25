@@ -26,6 +26,7 @@ import (
 
 	"golang.org/x/crypto/acme"
 
+	"commypanel/agent/internal/dnsprovider"
 	"commypanel/agent/internal/statedir"
 	"commypanel/agent/internal/validate"
 )
@@ -55,6 +56,13 @@ type Config struct {
 	HTTPClient    *http.Client
 	Timeout       time.Duration
 	UserAgent     string
+	// CloudflareURL is the DNS host's API address; empty means Cloudflare's own. Tests point it
+	// at a fake.
+	CloudflareURL string
+	// Propagation is how long the CA is kept waiting after a DNS record is created (default
+	// 10 seconds); NoPropagation skips the wait (tests).
+	Propagation   time.Duration
+	NoPropagation bool
 }
 
 func (c Config) withDefaults() Config {
@@ -73,6 +81,12 @@ func (c Config) withDefaults() Config {
 	if c.UserAgent == "" {
 		c.UserAgent = "commypanel-agent"
 	}
+	if c.Propagation == 0 && !c.NoPropagation {
+		c.Propagation = dnsprovider.DefaultPropagation
+	}
+	if c.NoPropagation {
+		c.Propagation = 0
+	}
 	return c
 }
 
@@ -84,6 +98,21 @@ type Request struct {
 	Staging bool     `json:"staging,omitempty"`
 	// AgreeTOS records that the user accepted the CA's subscriber agreement.
 	AgreeTOS bool `json:"agree_tos"`
+	// DNS is how wildcard names are validated (DNS-01). Without it a wildcard is refused.
+	DNS *DNSConfig `json:"dns,omitempty"`
+}
+
+// DNSConfig names the DNS host that publishes the challenge records and the token to use it.
+type DNSConfig struct {
+	Provider string `json:"provider"`
+	Token    string `json:"token"`
+}
+
+// String, GoString and LogValue keep the token out of logs and error text, whatever prints it.
+func (DNSConfig) String() string   { return "dns{provider, token: [redacted]}" }
+func (DNSConfig) GoString() string { return "dns{provider, token: [redacted]}" }
+func (DNSConfig) LogValue() slog.Value {
+	return slog.StringValue("[redacted]")
 }
 
 // Info describes a stored certificate.
@@ -110,6 +139,41 @@ func (m *Manager) webroot() string            { return filepath.Join(m.cfg.State
 
 // Validate checks a request without doing anything.
 func (m *Manager) Validate(r Request) error {
+	if err := m.validateBase(r); err != nil {
+		return err
+	}
+	for _, d := range r.Domains {
+		if validate.IsWildcard(d) && r.DNS == nil {
+			return &validate.InputError{Msg: "wildcard names (" + d + ") can only be validated through DNS: give a DNS provider and its token, or use the manual DNS steps"}
+		}
+	}
+	if r.DNS != nil && hasWildcard(r.Domains) {
+		return validateDNS(r.DNS)
+	}
+	return nil
+}
+
+func hasWildcard(domains []string) bool {
+	for _, d := range domains {
+		if validate.IsWildcard(d) {
+			return true
+		}
+	}
+	return false
+}
+
+func validateDNS(d *DNSConfig) error {
+	if d.Provider != "cloudflare" {
+		return &validate.InputError{Msg: "the DNS provider must be cloudflare"}
+	}
+	if _, err := dnsprovider.NewCloudflare(dnsprovider.Config{Token: d.Token}); err != nil {
+		return &validate.InputError{Msg: err.Error()}
+	}
+	return nil
+}
+
+// validateBase checks what every request has: name, agreement, domains (wildcards allowed) and email.
+func (m *Manager) validateBase(r Request) error {
 	if err := validate.Name(r.Name); err != nil {
 		return err
 	}
@@ -121,7 +185,7 @@ func (m *Manager) Validate(r Request) error {
 	}
 	seen := map[string]bool{}
 	for _, d := range r.Domains {
-		if err := validate.Domain(d); err != nil {
+		if err := validate.DomainOrWildcard(d); err != nil {
 			return err
 		}
 		if seen[d] {
@@ -201,24 +265,45 @@ func (m *Manager) Remove(name string) error {
 	return os.RemoveAll(m.certDir(name))
 }
 
-func (m *Manager) obtain(ctx context.Context, r Request) ([][]byte, *ecdsa.PrivateKey, error) {
+// newClient registers (or finds) the account at the chosen CA and returns its client.
+func (m *Manager) newClient(ctx context.Context, staging bool, email string) (*acme.Client, error) {
 	directory, label := m.cfg.ProductionURL, "production"
-	if r.Staging {
+	if staging {
 		directory, label = m.cfg.StagingURL, "staging"
 	}
 
 	accountKey, err := m.accountKey(label)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	client := &acme.Client{Key: accountKey, DirectoryURL: directory, HTTPClient: m.cfg.HTTPClient, UserAgent: m.cfg.UserAgent}
 
 	account := &acme.Account{}
-	if r.Email != "" {
-		account.Contact = []string{"mailto:" + r.Email}
+	if email != "" {
+		account.Contact = []string{"mailto:" + email}
 	}
 	if _, err := client.Register(ctx, account, acme.AcceptTOS); err != nil && !errors.Is(err, acme.ErrAccountAlreadyExists) {
-		return nil, nil, fmt.Errorf("could not register with Let's Encrypt: %w", err)
+		return nil, fmt.Errorf("could not register with Let's Encrypt: %w", err)
+	}
+	return client, nil
+}
+
+// provider makes the DNS client for a request that has wildcard names, or nil when it has none.
+func (m *Manager) provider(r Request) (dnsprovider.Provider, error) {
+	if r.DNS == nil || !hasWildcard(r.Domains) {
+		return nil, nil
+	}
+	return dnsprovider.NewCloudflare(dnsprovider.Config{Token: r.DNS.Token, BaseURL: m.cfg.CloudflareURL, Propagation: m.cfg.Propagation})
+}
+
+func (m *Manager) obtain(ctx context.Context, r Request) ([][]byte, *ecdsa.PrivateKey, error) {
+	client, err := m.newClient(ctx, r.Staging, r.Email)
+	if err != nil {
+		return nil, nil, err
+	}
+	prov, err := m.provider(r)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	order, err := client.AuthorizeOrder(ctx, acme.DomainIDs(r.Domains...))
@@ -227,12 +312,18 @@ func (m *Manager) obtain(ctx context.Context, r Request) ([][]byte, *ecdsa.Priva
 	}
 
 	for _, authzURL := range order.AuthzURLs {
-		if err := m.authorize(ctx, client, authzURL); err != nil {
+		if err := m.authorize(ctx, client, authzURL, prov); err != nil {
 			return nil, nil, err
 		}
 	}
 
-	if order, err = client.WaitOrder(ctx, order.URI); err != nil {
+	return m.finish(ctx, client, order.URI, r.Domains)
+}
+
+// finish waits for a ready order, finalises it with a fresh key and returns the chain.
+func (m *Manager) finish(ctx context.Context, client *acme.Client, orderURI string, domains []string) ([][]byte, *ecdsa.PrivateKey, error) {
+	order, err := client.WaitOrder(ctx, orderURI)
+	if err != nil {
 		return nil, nil, fmt.Errorf("the order did not become ready: %s", describeError(err))
 	}
 
@@ -240,7 +331,7 @@ func (m *Manager) obtain(ctx context.Context, r Request) ([][]byte, *ecdsa.Priva
 	if err != nil {
 		return nil, nil, err
 	}
-	csr, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{DNSNames: r.Domains}, key)
+	csr, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{DNSNames: domains}, key)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -251,9 +342,10 @@ func (m *Manager) obtain(ctx context.Context, r Request) ([][]byte, *ecdsa.Priva
 	return chain, key, nil
 }
 
-// authorize proves control of one domain by publishing the HTTP-01 token
-// where nginx serves it.
-func (m *Manager) authorize(ctx context.Context, client *acme.Client, authzURL string) error {
+// authorize proves control of one name: a wildcard through DNS (the provider publishes the TXT
+// record, and it is removed again whatever happens), anything else by publishing the HTTP-01
+// token where nginx serves it.
+func (m *Manager) authorize(ctx context.Context, client *acme.Client, authzURL string, prov dnsprovider.Provider) error {
 	authz, err := client.GetAuthorization(ctx, authzURL)
 	if err != nil {
 		return fmt.Errorf("could not read the authorization: %s", describeError(err))
@@ -261,13 +353,23 @@ func (m *Manager) authorize(ctx context.Context, client *acme.Client, authzURL s
 	if authz.Status == acme.StatusValid {
 		return nil
 	}
+	if authz.Wildcard {
+		return m.authorizeDNS(ctx, client, authz, prov)
+	}
+	return m.authorizeHTTP(ctx, client, authz)
+}
 
-	var challenge *acme.Challenge
+func findChallenge(authz *acme.Authorization, kind string) *acme.Challenge {
 	for _, c := range authz.Challenges {
-		if c.Type == "http-01" {
-			challenge = c
+		if c.Type == kind {
+			return c
 		}
 	}
+	return nil
+}
+
+func (m *Manager) authorizeHTTP(ctx context.Context, client *acme.Client, authz *acme.Authorization) error {
+	challenge := findChallenge(authz, "http-01")
 	if challenge == nil {
 		return fmt.Errorf("Let's Encrypt offered no HTTP-01 challenge for %s", authz.Identifier.Value)
 	}
@@ -289,6 +391,10 @@ func (m *Manager) authorize(ctx context.Context, client *acme.Client, authzURL s
 	}
 	defer os.Remove(file)
 
+	return m.accept(ctx, client, authz, challenge)
+}
+
+func (m *Manager) accept(ctx context.Context, client *acme.Client, authz *acme.Authorization, challenge *acme.Challenge) error {
 	if _, err := client.Accept(ctx, challenge); err != nil {
 		return fmt.Errorf("could not start validation of %s: %s", authz.Identifier.Value, describeError(err))
 	}
@@ -296,6 +402,40 @@ func (m *Manager) authorize(ctx context.Context, client *acme.Client, authzURL s
 		return fmt.Errorf("could not validate %s: %s", authz.Identifier.Value, describeError(err))
 	}
 	return nil
+}
+
+func (m *Manager) authorizeDNS(ctx context.Context, client *acme.Client, authz *acme.Authorization, prov dnsprovider.Provider) error {
+	if prov == nil {
+		return fmt.Errorf("%s needs DNS validation and no DNS provider was given", authz.Identifier.Value)
+	}
+	challenge := findChallenge(authz, "dns-01")
+	if challenge == nil {
+		return fmt.Errorf("Let's Encrypt offered no DNS-01 challenge for *.%s", authz.Identifier.Value)
+	}
+	if !tokenRe.MatchString(challenge.Token) {
+		return errors.New("Let's Encrypt sent an unexpected challenge token")
+	}
+	value, err := client.DNS01ChallengeRecord(challenge.Token)
+	if err != nil {
+		return err
+	}
+
+	rec, err := prov.Present(ctx, authz.Identifier.Value, value)
+	if rec.ID != "" {
+		// The record goes whatever happens next, also when the request was cancelled.
+		defer func() {
+			cleanCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			if err := prov.Cleanup(cleanCtx, rec); err != nil {
+				slog.Warn("could not remove a DNS challenge record", "domain", authz.Identifier.Value, "err", err)
+			}
+		}()
+	}
+	if err != nil {
+		return fmt.Errorf("could not publish the DNS record for *.%s: %w", authz.Identifier.Value, err)
+	}
+
+	return m.accept(ctx, client, authz, challenge)
 }
 
 // accountKey loads or creates the ACME account key for one CA.

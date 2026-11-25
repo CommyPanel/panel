@@ -15,4 +15,11 @@ interface DnsResolver
     public function aaaa(string $host): array;
 
     public function cname(string $host): ?string;
+
+    /**
+     * The text of the TXT records at a name.
+     *
+     * @return list<string>
+     */
+    public function txt(string $host): array;
 }

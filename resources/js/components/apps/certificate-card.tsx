@@ -1,11 +1,12 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { ShieldCheck } from 'lucide-react';
+import { RefreshCw, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import CertificateController from '@/actions/App/Http/Controllers/CertificateController';
 import DomainController from '@/actions/App/Http/Controllers/DomainController';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { CommandBox } from '@/components/ui/command-box';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useT } from '@/hooks/use-t';
 import { formatDate } from '@/lib/format';
@@ -17,7 +18,35 @@ type Props = {
     certificate: CertificateSummary | null;
     httpsEnabled: boolean;
     hasDomains: boolean;
+    /** Whether a Cloudflare token is connected, so wildcard names are proven automatically. */
+    cloudflare?: boolean;
+    /** Whether the app has a wildcard domain. */
+    hasWildcard?: boolean;
 };
+
+/** The TXT records a wildcard certificate waits for, each name and value with a copy button. */
+function TxtRecords({
+    records,
+}: {
+    records: { name: string; value: string }[];
+}) {
+    const { t } = useT();
+
+    return (
+        <div className="space-y-3">
+            {records.map((record) => (
+                <div key={record.name + record.value} className="space-y-1">
+                    <p className="text-xs text-base-content/70">
+                        {t('Name (type TXT)')}
+                    </p>
+                    <CommandBox command={record.name} />
+                    <p className="text-xs text-base-content/70">{t('Value')}</p>
+                    <CommandBox command={record.value} />
+                </div>
+            ))}
+        </div>
+    );
+}
 
 function Details({ certificate }: { certificate: CertificateSummary }) {
     const { t } = useT();
@@ -51,6 +80,8 @@ export function CertificateCard({
     certificate,
     httpsEnabled,
     hasDomains,
+    cloudflare = false,
+    hasWildcard = false,
 }: Props) {
     const { t } = useT();
     const { errors } = usePage().props;
@@ -67,8 +98,16 @@ export function CertificateCard({
             },
         );
 
+    const refreshDns = () =>
+        router.post(
+            CertificateController.refreshDns(slug),
+            {},
+            { preserveScroll: true },
+        );
+
     const badges = {
         issuing: { status: 'building', label: t('requesting') },
+        awaiting_dns: { status: 'pending', label: t('waiting for DNS') },
         active: { status: 'active', label: t('valid') },
         failed: { status: 'failed', label: t('failed') },
     } as const;
@@ -139,6 +178,55 @@ export function CertificateCard({
                 </Alert>
             )}
 
+            {certificate?.dns_pending && (
+                <Alert variant="info">
+                    <div className="w-full space-y-3">
+                        <p className="font-medium">
+                            {certificate.dns_pending.renewal
+                                ? t(
+                                      'The wildcard certificate needs a new TXT record to be renewed.',
+                                  )
+                                : t(
+                                      'Create this TXT record at your DNS provider to get the wildcard certificate.',
+                                  )}
+                        </p>
+                        <TxtRecords records={certificate.dns_pending.records} />
+                        <p className="text-sm">
+                            {t(
+                                'CommyPanel checks every few minutes and finishes the certificate as soon as it sees the record. If two records share a name, create both. Keep the old ones; they do no harm.',
+                            )}
+                        </p>
+                        {certificate.dns_pending.renewal && (
+                            <p className="text-sm">
+                                {t(
+                                    'Without Cloudflare connected, each renewal (every 60 days or so) needs a new record like this one. The current certificate keeps working until it ends.',
+                                )}
+                            </p>
+                        )}
+                        <Button variant="soft" size="sm" onClick={refreshDns}>
+                            <RefreshCw className="size-4" aria-hidden />
+                            {t('Get new records')}
+                        </Button>
+                    </div>
+                </Alert>
+            )}
+
+            {hasWildcard && !cloudflare && !certificate?.dns_pending && (
+                <p className="text-sm text-base-content/70">
+                    <Trans
+                        text="A wildcard certificate is checked through DNS. <link>Connect Cloudflare in Domains</link> to make and renew it automatically, or create the TXT record you are shown by hand."
+                        components={{
+                            link: (
+                                <Link
+                                    href={DomainController.index()}
+                                    className="link font-medium"
+                                />
+                            ),
+                        }}
+                    />
+                </p>
+            )}
+
             {certificate && hasIssued && <Details certificate={certificate} />}
 
             {!certificate && httpsEnabled && !hasDomains && (
@@ -158,7 +246,11 @@ export function CertificateCard({
                         disabled={certificate?.status === 'issuing'}
                     >
                         <ShieldCheck className="size-4" aria-hidden />
-                        {hasIssued ? t('Renew now') : t('Get certificate')}
+                        {certificate?.dns_pending
+                            ? t('Check now')
+                            : hasIssued
+                              ? t('Renew now')
+                              : t('Get certificate')}
                     </Button>
                 </div>
             )}

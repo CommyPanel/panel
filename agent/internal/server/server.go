@@ -124,6 +124,12 @@ type Certificates interface {
 	Issue(ctx context.Context, r certs.Request) (certs.Info, error)
 	Info(name string) (*certs.Info, error)
 	Remove(name string) error
+	// Prepare, Complete and RemovePending are the manual DNS steps for wildcard names.
+	Prepare(ctx context.Context, r certs.Request) (certs.Prepared, error)
+	Complete(ctx context.Context, name string) (certs.Info, error)
+	RemovePending(name string) error
+	// CheckCloudflare says whether a token finds the zone of a domain.
+	CheckCloudflare(ctx context.Context, token, domain string) (string, error)
 }
 
 // DockerUnit is the Docker daemon's systemd unit.
@@ -216,6 +222,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/certificates/issue", s.issueCertificate)
 	mux.HandleFunc("GET /v1/certificates/{name}", s.certificateInfo)
 	mux.HandleFunc("DELETE /v1/certificates/{name}", s.removeCertificate)
+	mux.HandleFunc("POST /v1/certificates/dns/prepare", s.prepareCertificate)
+	mux.HandleFunc("POST /v1/certificates/dns/complete", s.completeCertificate)
+	mux.HandleFunc("DELETE /v1/certificates/dns/{name}", s.removePendingCertificate)
+	mux.HandleFunc("POST /v1/dns/cloudflare/check", s.checkCloudflare)
 	mux.HandleFunc("POST /v1/docker/containers", s.runContainer)
 	mux.HandleFunc("GET /v1/docker/containers", s.listContainers)
 	mux.HandleFunc("POST /v1/docker/containers/{name}/stop", s.stopContainer)
@@ -505,6 +515,68 @@ func (s *Server) certificateInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, info)
+}
+
+func (s *Server) prepareCertificate(w http.ResponseWriter, r *http.Request) {
+	var req certs.Request
+	if !decode(w, r, &req) {
+		return
+	}
+	prepared, err := s.opts.Certs.Prepare(r.Context(), req)
+	if err != nil {
+		s.respond(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, prepared)
+}
+
+func (s *Server) completeCertificate(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name string `json:"name"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	info, err := s.opts.Certs.Complete(r.Context(), req.Name)
+	if errors.Is(err, certs.ErrNoPending) {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+		return
+	}
+	if err != nil {
+		s.respond(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, info)
+}
+
+func (s *Server) removePendingCertificate(w http.ResponseWriter, r *http.Request) {
+	if err := s.opts.Certs.RemovePending(r.PathValue("name")); err != nil {
+		s.respond(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// checkCloudflare tells whether a Cloudflare token can reach a domain's zone. The token is only
+// ever in the body, never in an address, and nothing here is written down.
+func (s *Server) checkCloudflare(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Token  string `json:"token"`
+		Domain string `json:"domain"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	zone, err := s.opts.Certs.CheckCloudflare(r.Context(), req.Token, req.Domain)
+	var input *validate.InputError
+	switch {
+	case err == nil:
+		writeJSON(w, http.StatusOK, map[string]string{"zone": zone})
+	case errors.As(err, &input):
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": input.Msg})
+	default:
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
+	}
 }
 
 func (s *Server) removeCertificate(w http.ResponseWriter, r *http.Request) {

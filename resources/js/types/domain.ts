@@ -41,11 +41,17 @@ export type PanelSummary = {
 };
 
 export type DomainCertificate = {
-    status: 'issuing' | 'active' | 'failed';
+    status: 'issuing' | 'active' | 'failed' | 'awaiting_dns';
     covers_domain: boolean;
     domains: string[];
     staging: boolean;
     issued_at: string | null;
     expires_at: string | null;
     last_error: string | null;
+};
+
+export type CloudflareSettings = {
+    connected: boolean;
+    zone: string | null;
+    saved_at: string | null;
 };

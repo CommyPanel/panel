@@ -35,6 +35,10 @@ it('can simulate a failure once', function () {
     expect($driver->containers())->toHaveKey('demo-1');
 });
 
+it('accepts a wildcard name in a site', function () {
+    expect((new NginxSite('demo', ['*.example.com', 'example.com'], 20001))->domains)->toBe(['*.example.com', 'example.com']);
+});
+
 it('rejects invalid names, domains and ports', function (callable $make) {
     expect($make)->toThrow(InvalidArgumentException::class);
 })->with([
@@ -43,6 +47,9 @@ it('rejects invalid names, domains and ports', function (callable $make) {
     'privileged port' => [fn () => new ContainerSpec('demo', 'demo:1', 80, 8080)],
     'no domains' => [fn () => new NginxSite('demo', [], 20001)],
     'bad domain' => [fn () => new NginxSite('demo', ['bad domain;'], 20001)],
+    'wildcard of a single label' => [fn () => new NginxSite('demo', ['*.com'], 20001)],
+    'wildcard in the middle' => [fn () => new NginxSite('demo', ['a.*.example.com'], 20001)],
+    'bare star' => [fn () => new NginxSite('demo', ['*'], 20001)],
     'bad upstream port' => [fn () => new NginxSite('demo', ['a.example.com'], 99999)],
     'redirect to an unknown domain' => [fn () => new NginxSite('demo', ['a.example.com', 'b.example.com'], 20001, null, ['a.example.com' => 'c.example.com'])],
     'redirect to itself' => [fn () => new NginxSite('demo', ['a.example.com', 'b.example.com'], 20001, null, ['a.example.com' => 'a.example.com'])],

@@ -8,9 +8,10 @@ type Props = {
     app: AppSettings;
     server: ServerAddress;
     https: { enabled: boolean; staging: boolean };
+    cloudflare: boolean;
 };
 
-export function DomainsTab({ app, server, https }: Props) {
+export function DomainsTab({ app, server, https, cloudflare }: Props) {
     const { t } = useT();
 
     // Redis and the like have no web interface: other apps reach them through a link.
@@ -41,6 +42,10 @@ export function DomainsTab({ app, server, https }: Props) {
                     certificate={app.certificate}
                     httpsEnabled={https.enabled}
                     hasDomains={app.domains.length > 0}
+                    cloudflare={cloudflare}
+                    hasWildcard={app.domains.some((d) =>
+                        d.name.startsWith('*.'),
+                    )}
                 />
             </div>
         </div>

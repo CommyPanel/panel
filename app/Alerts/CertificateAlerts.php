@@ -51,11 +51,40 @@ class CertificateAlerts
     }
 
     /**
+     * A wildcard certificate without a Cloudflare token needs a TXT record only the person can make:
+     * for the first certificate or for a renewal. Told once in a while until it is done.
+     *
+     * @param  list<array{name: string, value: string}>  $records
+     */
+    public function dnsNeeded(App $app, array $records, bool $renewal): void
+    {
+        $state = AlertState::for('cert-dns:'.$app->slug);
+
+        if ($state->notified_at?->isAfter(now()->subDays(self::EXPIRING_QUIET_DAYS))) {
+            return;
+        }
+
+        $this->alerter->send(new AlertMessage(
+            AlertEvent::CertificateExpiring,
+            $renewal
+                ? "The wildcard certificate for {$app->name} needs a new TXT record to be renewed"
+                : "The wildcard certificate for {$app->name} needs a TXT record",
+            array_map(fn (array $r) => "{$r['name']} TXT {$r['value']}", array_slice($records, 0, 4)),
+            $this->link($app),
+            $app->slug,
+            ['subject' => $this->subject($app), 'renewal' => $renewal],
+        ));
+
+        $state->forceFill(['state' => 'notified', 'notified_at' => now()])->save();
+    }
+
+    /**
      * An attempt worked: the next failure is a new one.
      */
     public function issued(?App $app): void
     {
         AlertState::query()->where('subject', 'cert:'.($this->subject($app)))->delete();
+        AlertState::query()->where('subject', 'cert-dns:'.($this->subject($app)))->delete();
     }
 
     /**

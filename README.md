@@ -152,6 +152,8 @@ sh -c 'npm run migrate && npm run seed'
 
 **Get told when a deployment fails.** Settings → Notifications takes a Slack, Discord or generic webhook. Messages hold the app, commit and reason, never logs or secrets.
 
+**Wildcard domains.** Add `*.example.com` to an app. Connect a Cloudflare API token (Domains → HTTPS) and the certificate is made and renewed automatically; without one, CommyPanel shows the TXT record to create and asks for a new one at each renewal.
+
 **Watch the server in Grafana.** A token with the metrics ability lets any Prometheus collect CPU, memory, disk, network and app state: [metrics](docs/metrics.md).
 
 More: [running apps](docs/apps.md), [databases](docs/databases.md), [GitHub](docs/github.md), [notifications](docs/notifications.md).
@@ -221,8 +223,8 @@ CommyPanel is pre-1.0. What you should know before you rely on it:
 
 **Certificates and domains**
 
-- No wildcard certificates yet (they need DNS-01 validation).
-- Certificates are validated over HTTP, so every name on a certificate must already point at the server.
+- Wildcard certificates need a Cloudflare API token, or a TXT record you create by hand (and by hand every renewal asks for a new record). Only Cloudflare is connected automatically.
+- Plain names on a certificate are validated over HTTP, so each must already point at the server.
 
 **Databases and backups**
 

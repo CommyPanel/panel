@@ -28,6 +28,7 @@ use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\BackupController;
 use App\Http\Controllers\BackupRemoteController;
 use App\Http\Controllers\CertificateController;
+use App\Http\Controllers\CloudflareController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DatabaseBackupController;
 use App\Http\Controllers\DatabaseRemoteController;
@@ -221,6 +222,7 @@ Route::middleware('auth')->group(function () {
         Route::middleware('can:'.Permissions::DOMAINS_MANAGE)->group(function () {
             Route::post('domains', [AppDomainController::class, 'store'])->name('domains.store');
             Route::post('certificate', [CertificateController::class, 'store'])->name('certificate.store');
+            Route::post('certificate/dns', [CertificateController::class, 'refreshDns'])->name('certificate.dns.refresh');
         });
     });
 
@@ -297,6 +299,8 @@ Route::middleware('auth')->group(function () {
         Route::delete('welcome/domain/next', [WelcomeController::class, 'cancel'])->name('welcome.cancel');
         Route::delete('welcome/domain', [WelcomeController::class, 'clear'])->middleware('password.confirm')->name('welcome.clear');
         Route::put('settings/https', [HttpsController::class, 'update'])->name('settings.https.update');
+        Route::put('settings/cloudflare', [CloudflareController::class, 'update'])->middleware('password.confirm')->name('settings.cloudflare.update');
+        Route::delete('settings/cloudflare', [CloudflareController::class, 'destroy'])->middleware('password.confirm')->name('settings.cloudflare.destroy');
         Route::put('settings/server-address', [ServerAddressController::class, 'update'])->name('settings.server-address.update');
         Route::post('settings/server-address/detect', [ServerAddressController::class, 'detect'])->name('settings.server-address.detect');
     });

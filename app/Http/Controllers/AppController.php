@@ -8,6 +8,7 @@ use App\Databases\DatabaseException;
 use App\Deploy\DestroyApp;
 use App\Deploy\LockedException;
 use App\Deploy\Source\GitProvider;
+use App\Dns\CloudflareSettings;
 use App\Dns\FreeDomains;
 use App\Dns\PanelDomain;
 use App\Dns\ServerAddress;
@@ -99,7 +100,7 @@ class AppController extends Controller
         return redirect()->route('apps.setup', $app);
     }
 
-    public function show(Request $request, App $app, HttpsSettings $https, ServerAddress $server, PanelDomain $panel, FreeDomains $free): Response|RedirectResponse
+    public function show(Request $request, App $app, HttpsSettings $https, CloudflareSettings $cloudflare, ServerAddress $server, PanelDomain $panel, FreeDomains $free): Response|RedirectResponse
     {
         if ($app->setup_step !== null) {
             return redirect()->route('apps.setup', $app);
@@ -113,6 +114,7 @@ class AppController extends Controller
                 ->map(fn ($deployment) => AppPresenter::deployment($deployment))->values(),
             'env_keys' => $app->envVars()->orderBy('key')->pluck('key')->values(),
             'https' => ['enabled' => $https->enabled(), 'staging' => $https->staging()],
+            'cloudflare' => $cloudflare->configured(),
             'server' => $server->forPage(),
             'free_domains' => $free->names(),
             'webhook' => $this->webhook($request, $app, $panel),

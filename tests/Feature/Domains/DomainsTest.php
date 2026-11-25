@@ -121,7 +121,7 @@ it('rejects invalid, duplicate and panel domains', function (string $input) {
     $this->post('/apps/shop/domains', ['name' => $input, 'redirect' => 'none'])->assertSessionHasErrors('name');
 
     expect(Domain::query()->count())->toBe(1);
-})->with(['https://x.example.com', '*.example.com', 'localhost', '203.0.113.7', 'taken.example.com', 'TAKEN.example.com', 'panel.example.com']);
+})->with(['https://x.example.com', '*.com', '*.*.example.com', '*example.com', 'localhost', '203.0.113.7', 'taken.example.com', 'TAKEN.example.com', 'panel.example.com']);
 
 it('routes a new domain at once when the app is live', function () {
     liveApp();

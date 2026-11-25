@@ -4,6 +4,37 @@ namespace App\Dns;
 
 final class DomainName
 {
+    /** The label looked up to see where a wildcard name points: any name under it would do. */
+    public const PROBE_LABEL = 'commypanel-check';
+
+    public static function isWildcard(string $name): bool
+    {
+        return str_starts_with($name, '*.');
+    }
+
+    /**
+     * Like normalize(), but a name may be a wildcard (`*.example.com`: every name one level below
+     * example.com). The part after `*.` must itself be a plain domain, so `*.com` is refused.
+     */
+    public static function normalizeAllowingWildcard(string $input): ?string
+    {
+        $input = trim($input);
+
+        if (! str_starts_with($input, '*.')) {
+            return self::normalize($input);
+        }
+
+        $base = self::normalize(substr($input, 2));
+
+        return $base === null ? null : '*.'.$base;
+    }
+
+    /** The name to look up in DNS for a domain: a wildcard is checked through one name below it. */
+    public static function probe(string $name): string
+    {
+        return self::isWildcard($name) ? self::PROBE_LABEL.'.'.substr($name, 2) : $name;
+    }
+
     /**
      * Normalise user input to a lowercase ASCII hostname, or null when it is
      * not a plain domain name (IP addresses, wildcards, URLs and single labels

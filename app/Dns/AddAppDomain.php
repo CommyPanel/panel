@@ -65,17 +65,23 @@ class AddAppDomain
      */
     public function __invoke(App $app, string $input, string $redirect): array
     {
-        $name = DomainName::normalize($input);
+        $name = DomainName::normalizeAllowingWildcard($input);
 
         if ($name === null) {
-            throw ValidationException::withMessages(['name' => 'Enter a domain such as app.example.com, without http://, paths or wildcards.']);
+            throw ValidationException::withMessages(['name' => 'Enter a domain such as app.example.com, or a wildcard such as *.example.com, without http:// or paths.']);
+        }
+
+        $wildcard = DomainName::isWildcard($name);
+
+        if ($wildcard && $redirect !== self::NONE) {
+            throw ValidationException::withMessages(['redirect' => 'A wildcard name takes no www redirect. Add the bare domain on its own if it should be served too.']);
         }
 
         if (FastApps::find($app->template)?->private()) {
             throw ValidationException::withMessages(['name' => 'This app has no web interface, so it takes no domain. Other apps reach it through a link.']);
         }
 
-        $hasWww = str_starts_with($name, 'www.');
+        $hasWww = ! $wildcard && str_starts_with($name, 'www.');
         $partner = match ($redirect) {
             self::WWW => $hasWww ? null : 'www.'.$name,
             self::APEX => $hasWww ? substr($name, 4) : null,

@@ -86,12 +86,18 @@ export type AppSettings = AppSummary & {
 };
 
 export type CertificateSummary = {
-    status: 'issuing' | 'active' | 'failed';
+    status: 'issuing' | 'active' | 'failed' | 'awaiting_dns';
     domains: string[];
     staging: boolean;
     issued_at: string | null;
     expires_at: string | null;
     last_error: string | null;
+    /** TXT records a wildcard certificate waits for, when no DNS provider is connected. */
+    dns_pending: {
+        records: { name: string; value: string }[];
+        expires_at: string | null;
+        renewal: boolean;
+    } | null;
 };
 
 export type DeploymentStatus =

@@ -8,6 +8,7 @@ import {
     DomainStatusMark,
     DomainTlsMark,
 } from '@/components/domains/domain-marks';
+import { CloudflareCard } from '@/components/domains/cloudflare-card';
 import { HttpsCard } from '@/components/domains/https-card';
 import { ServerAddressCard } from '@/components/domains/server-address-card';
 import { PageHeader } from '@/components/page-header';
@@ -19,6 +20,7 @@ import { useT } from '@/hooks/use-t';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate, timeAgo } from '@/lib/format';
 import type {
+    CloudflareSettings,
     DomainRow,
     HttpsSettings,
     PanelSummary,
@@ -28,6 +30,7 @@ import type {
 type Props = {
     server: ServerAddress;
     https: HttpsSettings;
+    cloudflare: CloudflareSettings;
     panel: PanelSummary;
     domains: DomainRow[];
 };
@@ -237,7 +240,13 @@ function PanelCard({ panel }: { panel: PanelSummary }) {
     );
 }
 
-export default function Index({ server, https, panel, domains }: Props) {
+export default function Index({
+    server,
+    https,
+    cloudflare,
+    panel,
+    domains,
+}: Props) {
     const { t } = useT();
     useDomainProgress(domains, ['domains', 'panel']);
 
@@ -302,6 +311,7 @@ export default function Index({ server, https, panel, domains }: Props) {
                     <div className="grid items-start gap-6 xl:grid-cols-2">
                         <HttpsCard https={https} />
                         <PanelCard panel={panel} />
+                        <CloudflareCard cloudflare={cloudflare} />
                     </div>
                 )}
                 {tab === 'server' && (

@@ -6,7 +6,9 @@ use App\Dns\CheckDomain;
 use App\Dns\ConfigurePanelDomain;
 use App\Dns\PanelDomain;
 use App\Enums\DomainStatus;
+use App\Models\Certificate;
 use App\Models\Domain;
+use App\Tls\TlsPlanner;
 use Illuminate\Console\Command;
 
 class CheckDomainsCommand extends Command
@@ -15,7 +17,7 @@ class CheckDomainsCommand extends Command
 
     protected $description = 'Re-check DNS for domains that are not connected yet, and connected ones hourly';
 
-    public function handle(CheckDomain $check, PanelDomain $panel, ConfigurePanelDomain $configure): int
+    public function handle(CheckDomain $check, PanelDomain $panel, ConfigurePanelDomain $configure, TlsPlanner $tls): int
     {
         $domains = Domain::query()
             ->where(fn ($query) => $query
@@ -26,6 +28,13 @@ class CheckDomainsCommand extends Command
 
         foreach ($domains as $domain) {
             $check($domain);
+        }
+
+        // Wildcard certificates waiting for a TXT record: finished as soon as the record can be seen.
+        foreach (Certificate::query()->whereNotNull('dns_pending')->with('app')->get() as $certificate) {
+            if ($certificate->app !== null) {
+                $tls->ensure($certificate->app);
+            }
         }
 
         // The panel's own domain, until its certificate is in place.

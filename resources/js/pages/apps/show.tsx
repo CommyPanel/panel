@@ -63,6 +63,7 @@ type Props = {
     deployments: DeploymentSummary[];
     env_keys: string[];
     https: { enabled: boolean; staging: boolean };
+    cloudflare: boolean;
     server: ServerAddress;
     webhook: AppWebhook | null;
 };
@@ -117,6 +118,7 @@ export default function Show({
     deployments,
     env_keys,
     https,
+    cloudflare,
     server,
     webhook,
 }: Props) {
@@ -433,7 +435,12 @@ export default function Show({
                     </Suspense>
                 )}
                 {active === 'domains' && (
-                    <DomainsTab app={app} server={server} https={https} />
+                    <DomainsTab
+                        app={app}
+                        server={server}
+                        https={https}
+                        cloudflare={cloudflare}
+                    />
                 )}
                 {active === 'nginx' && (
                     <NginxTab

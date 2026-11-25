@@ -20,7 +20,7 @@ final class Severity
         'database.remote_opened', 'database.remote_changed',
         'database_server.deleted', 'database.dropped', 'app.deleted', 'user.deleted',
         'auth.two_factor_disabled', 'admin.reset', 'app.volume_data_deleted',
-        'database.restore_replaced', 'volume.restored', 'server.key_viewed', 'app.env_downloaded',
+        'database.restore_replaced', 'volume.restored', 'server.key_viewed', 'app.env_downloaded', 'dns.cloudflare_saved',
     ];
 
     public const WARNING_ACTIONS = [
@@ -30,7 +30,7 @@ final class Severity
         'api.logs_read', 'app.terminal_opened', 'app.nginx_updated', 'app.volume_file_downloaded', 'app.volume_removed', 'app.git_token_saved', 'app.env_removed', 'app.env_revealed', 'app.env_changed', 'app.env_cleared',
         'token.created', 'user.created', 'user.updated', 'role.created', 'role.updated', 'role.deleted',
         'auth.password_changed', 'auth.two_factor_failed', 'auth.login_failed', 'auth.recovery_codes_generated', 'auth.recovery_code_used', 'user.sessions_viewed', 'user.session_revoked', 'user.sessions_revoked', 'audit.exported',
-        'https.disabled', 'panel.domain_removed', 'panel.domain_set', 'github.disconnected', 'github.connected', 'notifications.removed',
+        'https.disabled', 'dns.cloudflare_removed', 'panel.domain_removed', 'panel.domain_set', 'github.disconnected', 'github.connected', 'notifications.removed',
         'deploy.failed', 'deploy.auto_rolled_back', 'deploy.auto_rollback_failed', 'tls.failed', 'docker.restart_failed',
     ];
 

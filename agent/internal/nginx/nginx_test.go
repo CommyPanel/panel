@@ -594,3 +594,63 @@ func TestRenderWithoutIPv6(t *testing.T) {
 		t.Errorf("IPv4 listeners missing:\n%s", conf)
 	}
 }
+
+func TestWildcardDomainsAreServerNames(t *testing.T) {
+	m, _ := newManager(t, nil, true)
+	s := Site{Name: "demo", Domains: []string{"example.com", "*.example.com"}, UpstreamPort: 20001, Certificate: "demo"}
+	if err := s.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	conf, err := m.Render(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Count(conf, "server_name example.com *.example.com;"); got != 2 {
+		t.Errorf("want the wildcard in both the http and the https server, got %d:\n%s", got, conf)
+	}
+}
+
+func TestWildcardDomainValidation(t *testing.T) {
+	base := Site{Name: "demo", UpstreamPort: 20001}
+	for name, domains := range map[string][]string{
+		"too short":        {"*.com"},
+		"star inside":      {"a.*.example.com"},
+		"star as a prefix": {"*example.com"},
+		"two stars":        {"*.*.example.com"},
+		"duplicate":        {"*.example.com", "*.example.com"},
+	} {
+		s := base
+		s.Domains = domains
+		var ie *validate.InputError
+		if err := s.Validate(); !errors.As(err, &ie) {
+			t.Errorf("%s: want an input error, got %v", name, err)
+		}
+	}
+
+	// A wildcard cannot be the end of a redirect or the start of one: redirects stay between plain names.
+	s := base
+	s.Domains = []string{"example.com", "*.example.com"}
+	s.Redirects = []Redirect{{From: "example.com", To: "*.example.com"}}
+	if err := s.Validate(); err == nil {
+		t.Error("a redirect to a wildcard must be refused")
+	}
+	s.Redirects = []Redirect{{From: "*.example.com", To: "example.com"}}
+	if err := s.Validate(); err == nil {
+		t.Error("a redirect from a wildcard must be refused")
+	}
+}
+
+func TestStatusReadsWildcardNamesBack(t *testing.T) {
+	m, dir := newManager(t, nil, true)
+	if err := os.MkdirAll(filepath.Join(dir, "sites"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	conf := "server {\n    server_name *.example.com example.com;\n}\n"
+	if err := os.WriteFile(filepath.Join(dir, "sites", "commypanel-demo.conf"), []byte(conf), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	st := m.Status(context.Background())
+	if len(st.Sites) != 1 || strings.Join(st.Sites[0].Domains, ",") != "*.example.com,example.com" {
+		t.Errorf("sites = %+v", st.Sites)
+	}
+}

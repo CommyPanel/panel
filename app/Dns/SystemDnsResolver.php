@@ -19,6 +19,21 @@ class SystemDnsResolver implements DnsResolver
         return $this->lookup($host, DNS_CNAME, 'target')[0] ?? null;
     }
 
+    public function txt(string $host): array
+    {
+        $records = @dns_get_record($host.'.', DNS_TXT);
+
+        if ($records === false) {
+            return [];
+        }
+
+        // A long value is split into pieces ("entries"); the value is the pieces joined.
+        return array_values(array_unique(array_map(
+            fn (array $record) => isset($record['entries']) && is_array($record['entries']) ? implode('', $record['entries']) : (string) $record['txt'],
+            array_filter($records, fn (array $record) => isset($record['txt']) || isset($record['entries'])),
+        )));
+    }
+
     /**
      * @return list<string>
      */

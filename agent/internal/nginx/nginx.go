@@ -76,10 +76,17 @@ func (s Site) Validate() error {
 	if len(s.Domains) == 0 || len(s.Domains) > 50 {
 		return &validate.InputError{Msg: "a site needs between 1 and 50 domains"}
 	}
+	seenDomain := map[string]bool{}
 	for _, d := range s.Domains {
-		if err := validate.Domain(d); err != nil {
+		// A wildcard (*.example.com) is a server name like any other; nginx prefers an exact
+		// name of another site over it, so it only catches what nothing else claims.
+		if err := validate.DomainOrWildcard(d); err != nil {
 			return err
 		}
+		if seenDomain[d] {
+			return &validate.InputError{Msg: fmt.Sprintf("duplicate domain %q", d)}
+		}
+		seenDomain[d] = true
 	}
 	if err := validate.Port(s.UpstreamPort); err != nil {
 		return err

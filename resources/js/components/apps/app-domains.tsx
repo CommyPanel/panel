@@ -30,6 +30,19 @@ function redirectOptions(
     const bare = hasWww ? clean.slice(4) : clean;
     const options: Option[] = [{ value: 'none', label: t('No redirection') }];
 
+    // A wildcard has no www partner: the bare domain is added on its own.
+    if (clean.startsWith('*.')) {
+        return [
+            {
+                value: 'none',
+                label: t('No redirection'),
+                hint: t(
+                    'A wildcard serves every name one level below the domain, but not the bare domain itself. Add the bare domain separately if it should be served too.',
+                ),
+            },
+        ];
+    }
+
     if (bare.includes('.')) {
         options.push(
             hasWww
@@ -53,13 +66,6 @@ function redirectOptions(
                   },
         );
     }
-
-    options.push({
-        value: 'wildcard',
-        label: t('Wildcard domain (*.example.com)'),
-        hint: t('Coming later: it needs DNS provider integration.'),
-        disabled: true,
-    });
 
     return options;
 }
@@ -161,6 +167,9 @@ export function AddAppDomainCard({
                             form.setData('redirect', 'none');
                         }}
                         error={form.errors.name}
+                        hint={t(
+                            'A wildcard such as *.example.com serves every subdomain. Its certificate is checked through DNS: connect Cloudflare under Domains, or create a TXT record by hand.',
+                        )}
                     />
                 )}
                 {!choosing && (

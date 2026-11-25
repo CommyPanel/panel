@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Audit\AuditLogger;
 use App\Deploy\Traffic\AppRouting;
 use App\Dns\CheckDomain;
+use App\Dns\CloudflareSettings;
 use App\Dns\PanelDomain;
 use App\Dns\ServerAddress;
 use App\Models\Domain;
@@ -17,7 +18,7 @@ use Inertia\Response;
 
 class DomainController extends Controller
 {
-    public function index(ServerAddress $server, HttpsSettings $https, PanelDomain $panel): Response
+    public function index(ServerAddress $server, HttpsSettings $https, PanelDomain $panel, CloudflareSettings $cloudflare): Response
     {
         return Inertia::render('domains/index', [
             'panel' => [
@@ -28,6 +29,7 @@ class DomainController extends Controller
             ],
             'server' => $server->forPage(),
             'https' => ['enabled' => $https->enabled(), 'email' => $https->email(), 'staging' => $https->staging()],
+            'cloudflare' => ['connected' => $cloudflare->configured(), 'zone' => $cloudflare->zone(), 'saved_at' => $cloudflare->savedAt()?->toIso8601String()],
             'domains' => Domain::query()->with('app.certificate')->orderBy('name')->get()
                 ->map(fn (Domain $domain) => AppPresenter::domain($domain))->values(),
         ]);
@@ -49,6 +51,7 @@ class DomainController extends Controller
                 'issued_at' => $certificate->issued_at?->toIso8601String(),
                 'expires_at' => $certificate->expires_at?->toIso8601String(),
                 'last_error' => $certificate->last_error,
+                'dns_pending' => AppPresenter::dnsPending($certificate),
             ],
             'redirected_from' => Domain::query()->where('redirect_to', $domain->name)->orderBy('name')->pluck('name')->values(),
         ]);

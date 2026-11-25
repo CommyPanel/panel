@@ -19,17 +19,21 @@ class DomainVerifier
             return new DomainCheck(DomainStatus::Pending, problems: ['Set this server\'s public IP address first, so there is something to point the domain at.']);
         }
 
-        [$a, $aaaa] = $this->resolve($domain);
+        $wildcard = DomainName::isWildcard($domain);
+
+        [$a, $aaaa] = $this->resolve(DomainName::probe($domain));
 
         if ($a === [] && $aaaa === []) {
-            return new DomainCheck(DomainStatus::Pending, problems: ['No A or AAAA record found yet. DNS changes can take a few minutes to spread.']);
+            return new DomainCheck(DomainStatus::Pending, problems: [$wildcard ? 'No wildcard A or AAAA record (name *) found yet. DNS changes can take a few minutes to spread.' : 'No A or AAAA record found yet. DNS changes can take a few minutes to spread.']);
         }
 
         $found = [...$a, ...$aaaa];
 
         if (array_filter($found, fn (string $ip) => ! Cloudflare::owns($ip)) === []) {
             return new DomainCheck(DomainStatus::Proxied, $a, $aaaa, [
-                'This domain points at Cloudflare\'s proxy, so its real destination cannot be checked. Switch the record to "DNS only" (grey cloud) until the certificate has been issued.',
+                $wildcard
+                    ? 'This wildcard points at Cloudflare\'s proxy, so its real destination cannot be checked. A certificate for a wildcard is checked through DNS, so the proxy can stay on.'
+                    : 'This domain points at Cloudflare\'s proxy, so its real destination cannot be checked. Switch the record to "DNS only" (grey cloud) until the certificate has been issued.',
             ]);
         }
 
@@ -37,13 +41,13 @@ class DomainVerifier
 
         if ($serverV4 !== null && ! in_array($serverV4, $a, true)) {
             $problems[] = $a === []
-                ? "Add an A record pointing to {$serverV4}."
+                ? ($wildcard ? 'Add a wildcard A record (name *)' : 'Add an A record')." pointing to {$serverV4}."
                 : 'The A record points to '.implode(', ', $a)." instead of {$serverV4}.";
         }
 
         // With no IPv4 address configured, the guard above guarantees an IPv6 one.
         if ($serverV4 === null && ! in_array($serverV6, $aaaa, true)) {
-            $problems[] = "Add an AAAA record pointing to {$serverV6}.";
+            $problems[] = ($wildcard ? 'Add a wildcard AAAA record (name *)' : 'Add an AAAA record')." pointing to {$serverV6}.";
         }
 
         // An AAAA record that points elsewhere would send IPv6 visitors (and

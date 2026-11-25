@@ -7,13 +7,14 @@ use InvalidArgumentException;
 final readonly class CertificateRequest
 {
     /**
-     * @param  list<string>  $domains
+     * @param  list<string>  $domains  a name may be a wildcard (`*.example.com`), which needs `$dns` or the manual TXT flow
      */
     public function __construct(
         public string $name,
         public array $domains,
         public ?string $email = null,
         public bool $staging = false,
+        public ?DnsValidation $dns = null,
     ) {
         ResourceName::assertValid($name);
 

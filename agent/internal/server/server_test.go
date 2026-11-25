@@ -535,10 +535,14 @@ func TestRemoveVolumesRoute(t *testing.T) {
 }
 
 type fakeCerts struct {
-	issued  []certs.Request
-	removed []string
-	have    *certs.Info
-	err     error
+	issued    []certs.Request
+	removed   []string
+	prepared  []certs.Request
+	completed []string
+	dropped   []string
+	checked   []string
+	have      *certs.Info
+	err       error
 }
 
 func (f *fakeCerts) Issue(_ context.Context, r certs.Request) (certs.Info, error) {
@@ -552,6 +556,26 @@ func (f *fakeCerts) Info(name string) (*certs.Info, error) { return f.have, f.er
 func (f *fakeCerts) Remove(name string) error {
 	f.removed = append(f.removed, name)
 	return f.err
+}
+
+func (f *fakeCerts) Prepare(_ context.Context, r certs.Request) (certs.Prepared, error) {
+	f.prepared = append(f.prepared, r)
+	return certs.Prepared{Records: []certs.Record{{Name: "_acme-challenge.example.com", Value: "v"}}, ExpiresAt: time.Unix(1893456000, 0).UTC()}, f.err
+}
+
+func (f *fakeCerts) Complete(_ context.Context, name string) (certs.Info, error) {
+	f.completed = append(f.completed, name)
+	return certs.Info{Name: name, Domains: []string{"*.example.com"}, Serial: "def"}, f.err
+}
+
+func (f *fakeCerts) RemovePending(name string) error {
+	f.dropped = append(f.dropped, name)
+	return f.err
+}
+
+func (f *fakeCerts) CheckCloudflare(_ context.Context, token, domain string) (string, error) {
+	f.checked = append(f.checked, token+"|"+domain)
+	return "example.com", f.err
 }
 
 func newCertServer(f *fakeCerts) *Server {
@@ -1276,5 +1300,84 @@ func TestTrafficRangeRefusesBadInput(t *testing.T) {
 	}
 	if rec := do(t, New(Options{Nginx: &fakeNginx{}, Docker: &fakeDocker{}, Authorize: AllowAll()}), "GET", "/v1/traffic/shop", ""); rec.Code != http.StatusNotImplemented {
 		t.Errorf("without statistics: %d", rec.Code)
+	}
+}
+
+func TestWildcardCertificateRoutes(t *testing.T) {
+	f := &fakeCerts{}
+	s := newCertServer(f)
+
+	rec := do(t, s, "POST", "/v1/certificates/issue",
+		`{"name":"shop","domains":["*.example.com"],"agree_tos":true,"dns":{"provider":"cloudflare","token":"cftoken_abcdefghijklmnopqrstuvwxyz0123"}}`)
+	if rec.Code != 200 || len(f.issued) != 1 || f.issued[0].DNS == nil || f.issued[0].DNS.Provider != "cloudflare" {
+		t.Errorf("issue with dns: %d %v %s", rec.Code, f.issued, rec.Body)
+	}
+	if strings.Contains(rec.Body.String(), "cftoken") {
+		t.Error("the answer must never repeat the token")
+	}
+
+	rec = do(t, s, "POST", "/v1/certificates/dns/prepare", `{"name":"shop","domains":["*.example.com"],"agree_tos":true}`)
+	if rec.Code != 200 || len(f.prepared) != 1 || rec.Body.String() != `{"records":[{"name":"_acme-challenge.example.com","value":"v"}],"expires_at":"2030-01-01T00:00:00Z"}`+"\n" {
+		t.Errorf("prepare: %d %s", rec.Code, rec.Body)
+	}
+
+	rec = do(t, s, "POST", "/v1/certificates/dns/complete", `{"name":"shop"}`)
+	if rec.Code != 200 || len(f.completed) != 1 || !strings.Contains(rec.Body.String(), `"serial":"def"`) {
+		t.Errorf("complete: %d %s", rec.Code, rec.Body)
+	}
+
+	rec = do(t, s, "DELETE", "/v1/certificates/dns/shop", "")
+	if rec.Code != http.StatusNoContent || rec.Body.Len() != 0 || len(f.dropped) != 1 || f.dropped[0] != "shop" {
+		t.Errorf("delete pending: %d %q %v", rec.Code, rec.Body, f.dropped)
+	}
+}
+
+func TestWildcardCertificateRoutesAnswerWithTheRightStatus(t *testing.T) {
+	f := &fakeCerts{err: certs.ErrNoPending}
+	s := newCertServer(f)
+	if rec := do(t, s, "POST", "/v1/certificates/dns/complete", `{"name":"shop"}`); rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "prepare it again") {
+		t.Errorf("no pending order: %d %s", rec.Code, rec.Body)
+	}
+
+	f.err = &validate.InputError{Msg: "bad"}
+	if rec := do(t, s, "POST", "/v1/certificates/dns/prepare", `{"name":"shop","domains":["a.example.com"],"agree_tos":true}`); rec.Code != http.StatusBadRequest {
+		t.Errorf("input error: %d", rec.Code)
+	}
+
+	for name, body := range map[string]string{
+		"unknown field": `{"name":"shop","domains":["*.example.com"],"agree_tos":true,"order":"http://evil/"}`,
+		"not json":      `x`,
+	} {
+		if rec := do(t, s, "POST", "/v1/certificates/dns/prepare", body); rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: %d", name, rec.Code)
+		}
+	}
+	if rec := do(t, s, "POST", "/v1/certificates/dns/complete", `{"name":"shop","extra":1}`); rec.Code != http.StatusBadRequest {
+		t.Errorf("complete with an unknown field: %d", rec.Code)
+	}
+}
+
+func TestCloudflareCheckRoute(t *testing.T) {
+	f := &fakeCerts{}
+	s := newCertServer(f)
+
+	rec := do(t, s, "POST", "/v1/dns/cloudflare/check", `{"token":"cftoken_abcdefghijklmnopqrstuvwxyz0123","domain":"*.example.com"}`)
+	if rec.Code != 200 || rec.Body.String() != `{"zone":"example.com"}`+"\n" || len(f.checked) != 1 {
+		t.Errorf("check: %d %s", rec.Code, rec.Body)
+	}
+
+	f.err = &validate.InputError{Msg: "no active zone"}
+	rec = do(t, s, "POST", "/v1/dns/cloudflare/check", `{"token":"cftoken_abcdefghijklmnopqrstuvwxyz0123","domain":"example.org"}`)
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "no active zone") || strings.Contains(rec.Body.String(), "cftoken") {
+		t.Errorf("rejected: %d %s", rec.Code, rec.Body)
+	}
+
+	f.err = errors.New("Cloudflare is having trouble right now")
+	if rec := do(t, s, "POST", "/v1/dns/cloudflare/check", `{"token":"cftoken_abcdefghijklmnopqrstuvwxyz0123","domain":"example.com"}`); rec.Code != http.StatusBadGateway {
+		t.Errorf("upstream: %d", rec.Code)
+	}
+
+	if rec := do(t, s, "POST", "/v1/dns/cloudflare/check", `{"token":"x","domain":"example.com","zone":"z"}`); rec.Code != http.StatusBadRequest {
+		t.Errorf("unknown field: %d", rec.Code)
 	}
 }

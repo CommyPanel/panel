@@ -9,6 +9,7 @@ use App\Host\Data\ContainerSpec;
 use App\Host\Data\DatabaseTarget;
 use App\Host\Data\DatabaseTls;
 use App\Host\Data\DatabaseToolSession;
+use App\Host\Data\DnsChallenge;
 use App\Host\Data\DockerDiagnosis;
 use App\Host\Data\DockerInfo;
 use App\Host\Data\HostInfo;
@@ -474,6 +475,39 @@ interface HostDriver
      * @throws HostOperationFailed with the CA's explanation when validation fails
      */
     public function issueCertificate(CertificateRequest $request): CertificateInfo;
+
+    /**
+     * Start an order for a certificate with wildcard names when no DNS provider is connected: the
+     * agent keeps the order and answers with the TXT records the person has to create. Asking again
+     * for the same names while the order is still good gives the same records.
+     *
+     * @throws HostOperationFailed
+     */
+    public function prepareDnsCertificate(CertificateRequest $request): DnsChallenge;
+
+    /**
+     * Finish the order started by prepareDnsCertificate once the TXT records exist. The order is spent
+     * either way: after a failure the person has to start again, and the records change.
+     *
+     * @throws HostOperationFailed with the CA's explanation when validation fails
+     */
+    public function completeDnsCertificate(string $name): CertificateInfo;
+
+    /**
+     * Forget a waiting order. Forgetting one that does not exist succeeds.
+     *
+     * @throws HostOperationFailed
+     */
+    public function cancelDnsCertificate(string $name): void;
+
+    /**
+     * Whether the Cloudflare token can edit the DNS of the zone that holds `$domain`, and which zone that is.
+     *
+     * @return string the zone's name
+     *
+     * @throws HostOperationFailed with a sentence a person can act on
+     */
+    public function checkCloudflare(#[\SensitiveParameter] string $token, string $domain): string;
 
     /**
      * @throws HostOperationFailed

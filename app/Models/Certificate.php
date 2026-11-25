@@ -15,6 +15,7 @@ use Illuminate\Support\Carbon;
  * @property bool $staging
  * @property Carbon|null $issued_at
  * @property Carbon|null $expires_at
+ * @property array{domains: list<string>, records: list<array{name: string, value: string}>, expires_at: string|null}|null $dns_pending
  * @property Carbon|null $last_attempt_at
  * @property string|null $last_error
  */
@@ -27,6 +28,7 @@ class Certificate extends Model
         return [
             'status' => CertificateStatus::class,
             'domains' => 'array',
+            'dns_pending' => 'array',
             'staging' => 'boolean',
             'issued_at' => 'datetime',
             'expires_at' => 'datetime',

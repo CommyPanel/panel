@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
@@ -21,6 +22,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/acme"
 )
 
 // fakeCA is a minimal ACME server (RFC 8555) that validates HTTP-01 challenges
@@ -45,13 +48,21 @@ type fakeCA struct {
 
 	// Test switches.
 	forceToken string // override the token the CA hands out
+
+	// DNS-01: the account key's thumbprint (taken from the registration), and where the CA looks
+	// for TXT records. A nil lookup means no record is ever found.
+	thumbprint string
+	txtLookup  func(name string) []string
+	ignoreDNS  bool // find no TXT records even when they exist
 }
 
 type fakeAuthz struct {
-	domain string
-	token  string
-	status string
-	detail string
+	domain   string
+	ident    string // as ordered, with the "*." of a wildcard
+	wildcard bool
+	token    string
+	status   string
+	detail   string
 }
 
 func newFakeCA(t *testing.T, webroot string) *fakeCA {
@@ -105,6 +116,7 @@ func (c *fakeCA) serve(w http.ResponseWriter, r *http.Request) {
 	case path == "/nonce":
 		w.WriteHeader(200)
 	case path == "/acct-new":
+		c.rememberKey(r)
 		c.newAccounts++
 		w.Header().Set("Location", base+"/acct/1")
 		status := 201
@@ -140,6 +152,32 @@ func (c *fakeCA) payload(r *http.Request) []byte {
 	return raw
 }
 
+// rememberKey takes the account key out of the registration request, so DNS-01 values can be checked.
+func (c *fakeCA) rememberKey(r *http.Request) {
+	var jws struct {
+		Protected string `json:"protected"`
+	}
+	body, _ := io.ReadAll(r.Body)
+	_ = json.Unmarshal(body, &jws)
+	raw, _ := base64.RawURLEncoding.DecodeString(jws.Protected)
+	var header struct {
+		JWK struct{ X, Y string } `json:"jwk"`
+	}
+	_ = json.Unmarshal(raw, &header)
+	x, _ := base64.RawURLEncoding.DecodeString(header.JWK.X)
+	y, _ := base64.RawURLEncoding.DecodeString(header.JWK.Y)
+	pub := &ecdsa.PublicKey{Curve: elliptic.P256(), X: new(big.Int).SetBytes(x), Y: new(big.Int).SetBytes(y)}
+	if thumb, err := acme.JWKThumbprint(pub); err == nil {
+		c.thumbprint = thumb
+	}
+}
+
+// expectedTXT is what a correct DNS-01 answer for a token looks like.
+func (c *fakeCA) expectedTXT(token string) string {
+	sum := sha256.Sum256([]byte(token + "." + c.thumbprint))
+	return base64.RawURLEncoding.EncodeToString(sum[:])
+}
+
 func (c *fakeCA) newOrder(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Identifiers []struct{ Type, Value string } `json:"identifiers"`
@@ -154,7 +192,11 @@ func (c *fakeCA) newOrder(w http.ResponseWriter, r *http.Request) {
 		if c.forceToken != "" {
 			token = c.forceToken
 		}
-		c.authz = append(c.authz, &fakeAuthz{domain: id.Value, token: token, status: "pending"})
+		a := &fakeAuthz{domain: id.Value, ident: id.Value, token: token, status: "pending"}
+		if strings.HasPrefix(id.Value, "*.") {
+			a.domain, a.wildcard = strings.TrimPrefix(id.Value, "*."), true
+		}
+		c.authz = append(c.authz, a)
 	}
 	w.Header().Set("Location", c.srv.URL+"/order/"+strconv.Itoa(c.orders))
 	c.json(w, 201, c.orderBody())
@@ -177,7 +219,7 @@ func (c *fakeCA) orderBody() map[string]any {
 	var ids []map[string]string
 	var urls []string
 	for i, a := range c.authz {
-		ids = append(ids, map[string]string{"type": "dns", "value": a.domain})
+		ids = append(ids, map[string]string{"type": "dns", "value": a.ident})
 		urls = append(urls, c.srv.URL+"/authz/"+strconv.Itoa(i))
 	}
 	body := map[string]any{
@@ -201,24 +243,37 @@ func (c *fakeCA) authzIndex(path string) int {
 func (c *fakeCA) showAuthz(w http.ResponseWriter, path string) {
 	i := c.authzIndex(path)
 	a := c.authz[i]
+	kind := "http-01"
+	if a.wildcard {
+		kind = "dns-01"
+	}
 	challenge := map[string]any{
-		"type": "http-01", "url": c.srv.URL + "/chall/" + strconv.Itoa(i), "token": a.token, "status": a.status,
+		"type": kind, "url": c.srv.URL + "/chall/" + strconv.Itoa(i), "token": a.token, "status": a.status,
 	}
 	if a.status == "invalid" {
 		challenge["error"] = map[string]string{"type": "urn:ietf:params:acme:error:connection", "detail": a.detail}
 	}
-	c.json(w, 200, map[string]any{
+	body := map[string]any{
 		"status":     a.status,
 		"expires":    time.Now().Add(time.Hour).Format(time.RFC3339),
 		"identifier": map[string]string{"type": "dns", "value": a.domain},
 		"challenges": []any{challenge},
-	})
+	}
+	if a.wildcard {
+		body["wildcard"] = true
+	}
+	c.json(w, 200, body)
 }
 
 // validate plays Let's Encrypt fetching http://domain/.well-known/acme-challenge/token.
 func (c *fakeCA) validate(w http.ResponseWriter, path string) {
 	i := c.authzIndex(path)
 	a := c.authz[i]
+
+	if a.wildcard {
+		c.validateDNS(w, path, a)
+		return
+	}
 
 	file := filepath.Join(c.webroot, ".well-known", "acme-challenge", a.token)
 	if data, err := os.ReadFile(file); err == nil && len(data) > 0 && strings.HasPrefix(string(data), a.token+".") {
@@ -228,6 +283,26 @@ func (c *fakeCA) validate(w http.ResponseWriter, path string) {
 		a.detail = fmt.Sprintf("Fetching http://%s/.well-known/acme-challenge/%s: Timeout during connect", a.domain, a.token)
 	}
 	c.json(w, 200, map[string]any{"type": "http-01", "url": c.srv.URL + path, "token": a.token, "status": "processing"})
+}
+
+// validateDNS plays Let's Encrypt looking up _acme-challenge.<domain> TXT.
+func (c *fakeCA) validateDNS(w http.ResponseWriter, path string, a *fakeAuthz) {
+	want := c.expectedTXT(a.token)
+	found := false
+	if c.txtLookup != nil && !c.ignoreDNS {
+		for _, v := range c.txtLookup("_acme-challenge." + a.domain) {
+			if v == want {
+				found = true
+			}
+		}
+	}
+	if found {
+		a.status = "valid"
+	} else {
+		a.status = "invalid"
+		a.detail = fmt.Sprintf("DNS problem: NXDOMAIN looking up TXT for _acme-challenge.%s - check that a DNS record exists for this domain", a.domain)
+	}
+	c.json(w, 200, map[string]any{"type": "dns-01", "url": c.srv.URL + path, "token": a.token, "status": "processing"})
 }
 
 func (c *fakeCA) finalize(w http.ResponseWriter, r *http.Request) {

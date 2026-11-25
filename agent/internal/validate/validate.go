@@ -169,6 +169,22 @@ func Domain(s string) error {
 	return nil
 }
 
+// DomainOrWildcard checks a hostname like Domain, or a wildcard: "*." followed by a name that
+// itself has at least two labels (so "*.example.com" is fine and "*.com" is not). The star is
+// only ever the whole first label.
+func DomainOrWildcard(s string) error {
+	if !strings.HasPrefix(s, "*.") {
+		return Domain(s)
+	}
+	if err := Domain(s[2:]); err != nil {
+		return invalid("invalid wildcard domain %q", s)
+	}
+	return nil
+}
+
+// IsWildcard reports whether a name is a wildcard such as "*.example.com".
+func IsWildcard(s string) bool { return strings.HasPrefix(s, "*.") }
+
 // Port checks an unprivileged TCP port.
 func Port(p int) error {
 	if p < 1024 || p > 65535 {

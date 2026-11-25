@@ -10,6 +10,7 @@ use App\Host\Data\ContainerUsage;
 use App\Host\Data\DatabaseTarget;
 use App\Host\Data\DatabaseTls;
 use App\Host\Data\DatabaseToolSession;
+use App\Host\Data\DnsChallenge;
 use App\Host\Data\DockerDiagnosis;
 use App\Host\Data\DockerInfo;
 use App\Host\Data\HostInfo;
@@ -430,9 +431,51 @@ class AgentHostDriver implements HostDriver
             'email' => $request->email,
             'staging' => $request->staging,
             'agree_tos' => true,
+            'dns' => $request->dns === null ? null : ['provider' => $request->dns->provider, 'token' => $request->dns->token],
         ], fn ($value) => $value !== null)));
 
         return $this->certificateFrom($this->handle($response));
+    }
+
+    public function prepareDnsCertificate(CertificateRequest $request): DnsChallenge
+    {
+        $response = $this->request(fn () => $this->client(timeout: 120)->post('/v1/certificates/dns/prepare', array_filter([
+            'name' => $request->name,
+            'domains' => $request->domains,
+            'email' => $request->email,
+            'staging' => $request->staging,
+            'agree_tos' => true,
+        ], fn ($value) => $value !== null)));
+        $data = $this->handle($response);
+
+        return new DnsChallenge(
+            array_values(array_map(fn (array $r) => ['name' => (string) $r['name'], 'value' => (string) $r['value']], $data['records'] ?? [])),
+            isset($data['expires_at']) ? new DateTimeImmutable((string) $data['expires_at']) : null,
+        );
+    }
+
+    public function completeDnsCertificate(string $name): CertificateInfo
+    {
+        ResourceName::assertValid($name);
+
+        // Waits for Let's Encrypt to look at the records.
+        $response = $this->request(fn () => $this->client(timeout: 400)->post('/v1/certificates/dns/complete', ['name' => $name]));
+
+        return $this->certificateFrom($this->handle($response));
+    }
+
+    public function cancelDnsCertificate(string $name): void
+    {
+        ResourceName::assertValid($name);
+
+        $this->handle($this->request(fn () => $this->client()->delete("/v1/certificates/dns/{$name}")));
+    }
+
+    public function checkCloudflare(#[\SensitiveParameter] string $token, string $domain): string
+    {
+        $data = $this->handle($this->request(fn () => $this->client(timeout: 60)->post('/v1/dns/cloudflare/check', ['token' => $token, 'domain' => $domain])));
+
+        return (string) ($data['zone'] ?? '');
     }
 
     public function certificateInfo(string $name): ?CertificateInfo

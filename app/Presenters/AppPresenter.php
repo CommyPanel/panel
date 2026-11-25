@@ -10,8 +10,10 @@ use App\Enums\DeploymentStatus;
 use App\Enums\SourceType;
 use App\FastApps\FastApps;
 use App\Models\App;
+use App\Models\Certificate;
 use App\Models\Deployment;
 use App\Models\Domain;
+use App\Tls\TlsPlanner;
 
 /**
  * Shapes models into the arrays the React pages receive. Secrets (env values,
@@ -216,6 +218,23 @@ class AppPresenter
             'issued_at' => $certificate->issued_at?->toIso8601String(),
             'expires_at' => $certificate->expires_at?->toIso8601String(),
             'last_error' => $certificate->last_error,
+            'dns_pending' => self::dnsPending($certificate),
+        ];
+    }
+
+    /**
+     * The TXT records a wildcard certificate is waiting for, if any are still good.
+     *
+     * @return array{records: list<array{name: string, value: string}>, expires_at: string|null, renewal: bool}|null
+     */
+    public static function dnsPending(Certificate $certificate): ?array
+    {
+        $pending = app(TlsPlanner::class)->pending($certificate);
+
+        return $pending === null ? null : [
+            'records' => $pending['records'],
+            'expires_at' => $pending['expires_at'],
+            'renewal' => $certificate->isUsable(),
         ];
     }
 }

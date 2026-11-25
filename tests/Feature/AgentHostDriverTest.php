@@ -3,6 +3,7 @@
 use App\Host\Data\CertificateRequest;
 use App\Host\Data\ContainerSpec;
 use App\Host\Data\DatabaseTarget;
+use App\Host\Data\DnsValidation;
 use App\Host\Data\ImageBuildSpec;
 use App\Host\Data\NginxSite;
 use App\Host\Data\Volume;
@@ -160,6 +161,50 @@ it('shows the CA\'s reason when a certificate cannot be issued', function () {
 
     expect(fn () => agentDriver()->issueCertificate(new CertificateRequest('shop', ['shop.example.com'])))
         ->toThrow(HostOperationFailed::class, 'Timeout during connect');
+});
+
+it('sends the DNS provider with a wildcard request, and only then', function () {
+    Http::fake(['agent/v1/certificates/issue' => Http::response([
+        'name' => 'shop', 'domains' => ['*.example.com'], 'issuer' => 'R11',
+        'not_before' => '2026-10-30T10:00:00Z', 'not_after' => '2027-01-28T10:00:00Z',
+    ])]);
+
+    agentDriver()->issueCertificate(new CertificateRequest('shop', ['*.example.com'], null, true, new DnsValidation('cloudflare', 'cf_token_0123456789abcdefghij')));
+
+    Http::assertSent(fn ($request) => $request->data() === ['name' => 'shop', 'domains' => ['*.example.com'], 'staging' => true, 'agree_tos' => true, 'dns' => ['provider' => 'cloudflare', 'token' => 'cf_token_0123456789abcdefghij']]);
+});
+
+it('prepares and completes a wildcard order that waits for TXT records', function () {
+    Http::fake([
+        'agent/v1/certificates/dns/prepare' => Http::response(['records' => [['name' => '_acme-challenge.example.com', 'value' => 'abc']], 'expires_at' => '2026-12-01T00:00:00Z']),
+        'agent/v1/certificates/dns/complete' => Http::response(['name' => 'shop', 'domains' => ['*.example.com'], 'not_before' => '2026-11-26T10:00:00Z', 'not_after' => '2027-02-24T10:00:00Z']),
+        'agent/v1/certificates/dns/shop' => Http::response(null, 204),
+    ]);
+
+    $challenge = agentDriver()->prepareDnsCertificate(new CertificateRequest('shop', ['*.example.com'], 'ops@example.com'));
+    $info = agentDriver()->completeDnsCertificate('shop');
+    agentDriver()->cancelDnsCertificate('shop');
+
+    expect($challenge->records)->toBe([['name' => '_acme-challenge.example.com', 'value' => 'abc']])
+        ->and($challenge->expiresAt->format('Y-m-d'))->toBe('2026-12-01')
+        ->and($info->domains)->toBe(['*.example.com']);
+
+    Http::assertSent(fn ($request) => $request->url() === 'http://agent/v1/certificates/dns/prepare' && $request->data() === ['name' => 'shop', 'domains' => ['*.example.com'], 'email' => 'ops@example.com', 'staging' => false, 'agree_tos' => true]);
+    Http::assertSent(fn ($request) => $request->url() === 'http://agent/v1/certificates/dns/complete' && $request->data() === ['name' => 'shop']);
+    Http::assertSent(fn ($request) => $request->method() === 'DELETE' && $request->url() === 'http://agent/v1/certificates/dns/shop');
+});
+
+it('asks the agent to test a Cloudflare token, and passes its sentence on when it is refused', function () {
+    Http::fake(['agent/v1/dns/cloudflare/check' => Http::sequence()
+        ->push(['zone' => 'example.com'])
+        ->push(['error' => 'the token cannot edit DNS for example.com'], 400)]);
+
+    expect(agentDriver()->checkCloudflare('cf_token_0123456789abcdefghij', 'example.com'))->toBe('example.com');
+
+    Http::assertSent(fn ($request) => $request->data() === ['token' => 'cf_token_0123456789abcdefghij', 'domain' => 'example.com']);
+
+    expect(fn () => agentDriver()->checkCloudflare('cf_token_0123456789abcdefghij', 'example.com'))
+        ->toThrow(HostOperationFailed::class, 'cannot edit DNS');
 });
 
 it('treats a missing certificate as null', function () {

@@ -32,7 +32,10 @@ final readonly class NginxSite
         }
 
         foreach ($domains as $domain) {
-            if (! filter_var($domain, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) {
+            // A wildcard (`*.example.com`) is `*.` and a real domain.
+            $name = str_starts_with($domain, '*.') ? substr($domain, 2) : $domain;
+
+            if (! filter_var($name, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) || ($name !== $domain && ! str_contains($name, '.'))) {
                 throw new InvalidArgumentException("Invalid domain [{$domain}].");
             }
         }

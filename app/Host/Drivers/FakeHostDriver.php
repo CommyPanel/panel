@@ -10,6 +10,7 @@ use App\Host\Data\ContainerUsage;
 use App\Host\Data\DatabaseTarget;
 use App\Host\Data\DatabaseTls;
 use App\Host\Data\DatabaseToolSession;
+use App\Host\Data\DnsChallenge;
 use App\Host\Data\DockerDiagnosis;
 use App\Host\Data\DockerInfo;
 use App\Host\Data\HostInfo;
@@ -61,6 +62,13 @@ class FakeHostDriver implements HostDriver
 
     /** @var array<string, CertificateInfo> */
     private array $certificates = [];
+
+    /** @var array<string, CertificateRequest> orders waiting for the person's TXT records, by certificate name */
+    private array $dnsOrders = [];
+
+    private ?string $dnsCompleteFails = null;
+
+    private ?string $cloudflareFails = null;
 
     /** @var array<string, true> names of containers that are stopped */
     private array $stopped = [];
@@ -401,6 +409,77 @@ class FakeHostDriver implements HostDriver
             new DateTimeImmutable('+90 days'),
             $request->staging ? '(STAGING) Fake CA' : 'Fake CA',
         );
+    }
+
+    public function prepareDnsCertificate(CertificateRequest $request): DnsChallenge
+    {
+        $this->record('prepareDnsCertificate', ['request' => $request]);
+
+        $this->dnsOrders[$request->name] = $request;
+        $records = [];
+
+        foreach ($request->domains as $domain) {
+            if (str_starts_with($domain, '*.')) {
+                $records[] = ['name' => '_acme-challenge.'.substr($domain, 2), 'value' => 'fake-txt-'.substr(md5($request->name.$domain), 0, 16)];
+            }
+        }
+
+        return new DnsChallenge($records, new DateTimeImmutable('+6 days'));
+    }
+
+    public function completeDnsCertificate(string $name): CertificateInfo
+    {
+        $this->record('completeDnsCertificate', ['name' => $name]);
+
+        $order = $this->dnsOrders[$name] ?? throw new HostOperationFailed('Agent error: there is no waiting order for this certificate');
+        unset($this->dnsOrders[$name]);
+
+        if ($this->dnsCompleteFails !== null) {
+            throw new HostOperationFailed($this->dnsCompleteFails);
+        }
+
+        return $this->issueCertificate(new CertificateRequest($order->name, $order->domains, $order->email, $order->staging));
+    }
+
+    public function cancelDnsCertificate(string $name): void
+    {
+        $this->record('cancelDnsCertificate', ['name' => $name]);
+        unset($this->dnsOrders[$name]);
+    }
+
+    public function checkCloudflare(#[\SensitiveParameter] string $token, string $domain): string
+    {
+        $this->record('checkCloudflare', ['domain' => $domain]);
+
+        if ($this->cloudflareFails !== null) {
+            throw new HostOperationFailed($this->cloudflareFails);
+        }
+
+        return implode('.', array_slice(explode('.', ltrim($domain, '*.')), -2));
+    }
+
+    /**
+     * Make the next completions of a waiting order fail with this message (tests).
+     */
+    public function failDnsCompleteWith(?string $message): void
+    {
+        $this->dnsCompleteFails = $message;
+    }
+
+    /**
+     * Make Cloudflare checks fail with this message (tests).
+     */
+    public function failCloudflareWith(?string $message): void
+    {
+        $this->cloudflareFails = $message;
+    }
+
+    /**
+     * @return array<string, CertificateRequest>
+     */
+    public function dnsOrders(): array
+    {
+        return $this->dnsOrders;
     }
 
     public function certificateInfo(string $name): ?CertificateInfo
