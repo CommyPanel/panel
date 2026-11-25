@@ -72,6 +72,10 @@ class AppController extends Controller
 
             $audit->record('app.setup_started', null, ['app' => $app->slug, 'template' => $template->id()], $app);
 
+            foreach ($app->databaseLinks()->with('database.server')->get() as $link) {
+                $audit->record('app.database_linked', $request->user(), ['app' => $app->slug, 'database' => $link->database->name, 'server' => $link->database->server->slug, 'prefix' => $link->env_prefix], $app);
+            }
+
             return redirect()->route('apps.setup', $app);
         }
 

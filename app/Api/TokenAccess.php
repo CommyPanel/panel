@@ -15,7 +15,7 @@ use Laravel\Sanctum\PersonalAccessToken;
  * it says, a request is still checked against what the person may do NOW, so
  * taking a permission away from a user takes it from their tokens too.
  *
- * Abilities are strings on the token: `apps:read`, `apps:deploy`, `apps:control`, `apps:logs`, `apps:env`, and one
+ * Abilities are strings on the token: `apps:read`, `apps:deploy`, `apps:control`, `apps:logs`, `apps:env`, `metrics:read` (for a Prometheus), and one
  * `app:<slug>` for each app the token is limited to (none means every app the
  * person may use).
  */
@@ -30,6 +30,8 @@ class TokenAccess
     public const LOGS = 'apps:logs';
 
     public const ENV = 'apps:env';
+
+    public const METRICS = 'metrics:read';
 
     /** The most a token may live, and what it gets when nothing else is said. */
     public const MAX_DAYS = 365;
@@ -48,6 +50,7 @@ class TokenAccess
             self::DEPLOY => ['label' => __('Start deployments'), 'description' => __('Deploy an app, for example from a CI pipeline after the tests pass. Also lets a token apply changed variables.'), 'permission' => Permissions::APPS_DEPLOY],
             self::CONTROL => ['label' => __('Start, stop and restart apps'), 'description' => __('Stop an app, start it again and restart it. Visitors see an error while it is stopped.'), 'permission' => Permissions::APPS_CONTROL],
             self::LOGS => ['label' => __('Read app logs'), 'description' => __('Read the output of an app\'s running container. Apps often print secrets into their logs, and every read is recorded in the audit log.'), 'permission' => Permissions::APPS_LOGS],
+            self::METRICS => ['label' => __('Read server metrics'), 'description' => __('Let a Prometheus read how busy the server and its containers are, and whether each app and database server is up. Only numbers and names, no variables or logs. A token limited to some apps sees only those apps.'), 'permission' => Permissions::SERVER_VIEW],
             self::ENV => ['label' => __('Manage environment variables'), 'description' => __('List the names of an app\'s variables, set a variable and remove one. Values are never read back through the API, only written. They often hold secrets.'), 'permission' => Permissions::ENV_MANAGE],
         ];
     }

@@ -1,22 +1,26 @@
 # Ready-made apps
 
-Besides your own code, **Apps > New app > A ready-made app** installs software you only need to run: **Meilisearch**, **Typesense**, **Grafana**, **Elasticsearch**, **Kibana**, **Uptime Kuma**, **Mailpit**, **Gotenberg**, **Redis**, **n8n** and **Garage**. You pick the app from the list (with its logo); a short guide appears under it with what CommyPanel does for you, what to do once it runs (such as creating the first account) and how to upgrade it. You then choose a name, the app's **memory limit** (filled with the amount the app is made for; Elasticsearch, Kibana and n8n refuse less than they need to run), optionally add a domain, and CommyPanel builds and starts it like any other app: the same releases, rollbacks, logs, variables, volumes, domains and HTTPS.
+Besides your own code, **Apps > New app > A ready-made app** installs software you only need to run: **Meilisearch**, **Typesense**, **Grafana**, **Elasticsearch**, **Kibana**, **Uptime Kuma**, **Mailpit**, **Gotenberg**, **Redis**, **n8n**, **Garage**, **Vaultwarden**, **Forgejo**, **Umami** and **ntfy**. You pick the app from the list (with its logo); a short guide appears under it with what CommyPanel does for you, what to do once it runs (such as creating the first account) and how to upgrade it. You then choose a name, the app's **memory limit** (filled with the amount the app is made for; Elasticsearch, Kibana and n8n refuse less than they need to run), optionally add a domain, and CommyPanel builds and starts it like any other app: the same releases, rollbacks, logs, variables, volumes, domains and HTTPS.
 
 Each one runs the **official image** at a version CommyPanel pins (shown on the app's page), so a new CommyPanel release never changes the version under your data by itself. Their data lives in a persistent volume, which survives deployments and rollbacks.
 
-| App           | Image                                                  | Port | Data volume                     | Memory limit |
-| ------------- | ------------------------------------------------------ | ---- | ------------------------------- | ------------ |
-| Meilisearch   | `getmeili/meilisearch:v1.15`                           | 7700 | `/meili_data`                   | default      |
-| Typesense     | `typesense/typesense:28.0`                             | 8108 | `/data`                         | default      |
-| Grafana       | `grafana/grafana:12.2.0`                               | 3000 | `/var/lib/grafana`              | default      |
-| Elasticsearch | `docker.elastic.co/elasticsearch/elasticsearch:8.19.0` | 9200 | `/usr/share/elasticsearch/data` | 2048 MB      |
-| Kibana        | `docker.elastic.co/kibana/kibana:8.19.0`               | 5601 | none                            | 2048 MB      |
-| Uptime Kuma   | `louislam/uptime-kuma:2.5.11`                          | 3001 | `/app/data`                     | default      |
-| Mailpit       | `axllent/mailpit:v1.33`                                | 8025 | `/data`                         | default      |
-| Gotenberg     | `gotenberg/gotenberg:9.5`                              | 3000 | none                            | 1024 MB      |
-| Redis         | `redis:8.10`                                           | 6379 | `/data`                         | default      |
-| n8n           | `docker.n8n.io/n8nio/n8n:3.2.2`                        | 5678 | `/home/node/.n8n`               | 2048 MB      |
-| Garage        | `dxflrs/garage:v2.5.0`                                 | 3900 | `/data`                         | default      |
+| App           | Image                                                  | Port | Data volume                        | Memory limit |
+| ------------- | ------------------------------------------------------ | ---- | ---------------------------------- | ------------ |
+| Meilisearch   | `getmeili/meilisearch:v1.15`                           | 7700 | `/meili_data`                      | default      |
+| Typesense     | `typesense/typesense:28.0`                             | 8108 | `/data`                            | default      |
+| Grafana       | `grafana/grafana:12.2.0`                               | 3000 | `/var/lib/grafana`                 | default      |
+| Elasticsearch | `docker.elastic.co/elasticsearch/elasticsearch:8.19.0` | 9200 | `/usr/share/elasticsearch/data`    | 2048 MB      |
+| Kibana        | `docker.elastic.co/kibana/kibana:8.19.0`               | 5601 | none                               | 2048 MB      |
+| Uptime Kuma   | `louislam/uptime-kuma:2.5.11`                          | 3001 | `/app/data`                        | default      |
+| Mailpit       | `axllent/mailpit:v1.33`                                | 8025 | `/data`                            | default      |
+| Gotenberg     | `gotenberg/gotenberg:9.5`                              | 3000 | none                               | 1024 MB      |
+| Redis         | `redis:8.10`                                           | 6379 | `/data`                            | default      |
+| n8n           | `docker.n8n.io/n8nio/n8n:3.2.2`                        | 5678 | `/home/node/.n8n`                  | 2048 MB      |
+| Garage        | `dxflrs/garage:v2.5.0`                                 | 3900 | `/data`                            | default      |
+| Vaultwarden   | `vaultwarden/server:1.37.5`                            | 80   | `/data`                            | default      |
+| Forgejo       | `codeberg.org/forgejo/forgejo:17.0.2-rootless`         | 3000 | `/var/lib/gitea`                   | default      |
+| Umami         | `ghcr.io/umami-software/umami:3.5.0`                   | 3000 | none (uses a PostgreSQL database)  | default      |
+| ntfy          | `binwiederhier/ntfy:v2.38.2`                           | 80   | `/var/lib/ntfy`, `/var/cache/ntfy` | default      |
 
 ## Passwords and keys
 
@@ -33,6 +37,10 @@ A password or key is generated for each app and stored encrypted, like the app's
 - **Redis**: a generated password. Redis has **no web address**: the app takes no domain and is reached only by linked apps.
 - **n8n**: the first person to open it creates the owner account. A generated encryption key (`N8N_ENCRYPTION_KEY`) protects the credentials you save in n8n; keep a copy of it, because without it they cannot be read again.
 - **Garage**: a generated access key and secret key, and a first bucket called `main`.
+- **Vaultwarden**: no generated password. Anyone who can open it can make an account until you switch sign-ups off (see below).
+- **Forgejo**: no generated password. The first person to open it creates the administrator account, so open it right after it is running.
+- **Umami**: user `admin` and a generated password. Umami ships with the password `umami`; CommyPanel replaces it on the first start, and never touches a password you have set since.
+- **ntfy**: user `admin` and a generated password. Nobody can publish or read without a user: the default access is "deny all".
 
 ## Reaching them from your own apps
 
@@ -48,10 +56,11 @@ Linking an app to a ready-made app adds `<PREFIX>_URL`, `<PREFIX>_HOST` and `<PR
 | Mailpit   | `<PREFIX>_SMTP_HOST`, `<PREFIX>_SMTP_PORT` (1025)                                                                | Send mail to that SMTP address with no login and no TLS; it stays inside the server. The web inbox is `<PREFIX>_URL`.            |
 | Garage    | `<PREFIX>_ACCESS_KEY_ID`, `<PREFIX>_SECRET_ACCESS_KEY`, `<PREFIX>_REGION` (`garage`), `<PREFIX>_BUCKET` (`main`) | Use any S3 client with the endpoint `<PREFIX>_URL`, path-style addressing and that region. The key may also create more buckets. |
 | Gotenberg | `<PREFIX>_USER`, `<PREFIX>_PASSWORD`                                                                             | Call its API at `<PREFIX>_URL` with basic authentication, for example `POST /forms/chromium/convert/html`.                       |
+| ntfy      | `<PREFIX>_USER` (`admin`), `<PREFIX>_PASSWORD`                                                                   | Publish with `curl -u "$PREFIX_USER:$PREFIX_PASSWORD" -d "message" $PREFIX_URL/topic`.                                           |
 
-## Redis and Garage: upgrade by stopping first
+## Redis, Garage and the apps that keep their data in files: upgrade by stopping first
 
-Two Redis servers, or two Garage nodes, must never write to the same data, and the same is true of Elasticsearch. A normal deployment starts the new version next to the old one, which these cannot do, so they use the deploy mode **Stop the old version first** (set for you, and shown on the app's Settings tab). A deploy then stops the running version, starts the new one and checks it; the app is **unavailable for a short while**, and if the new version does not start, the old one is started again. The data is kept. Redis is checked with a PING instead of an HTTP request, because it does not speak HTTP.
+Two Redis servers, or two Garage nodes, must never write to the same data, and the same is true of Elasticsearch, Vaultwarden, Forgejo and ntfy, which keep SQLite databases and files in their volume. A normal deployment starts the new version next to the old one, which these cannot do, so they use the deploy mode **Stop the old version first** (set for you, and shown on the app's Settings tab). A deploy then stops the running version, starts the new one and checks it; the app is **unavailable for a short while**, and if the new version does not start, the old one is started again. The data is kept. Redis is checked with a PING instead of an HTTP request, because it does not speak HTTP.
 
 ## Garage
 
@@ -64,6 +73,13 @@ Two Redis servers, or two Garage nodes, must never write to the same data, and t
 - **Mailpit** keeps up to 5,000 messages. Give your test apps its SMTP address instead of a real mail server; nothing is delivered outside the server.
 - **Gotenberg** runs a browser and an office suite and is given 1 GB of memory. Link it to the apps that use it and leave it without a domain; its API is behind a password either way.
 - **n8n** only lets you sign in over HTTPS, so add a domain and wait for the certificate. Then add the variable `WEBHOOK_URL` (`https://` and the domain, ending with a slash) on the Variables tab and apply, so webhook addresses are shown correctly.
+
+## Vaultwarden, Forgejo, Umami and ntfy
+
+- **Vaultwarden** is a Bitwarden-compatible password manager. The vault in the browser only works over HTTPS, so add a domain and wait for its certificate. Make your own account first, then add the variable `SIGNUPS_ALLOWED` with the value `false` (it is created as `true`) and apply, so nobody else can register. Back up its volume (Volumes tab): it holds every password. Point the Bitwarden apps at the app's address as their server.
+- **Forgejo** is a small Git host (a community fork of Gitea) with SQLite. Git works over **HTTPS only**: CommyPanel publishes no SSH port, and Forgejo's SSH is switched off. Open it right after it is running and make the first account, which becomes the administrator; then set `FORGEJO__service__DISABLE_REGISTRATION` to `true` and apply. After you add a domain, add `FORGEJO__server__ROOT_URL` (`https://` and the domain, ending with a slash) so clone addresses show the right name.
+- **Umami** keeps its data in one of your **PostgreSQL** databases, so make a database server and an empty database first (Databases); you pick the database when you install Umami, and it is linked as `DATABASE_URL` (you need permission to link apps, and the link is recorded in the audit log). Umami makes its own tables on the first start. A generated admin password replaces Umami's shipped one on that start.
+- **ntfy** is a push notification server. After you add a domain, add `NTFY_BASE_URL` (`https://` and the domain, without a closing slash) and apply; the apps need it to subscribe. Its default access is "deny all": sign in as `admin` to make topics and more users.
 
 ## Elasticsearch
 

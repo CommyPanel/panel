@@ -20,7 +20,7 @@ final class Guide
 
         $automatic = [(string) __('Runs the official image at a version CommyPanel pins.')];
 
-        if ($id !== 'uptime-kuma') {
+        if (! in_array($id, ['uptime-kuma', 'vaultwarden', 'forgejo'], true)) {
             $automatic[] = (string) __('Generates its password or key and keeps it encrypted. You see it with Show access details on the app\'s page.');
         }
 
@@ -40,6 +40,10 @@ final class Guide
             'redis' => (string) __('Sets a password and writes it into a config file only Redis can read.'),
             'n8n' => (string) __('Generates the key that encrypts the credentials n8n stores.'),
             'garage' => (string) __('Sets up a one-node cluster, an access key and a bucket called main.'),
+            'vaultwarden' => (string) __('Keeps the whole vault, its keys and attachments in one persistent volume.'),
+            'forgejo' => (string) __('Chooses SQLite and the rootless image, and switches SSH off because only HTTP is published.'),
+            'umami' => (string) __('Links the PostgreSQL database you choose as DATABASE_URL and replaces Umami\'s shipped admin password with a generated one.'),
+            'ntfy' => (string) __('Denies all access by default and makes an admin user with the generated password.'),
             default => null,
         };
 
@@ -55,6 +59,10 @@ final class Guide
             'redis' => [(string) __('It has no web interface and takes no domain. Apps use it through a link: add one on their Links tab.')],
             'mailpit' => [(string) __('Read the caught email in the web inbox. Point your app\'s mail settings at the SMTP variables its link adds.')],
             'garage' => [(string) __('It has no web interface. Use any S3 client with the access key, secret key and region its link adds.')],
+            'vaultwarden' => [(string) __('Open it over HTTPS, make your account, then switch sign-ups off. Connect the Bitwarden apps by choosing the address of this app as the server.')],
+            'forgejo' => [(string) __('The first person to open Forgejo creates the administrator account. Open it as soon as it is running, before anyone else can.')],
+            'umami' => [(string) __('Sign in as admin with the generated password, add your website and put its tracking script on your pages.')],
+            'ntfy' => [(string) __('Sign in as admin to make topics and users. Apps publish messages to its address with the user and password its link adds.')],
             default => [(string) __('To use it from your app, link it on the app\'s Links tab: its address and keys arrive as environment variables.')],
         };
 

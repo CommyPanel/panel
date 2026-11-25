@@ -6,7 +6,8 @@ namespace App\FastApps;
 final readonly class Field
 {
     /**
-     * @param  'app'  $type  the choice is one of the person's own apps made from `$appTemplate`
+     * @param  'app'|'database'  $type  the choice is one of the person's own apps made from `$appTemplate`, or
+     *                                  a PostgreSQL database that is linked to the new app under `$prefix`
      * @param  list<mixed>  $rules  Laravel validation rules
      */
     public function __construct(
@@ -16,5 +17,6 @@ final readonly class Field
         public string $appTemplate,
         public ?string $hint = null,
         public array $rules = [],
+        public ?string $prefix = null,
     ) {}
 }

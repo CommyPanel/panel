@@ -11,7 +11,7 @@ Settings > API tokens > New token (needs the `tokens.manage` permission). Choose
 
 - **What it may do**: read apps and deployments (`apps:read`), start deployments and apply changes
   (`apps:deploy`), start, stop and restart (`apps:control`), read logs (`apps:logs`), manage variables
-  (`apps:env`, write-only). You can only give what you hold yourself. Logs and variables are separate
+  (`apps:env`, write-only), and read server metrics (`metrics:read`, for a Prometheus: see [metrics](metrics.md), it is not part of the JSON API). You can only give what you hold yourself. Logs and variables are separate
   abilities because they often hold secrets: give a token only what it needs.
 - **Which apps**: all, or only the ones you tick. A token restricted to some apps gets a 404 for any other.
 - **Valid for**: 30 days, 90 days (the default), 6 months, 1 year, or **Never expires**. A token that never

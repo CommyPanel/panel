@@ -42,8 +42,8 @@ it('shows a person their own tokens and what they may put on one', function () {
 
     $this->get('/settings/tokens/create')->assertInertia(fn (Assert $page) => $page
         ->component('settings/token-create')
-        ->has('abilities', 5)
-        ->where('abilities', fn ($abilities) => collect($abilities)->pluck('key')->sort()->values()->all() === ['apps:control', 'apps:deploy', 'apps:env', 'apps:logs', 'apps:read'])
+        ->has('abilities', 6)
+        ->where('abilities', fn ($abilities) => collect($abilities)->pluck('key')->sort()->values()->all() === ['apps:control', 'apps:deploy', 'apps:env', 'apps:logs', 'apps:read', 'metrics:read'])
         ->where('apps', fn ($apps) => collect($apps)->pluck('slug')->sort()->values()->all() === ['blog', 'shop'])
         ->where('default_days', 90));
 });

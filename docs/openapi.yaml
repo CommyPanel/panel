@@ -10,7 +10,9 @@ info:
 
         Answers hold no secrets. Environment variable values are write-only: the API never returns them.
         Terminal, volume files, credentials, database passwords, users, roles, tokens, settings, backups and
-        certificates are deliberately not part of this API.
+        certificates are deliberately not part of this API. The `metrics:read` ability is for a Prometheus
+        scraping `/api/metrics` (see the documentation), which answers in the Prometheus text format and is
+        not described here.
 
         Every error has an `error` sentence. A validation error (422) also has `errors` (field to sentences).
     license:
@@ -608,6 +610,7 @@ components:
                             - 'apps:control'
                             - 'apps:logs'
                             - 'apps:env'
+                            - 'metrics:read'
                 apps:
                     type: array
                     nullable: true

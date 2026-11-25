@@ -5,17 +5,19 @@ namespace App\FastApps;
 use App\Databases\AppLinks;
 use App\Databases\DatabaseException;
 use App\Deploy\AppVolumes;
+use App\Enums\DatabaseEngine;
 use App\Enums\SetupStep;
 use App\Enums\SourceType;
 use App\Enums\Stack;
 use App\Models\App;
 use App\Models\AppEnvVar;
+use App\Models\ManagedDatabase;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
  * Setting up an app from a quick-install recipe (the only code that does): the app with its volumes,
- * generated variables and, for Kibana, the link to its Elasticsearch app. It lands at the wizard's
+ * generated variables and, for Kibana, the link to its Elasticsearch app (for Umami, to its database). It lands at the wizard's
  * domain step; after the first release went live the variables only the first start needed are removed.
  */
 class QuickInstall
@@ -77,6 +79,20 @@ class QuickInstall
                 }
 
                 $this->links->linkApp($app, $target, 'ES');
+            }
+
+            foreach ($template->fields() as $field) {
+                if ($field->type !== 'database' || $field->prefix === null) {
+                    continue;
+                }
+
+                $database = ManagedDatabase::query()->with('server')->find((int) ($settings[$field->key] ?? 0));
+
+                if ($database === null || $database->server->engine !== DatabaseEngine::Postgres) {
+                    throw new DatabaseException(__('Choose one of your PostgreSQL databases.'));
+                }
+
+                $this->links->linkDatabase($app, $database, $field->prefix);
             }
 
             return $app;

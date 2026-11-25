@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\EnvController;
 use App\Http\Controllers\Api\V1\LogsController;
 use App\Http\Controllers\Api\V1\TokenController;
 use App\Http\Controllers\FallbackController;
+use App\Http\Controllers\MetricsController;
 use App\Http\Middleware\LimitApiFailures;
 use Illuminate\Support\Facades\Route;
 
@@ -48,6 +49,12 @@ Route::prefix('v1')->name('api.')->middleware([LimitApiFailures::class, 'throttl
         Route::delete('apps/{app:slug}/env/{key}', [EnvController::class, 'destroy'])->where('key', '[A-Za-z_][A-Za-z0-9_]*')->name('apps.env.destroy');
     });
 });
+
+// What a Prometheus scrapes (docs/metrics.md). Not part of the versioned JSON API: it answers in the
+// Prometheus text format and has its own ability, so a scraper's token can do nothing else.
+Route::get('metrics', MetricsController::class)
+    ->middleware([LimitApiFailures::class, 'throttle:api', 'auth:sanctum', 'abilities:metrics:read', 'can:'.Permissions::SERVER_VIEW])
+    ->name('api.metrics');
 
 // Anything under /api that matches nothing: a plain JSON 404 (or 405 with the allowed methods), with no
 // session and no cookie, whatever the method (the web group's fallback would ask a bot for a CSRF token).

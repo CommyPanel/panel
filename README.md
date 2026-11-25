@@ -152,6 +152,8 @@ sh -c 'npm run migrate && npm run seed'
 
 **Get told when a deployment fails.** Settings → Notifications takes a Slack, Discord or generic webhook. Messages hold the app, commit and reason, never logs or secrets.
 
+**Watch the server in Grafana.** A token with the metrics ability lets any Prometheus collect CPU, memory, disk, network and app state: [metrics](docs/metrics.md).
+
 More: [running apps](docs/apps.md), [databases](docs/databases.md), [GitHub](docs/github.md), [notifications](docs/notifications.md).
 
 ## How it works
@@ -247,6 +249,7 @@ CommyPanel is pre-1.0. What you should know before you rely on it:
 - [GitHub connection](docs/github.md)
 - [API tokens and the API](docs/api.md)
 - [Deployment notifications](docs/notifications.md)
+- [Metrics for Prometheus and Grafana](docs/metrics.md)
 - [Release notes](docs/releases)
 
 ## Contributing

@@ -2,11 +2,15 @@
 
 use App\Audit\Severity;
 use App\Databases\AppLinks;
+use App\Databases\DatabaseServers;
+use App\Databases\ManageDatabases;
 use App\Deploy\Deployer;
 use App\Deploy\Health\HealthChecker;
 use App\Deploy\Source\TemplateSourceFetcher;
 use App\Deploy\Stacks\StackDetector;
 use App\Deploy\Traffic\TrafficSwitcher;
+use App\Enums\DatabaseEngine;
+use App\Enums\DeployStrategy;
 use App\Enums\SetupStep;
 use App\Enums\SourceType;
 use App\Enums\Stack;
@@ -17,6 +21,7 @@ use App\Host\HostDriver;
 use App\Models\App;
 use App\Models\AppEnvVar;
 use App\Models\AuditLog;
+use App\Models\ManagedDatabase;
 use App\Models\User;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Sleep;
@@ -57,7 +62,7 @@ describe('the create page', function () {
 
         $this->get('/apps/create')->assertInertia(fn (Assert $page) => $page
             ->component('apps/create')
-            ->where('fast_apps', fn ($apps) => collect($apps)->pluck('id')->all() === ['meilisearch', 'typesense', 'grafana', 'elasticsearch', 'kibana', 'uptime-kuma', 'mailpit', 'gotenberg', 'redis', 'n8n', 'garage'])
+            ->where('fast_apps', fn ($apps) => collect($apps)->pluck('id')->all() === ['meilisearch', 'typesense', 'grafana', 'elasticsearch', 'kibana', 'uptime-kuma', 'mailpit', 'gotenberg', 'redis', 'n8n', 'garage', 'vaultwarden', 'forgejo', 'umami', 'ntfy'])
             ->where('fast_apps.3.warnings.1', fn ($text) => str_contains($text, 'vm.max_map_count=262144'))
             ->where('fast_apps.4.fields.0.key', 'elasticsearch')
             ->where('fast_apps.4.fields.0.options', [['value' => 'logs', 'label' => 'Logs']]));
@@ -214,6 +219,9 @@ describe('the build', function () {
         'Redis' => ['redis', 'redis:8.10'],
         'n8n' => ['n8n', 'docker.n8n.io/n8nio/n8n:3.2.2'],
         'Garage' => ['garage', 'dxflrs/garage:v2.5.0'],
+        'Vaultwarden' => ['vaultwarden', 'vaultwarden/server:1.37.5'],
+        'Forgejo' => ['forgejo', 'codeberg.org/forgejo/forgejo:17.0.2-rootless'],
+        'ntfy' => ['ntfy', 'binwiederhier/ntfy:v2.38.2'],
     ]);
 
     it('secures Elasticsearch in its own settings file', function () {
@@ -228,7 +236,7 @@ describe('the build', function () {
     it('never puts a generated secret into any build context', function () {
         $secrets = [];
 
-        foreach (['meilisearch', 'typesense', 'grafana', 'elasticsearch', 'mailpit', 'gotenberg', 'redis', 'n8n', 'garage'] as $template) {
+        foreach (['meilisearch', 'typesense', 'grafana', 'elasticsearch', 'mailpit', 'gotenberg', 'redis', 'n8n', 'garage', 'vaultwarden', 'forgejo', 'ntfy'] as $template) {
             $this->post('/apps', quickForm($template, ucfirst($template).' App'));
         }
         finishedElasticsearch('Search');
@@ -361,6 +369,9 @@ describe('the second batch', function () {
         'Gotenberg' => ['gotenberg', 3000, [], ['API_ENABLE_BASIC_AUTH', 'GOTENBERG_API_BASIC_AUTH_USERNAME', 'GOTENBERG_API_BASIC_AUTH_PASSWORD'], 1024, 90],
         'Redis' => ['redis', 6379, ['/data'], ['REDIS_PASSWORD'], null, 120],
         'n8n' => ['n8n', 5678, ['/home/node/.n8n'], ['N8N_ENCRYPTION_KEY'], 2048, 180],
+        'Vaultwarden' => ['vaultwarden', 80, ['/data'], ['SIGNUPS_ALLOWED'], null, null],
+        'Forgejo' => ['forgejo', 3000, ['/var/lib/gitea'], ['FORGEJO__service__DISABLE_REGISTRATION'], null, 180],
+        'ntfy' => ['ntfy', 80, ['/var/cache/ntfy', '/var/lib/ntfy'], ['NTFY_ADMIN_PASSWORD'], null, null],
         'Garage' => ['garage', 3900, ['/data'], ['GARAGE_RPC_SECRET', 'GARAGE_ADMIN_TOKEN', 'COMMYPANEL_ACCESS_KEY_ID', 'COMMYPANEL_SECRET_ACCESS_KEY', 'COMMYPANEL_BUCKET'], null, 120],
     ]);
 
@@ -582,6 +593,9 @@ describe('the second batch', function () {
         'Gotenberg' => ['gotenberg', [['Address for linked apps', false], ['User', false], ['Password', true]]],
         'Redis' => ['redis', [['Address for linked apps', false], ['Password', true], ['Connection URL', true]]],
         'n8n' => ['n8n', [['Address for linked apps', false], ['Encryption key', true]]],
+        'Vaultwarden' => ['vaultwarden', [['Sign-ups allowed', false]]],
+        'Forgejo' => ['forgejo', [['Address for linked apps', false], ['Registration closed', false]]],
+        'ntfy' => ['ntfy', [['Address for linked apps', false], ['User', false], ['Password', true]]],
         'Garage' => ['garage', [['Address for linked apps', false], ['Region', false], ['Bucket', false], ['Access key', false], ['Secret key', true]]],
     ]);
 
@@ -593,7 +607,7 @@ describe('the second batch', function () {
         exec('sh -n '.escapeshellarg($path).' 2>&1', $out, $code);
 
         expect($code)->toBe(0, implode("\n", $out));
-    })->with(['redis', 'garage']);
+    })->with(['redis', 'garage', 'ntfy', 'umami']);
 
     it('builds Garage from its own image and a plain Alpine, with no secret in the settings file', function () {
         $files = FastApps::find('garage')->files(new App(['slug' => 'files']));
@@ -622,5 +636,104 @@ describe('the app page', function () {
         $this->put('/apps/search', ['name' => 'Search', 'container_port' => 7700, 'health_path' => '/health', 'memory_limit_mb' => 512])->assertSessionHasNoErrors();
 
         expect(App::query()->firstOrFail()->memory_limit_mb)->toBe(512);
+    });
+});
+
+describe('the apps added in 0.11.0', function () {
+    function postgresDatabase(string $name = 'stats', string $version = '17'): ManagedDatabase
+    {
+        $server = app(DatabaseServers::class)->create('Main '.$name, DatabaseEngine::Postgres, $version);
+
+        return app(ManageDatabases::class)->create($server->fresh(), $name);
+    }
+
+    it('stops the old version first for the apps that keep their data in files', function (string $template) {
+        expect(FastApps::find($template)->deployStrategy())->toBe(DeployStrategy::StopFirst);
+    })->with(['vaultwarden', 'forgejo', 'ntfy']);
+
+    it('makes the first account of Vaultwarden and Forgejo something to do at once, in their guides and warnings', function () {
+        $vault = collect(FastApps::catalog())->firstWhere('id', 'vaultwarden');
+        $git = collect(FastApps::catalog())->firstWhere('id', 'forgejo');
+
+        expect(implode(' ', $vault['warnings']))->toContain('SIGNUPS_ALLOWED')->toContain('HTTPS')
+            ->and(implode(' ', $git['warnings']))->toContain('DISABLE_REGISTRATION')->toContain('ROOT_URL')
+            ->and($git['guide']['after'][0])->toContain('first person');
+    });
+
+    it('keeps ntfy closed to the public and makes its admin user from the password in the variables', function () {
+        $this->post('/apps', quickForm('ntfy', 'Push'))->assertRedirect('/apps/push/setup');
+        $app = App::query()->where('slug', 'push')->firstOrFail();
+        $files = FastApps::find('ntfy')->files($app);
+
+        expect($files['Dockerfile'])->toContain('NTFY_AUTH_DEFAULT_ACCESS=deny-all')->toContain('NTFY_BEHIND_PROXY=true')
+            ->and($files['commypanel-start.sh'])->toContain('ntfy user add --role=admin admin')->toContain('change-pass')
+            ->and($files['commypanel-start.sh'])->not->toContain($app->environment()['NTFY_ADMIN_PASSWORD'])
+            ->and(FastApps::find('ntfy')->linkEnvironment($app, 'PUSH'))->toBe(['PUSH_USER' => 'admin', 'PUSH_PASSWORD' => $app->environment()['NTFY_ADMIN_PASSWORD']]);
+    });
+
+    it('lists only the ready PostgreSQL databases for Umami, and only to a person who may link apps', function () {
+        postgresDatabase('stats');
+        $server = app(DatabaseServers::class)->create('Maria', DatabaseEngine::Mariadb, '11.4');
+        app(ManageDatabases::class)->create($server->fresh(), 'other');
+
+        $options = fn () => collect(FastApps::catalog())->firstWhere('id', 'umami')['fields'][0]['options'];
+
+        expect($options())->toHaveCount(1)->and($options()[0]['label'])->toContain('stats on Main stats');
+
+        $user = User::factory()->regular()->create();
+        $user->givePermissionTo(Permission::findOrCreate('apps.create'));
+        $this->actingAs($user);
+
+        expect($options())->toBe([]);
+    });
+
+    it('makes Umami with its database linked as DATABASE_URL, and records the link', function () {
+        $database = postgresDatabase('stats');
+
+        $this->post('/apps', quickForm('umami', 'Analytics', ['database' => (string) $database->id]))->assertRedirect('/apps/analytics/setup');
+
+        $app = App::query()->where('slug', 'analytics')->firstOrFail();
+        $env = $app->environment();
+
+        expect($app->databaseLinks()->pluck('env_prefix')->all())->toBe(['DATABASE'])
+            ->and(app(AppLinks::class)->environment($app))->toHaveKey('DATABASE_URL')
+            ->and($env)->toHaveKeys(['APP_SECRET', 'COMMYPANEL_ADMIN_PASSWORD', 'COMMYPANEL_ADMIN_HASH'])
+            ->and($env['COMMYPANEL_ADMIN_HASH'])->toStartWith('$2b$')
+            ->and(password_verify($env['COMMYPANEL_ADMIN_PASSWORD'], '$2y$'.substr($env['COMMYPANEL_ADMIN_HASH'], 4)))->toBeTrue()
+            ->and($app->volumes()->count())->toBe(0)
+            ->and(AuditLog::query()->where('action', 'app.database_linked')->exists())->toBeTrue();
+    });
+
+    it('never puts the admin password or its hash into the build context', function () {
+        $database = postgresDatabase('stats');
+        $this->post('/apps', quickForm('umami', 'Analytics', ['database' => (string) $database->id]));
+        $app = App::query()->where('slug', 'analytics')->firstOrFail();
+
+        foreach (FastApps::find('umami')->files($app) as $contents) {
+            expect($contents)->not->toContain($app->environment()['COMMYPANEL_ADMIN_PASSWORD'])->not->toContain($app->environment()['COMMYPANEL_ADMIN_HASH']);
+        }
+    });
+
+    it('refuses Umami without a PostgreSQL database, with a MariaDB one, or for a person who may not link apps', function () {
+        $this->post('/apps', quickForm('umami', 'No Database'))->assertSessionHasErrors('settings.database');
+
+        $server = app(DatabaseServers::class)->create('Maria', DatabaseEngine::Mariadb, '11.4');
+        $maria = app(ManageDatabases::class)->create($server->fresh(), 'other');
+        $this->post('/apps', quickForm('umami', 'Wrong Engine', ['database' => (string) $maria->id]))->assertSessionHasErrors('settings.database');
+
+        $postgres = postgresDatabase('stats');
+        $user = User::factory()->regular()->create();
+        $user->givePermissionTo(Permission::findOrCreate('apps.create'));
+        $this->actingAs($user);
+        $this->post('/apps', quickForm('umami', 'Not Allowed', ['database' => (string) $postgres->id]))->assertSessionHasErrors('settings.database');
+
+        expect(App::query()->count())->toBe(0);
+    });
+
+    it('only replaces Umami\'s shipped admin password, never one the person set', function () {
+        $files = FastApps::find('umami')->files(new App(['slug' => 'x']));
+
+        expect($files['commypanel-admin.mjs'])->toContain("username = 'admin' AND password = \${shipped}")
+            ->toContain('BUli0c.muyCW1ErNJc3jL.vFRFtFJWrT8/GcR4A.sUdCznaXiqFXa');
     });
 });
