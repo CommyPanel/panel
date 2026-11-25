@@ -9,10 +9,14 @@ Creating a Laravel app adds steps to the wizard:
 1. **Basics** and **Repository access** (or **Upload code**), as for any app. When access works, CommyPanel looks at your code to find the Laravel version, the PHP version, how assets are built and which services it may need. It reads files; it never runs your code.
 2. **Settings**: the PHP version (8.2 to 8.5, from your `composer.json` when it names one), how assets are built (npm, pnpm, yarn, or not at all, from your lock file), the health check path (`/up`), and the usual limits.
 3. **Database**: use an existing database on a database server you already run (PostgreSQL, MySQL or MariaDB), have a new database made on an existing server, make a **new database server just for this app**, or use none (SQLite, or no database). The connection arrives as Laravel's own variables (`DB_CONNECTION`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`, `DB_URL`) and follows a password change.
-4. **Services**: processes that run beside the web server, each in its own container from the same release. The **scheduler** (`php artisan schedule:work`) is on by default; a **queue worker**, **Horizon**, **Pulse** and **Inertia SSR** are listed when your code uses them, switched off until you switch them on. You can change each command and add your own. Commands run without a shell, in the app's folder.
+4. **Services**: processes that run beside the web server, each in its own container from the same release. Each service is a card with a switch; a service that is off is faded and its command is closed. The **scheduler** (`php artisan schedule:work`) is on by default; a **queue worker**, **Horizon**, **Pulse** and **Inertia SSR** are listed when your code uses them, switched off until you switch them on. **Customize** opens a service's command, grace time and memory limit, and you can add your own. Commands run without a shell, in the app's folder. The same step asks about **Redis**: none, one of your own Redis apps, or a new Redis made for this app (suggested when your code uses it, for example with Horizon or predis).
 5. **Volumes**: the `storage` folder is suggested, so uploads, logs and caches survive releases. Remove it, change it or add others.
 6. **Domain**, as for any app. A wildcard (`*.example.com`) works too; see _Domains and HTTPS_.
 7. **Review**: a summary, the **release script**, and your variables as a `.env` text. Then CommyPanel builds and deploys.
+
+## Redis
+
+Choose **Make a Redis just for this app** and CommyPanel creates a ready-made Redis app named after your app, links it, and starts it. The connection arrives as `REDIS_URL`, `REDIS_HOST`, `REDIS_PORT` and `REDIS_PASSWORD`, which Laravel's Redis configuration reads. With Redis linked, the starting `.env` text uses it for cache and sessions, and for the queue when a worker or Horizon runs. You can also use a Redis app you already run. Horizon needs Redis.
 
 ## What the image is
 

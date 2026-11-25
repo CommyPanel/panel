@@ -27,6 +27,7 @@ use App\Deploy\Stacks\SourceTree;
  *   services          list of {kind, name, detected_by, default_command, supported, default_enabled, overlap, needs_node, note, env_note}
  *   suggested_volumes list of {path, why}   container paths
  *   env_hints         list<string> variable NAMES found in .env.example (never values)
+ *   redis             {suggested: bool, why: string|null}  whether the code seems to use Redis, and what showed it
  */
 final class LaravelInspector
 {
@@ -73,6 +74,7 @@ final class LaravelInspector
                 ['path' => self::APP_ROOT.'/storage', 'why' => 'Uploads, sessions, cache files and logs are written here. Without a volume they are lost at every deployment.'],
             ],
             'env_hints' => $this->envHints($path),
+            'redis' => $this->redis($project, $path),
         ];
     }
 
@@ -209,5 +211,32 @@ final class LaravelInspector
         }
 
         return array_values(array_unique($names));
+    }
+
+    /**
+     * Whether the code seems to use Redis, and what showed it (a package, a required extension, or a
+     * Redis driver in .env.example).
+     *
+     * @return array{suggested: bool, why: string|null}
+     */
+    private function redis(LaravelProject $project, string $path): array
+    {
+        foreach (['laravel/horizon' => 'laravel/horizon', 'predis/predis' => 'predis/predis'] as $package => $label) {
+            if ($project->has($package)) {
+                return ['suggested' => true, 'why' => $label];
+            }
+        }
+
+        if ($project->requires('ext-redis')) {
+            return ['suggested' => true, 'why' => 'ext-redis'];
+        }
+
+        foreach (preg_split('/\R/', (string) LaravelProject::read($path, '.env.example')) ?: [] as $line) {
+            if (preg_match('/^\s*(?:export\s+)?(QUEUE_CONNECTION|CACHE_STORE|CACHE_DRIVER|SESSION_DRIVER)\s*=\s*["\']?redis["\']?\s*(?:#.*)?$/', $line, $m) === 1) {
+                return ['suggested' => true, 'why' => $m[1].'=redis'];
+            }
+        }
+
+        return ['suggested' => false, 'why' => null];
     }
 }

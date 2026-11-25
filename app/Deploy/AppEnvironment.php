@@ -19,7 +19,8 @@ class AppEnvironment
     /** Whether the app's variables are edited as a .env text. */
     public static function usesText(App $app): bool
     {
-        return $app->stack === Stack::Laravel;
+        // A draft knows its type only as the hint (the stack is set when it is first built).
+        return $app->stack === Stack::Laravel || $app->stack_hint === Stack::Laravel;
     }
 
     /**

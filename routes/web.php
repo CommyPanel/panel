@@ -60,6 +60,7 @@ use App\Http\Controllers\ServerNginxController;
 use App\Http\Controllers\ServerUsageController;
 use App\Http\Controllers\SetupController;
 use App\Http\Controllers\SetupDatabaseController;
+use App\Http\Controllers\SetupRedisController;
 use App\Http\Controllers\UpdateController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserSessionController;
@@ -120,6 +121,7 @@ Route::middleware('auth')->group(function () {
             Route::post('setup/settings', [AppSetupController::class, 'settings'])->name('setup.settings');
             Route::get('setup/database', [SetupDatabaseController::class, 'show'])->name('setup.database.show');
             Route::put('setup/database', [SetupDatabaseController::class, 'update'])->name('setup.database.update');
+            Route::put('setup/redis', [SetupRedisController::class, 'update'])->name('setup.redis.update');
             Route::post('setup/database/continue', [AppSetupController::class, 'databaseContinue'])->name('setup.database.continue');
             Route::post('setup/services/continue', [AppSetupController::class, 'servicesContinue'])->name('setup.services.continue');
             Route::post('setup/volumes/continue', [AppSetupController::class, 'volumesContinue'])->name('setup.volumes.continue');
@@ -259,6 +261,7 @@ Route::middleware('auth')->group(function () {
             Route::post('{server:slug}/backups/{name}/restore', [DatabaseBackupController::class, 'restore'])->where('name', '[a-z0-9_.-]+')->middleware('password.confirm')->name('backups.restore');
             Route::post('{server:slug}/backups/{name}/restore-over', [DatabaseBackupController::class, 'restoreOver'])->where('name', '[a-z0-9_.-]+')->middleware('password.confirm')->name('backups.restore-over');
             Route::delete('{server:slug}/backups/{name}', [DatabaseBackupController::class, 'destroy'])->where('name', '[a-z0-9_.-]+')->middleware('password.confirm')->name('backups.destroy');
+            Route::put('{server:slug}/databases/{database}/privileges', [ManagedDatabaseController::class, 'privileges'])->whereNumber('database')->middleware('password.confirm')->name('databases.privileges');
             Route::post('{server:slug}/databases/{database}/password', [ManagedDatabaseController::class, 'password'])->whereNumber('database')->middleware('password.confirm')->name('databases.password');
         });
 

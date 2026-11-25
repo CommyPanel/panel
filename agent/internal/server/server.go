@@ -63,6 +63,7 @@ type Docker interface {
 	CreateAdminDatabase(ctx context.Context, t docker.DatabaseTarget, db, user, password string) error
 	DropDatabase(ctx context.Context, t docker.DatabaseTarget, db, user string) error
 	SetDatabasePassword(ctx context.Context, t docker.DatabaseTarget, user, password string) error
+	SetDatabasePrivileges(ctx context.Context, t docker.DatabaseTarget, db, user, scope string, privileges []string, grantOption bool) error
 	RemoveDatabaseData(ctx context.Context, server string) error
 	DumpDatabase(ctx context.Context, t docker.DatabaseTarget, db string) (string, error)
 	RegisterDump(sum string) error
@@ -248,6 +249,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/databases/create", s.databaseCreate)
 	mux.HandleFunc("POST /v1/databases/drop", s.databaseDrop)
 	mux.HandleFunc("POST /v1/databases/password", s.databasePassword)
+	mux.HandleFunc("POST /v1/databases/privileges", s.databasePrivileges)
 	mux.HandleFunc("POST /v1/databases/remove-data", s.databaseRemoveData)
 	mux.HandleFunc("POST /v1/databases/dump", s.databaseDump)
 	mux.HandleFunc("POST /v1/databases/restore", s.databaseRestore)
@@ -791,6 +793,23 @@ func (s *Server) databaseCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.respond(w, s.opts.Docker.CreateDatabase(r.Context(), body.DatabaseTarget, body.Database, body.User, body.Password))
+}
+
+// databasePrivileges changes what a database user may do: the whole list of privileges at once, on its
+// database or (an app's own server) on the whole server. Only names from the agent's fixed lists are accepted.
+func (s *Server) databasePrivileges(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		docker.DatabaseTarget
+		Database    string   `json:"database"`
+		User        string   `json:"user"`
+		Scope       string   `json:"scope"`
+		Privileges  []string `json:"privileges"`
+		GrantOption bool     `json:"grant_option"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	s.respond(w, s.opts.Docker.SetDatabasePrivileges(r.Context(), body.DatabaseTarget, body.Database, body.User, body.Scope, body.Privileges, body.GrantOption))
 }
 
 func (s *Server) databaseDrop(w http.ResponseWriter, r *http.Request) {

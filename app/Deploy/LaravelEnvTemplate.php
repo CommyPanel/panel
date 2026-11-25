@@ -20,7 +20,8 @@ class LaravelEnvTemplate
     {
         $url = $domain !== null && $domain !== '' ? 'https://'.ltrim($domain, '*.') : 'http://localhost';
         $store = $redis ? 'redis' : 'file';
-        $queueConnection = $redis ? 'redis' : ($queue ? 'database' : 'sync');
+        // Jobs only go to a real queue when something will run them.
+        $queueConnection = $queue ? ($redis ? 'redis' : 'database') : 'sync';
         $key = 'base64:'.base64_encode(random_bytes(32));
 
         return <<<ENV

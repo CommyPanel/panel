@@ -5,6 +5,7 @@ import AppSetupController from '@/actions/App/Http/Controllers/AppSetupControlle
 import { EnvEditorCard } from '@/components/apps/env-editor-card';
 import { ServicesCard } from '@/components/apps/services-card';
 import { DatabaseStep } from '@/components/apps/setup/database-step';
+import { RedisStep } from '@/components/apps/setup/redis-step';
 import {
     AddVolumeModal,
     RemoveVolumeModal,
@@ -192,10 +193,23 @@ export function LaravelDatabasePage({ app }: { app: AppSetup }) {
     );
 }
 
-export function LaravelServicesPage({ app }: { app: AppSetup }) {
+export function LaravelServicesPage({
+    app,
+    laravel,
+}: {
+    app: AppSetup;
+    laravel: LaravelSetup | null;
+}) {
     const { t } = useT();
     const [busy, setBusy] = useState(false);
     const [dirty, setDirty] = useState(false);
+    const redis = laravel?.redis ?? null;
+    const [redisDone, setRedisDone] = useState(
+        redis === null || redis.choice.mode !== null,
+    );
+    const horizonOn = app.processes.some(
+        (process) => process.kind === 'horizon' && process.enabled,
+    );
 
     return (
         <div className="space-y-6">
@@ -214,10 +228,18 @@ export function LaravelServicesPage({ app }: { app: AppSetup }) {
                 onSaved={() => setDirty(false)}
                 onDirtyChange={setDirty}
             />
+            {redis && (
+                <RedisStep
+                    slug={app.slug}
+                    redis={redis}
+                    horizonOn={horizonOn}
+                    onChange={({ done }) => setRedisDone(done)}
+                />
+            )}
             <Nav
                 app={app}
                 busy={busy}
-                disabled={dirty}
+                disabled={dirty || (redis?.suggested === true && !redisDone)}
                 onContinue={() =>
                     router.post(
                         AppSetupController.servicesContinue(app.slug),

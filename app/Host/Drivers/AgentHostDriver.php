@@ -628,6 +628,11 @@ class AgentHostDriver implements HostDriver
         $this->send('post', '/v1/databases/password', [...$this->target($server), 'user' => $user, 'password' => $password]);
     }
 
+    public function setDatabasePrivileges(DatabaseTarget $server, string $database, string $user, string $scope, array $privileges, bool $grantOption = false): void
+    {
+        $this->send('post', '/v1/databases/privileges', [...$this->target($server), 'database' => $database, 'user' => $user, 'scope' => $scope, 'privileges' => $privileges, 'grant_option' => $grantOption]);
+    }
+
     public function dumpDatabase(DatabaseTarget $server, string $database, string $toPath): void
     {
         $partial = $toPath.'.part';

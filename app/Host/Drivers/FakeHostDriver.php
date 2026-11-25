@@ -121,7 +121,7 @@ class FakeHostDriver implements HostDriver
     private const DOCKER_ACTIONS = [
         'buildImage', 'runContainer', 'runTask', 'stopContainer', 'startContainer', 'restartContainer',
         'removeContainer', 'containerLogs', 'pruneDanglingImages', 'removeImage', 'removeNetwork',
-        'pullImage', 'databaseReady', 'dumpDatabase', 'restoreDatabase', 'backupVolume', 'restoreVolume', 'startDatabaseTool', 'databaseToolStatus', 'databaseToolTicket', 'stopDatabaseTool', 'createDatabase', 'dropDatabase', 'setDatabasePassword', 'connectNetwork', 'disconnectNetwork', 'pruneLinkNetworks',
+        'pullImage', 'databaseReady', 'dumpDatabase', 'restoreDatabase', 'backupVolume', 'restoreVolume', 'startDatabaseTool', 'databaseToolStatus', 'databaseToolTicket', 'stopDatabaseTool', 'createDatabase', 'dropDatabase', 'setDatabasePassword', 'setDatabasePrivileges', 'connectNetwork', 'disconnectNetwork', 'pruneLinkNetworks',
     ];
 
     /**
@@ -602,6 +602,17 @@ class FakeHostDriver implements HostDriver
         $this->record('dropDatabase', ['container' => $server->container, 'database' => $database, 'user' => $user]);
 
         unset($this->databases[$server->container][$database]);
+    }
+
+    public function setDatabasePrivileges(DatabaseTarget $server, string $database, string $user, string $scope, array $privileges, bool $grantOption = false): void
+    {
+        $this->record('setDatabasePrivileges', ['container' => $server->container, 'database' => $database, 'user' => $user, 'scope' => $scope, 'privileges' => $privileges, 'grant_option' => $grantOption]);
+
+        if (! isset($this->databases[$server->container][$database])) {
+            throw new HostOperationFailed('Agent error: the database does not exist');
+        }
+
+        $this->databases[$server->container][$database]['privileges'] = ['scope' => $scope, 'privileges' => $privileges, 'grant_option' => $grantOption];
     }
 
     public function setDatabasePassword(DatabaseTarget $server, string $user, #[\SensitiveParameter] string $password): void

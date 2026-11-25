@@ -60,6 +60,32 @@ class ManagedDatabaseController extends Controller
     }
 
     /**
+     * Change what the database's user may do. An ordinary user only on its own database; the administrator
+     * of a server made for one app on the whole server, which is graded as a high-risk change in the audit log.
+     */
+    public function privileges(Request $request, DatabaseServer $server, ManagedDatabase $database, ManageDatabases $databases, AuditLogger $audit): RedirectResponse
+    {
+        $data = $request->validate([
+            'privileges' => ['present', 'array'],
+            'privileges.*' => ['string', 'max:40'],
+        ]);
+
+        try {
+            $change = $databases->updatePrivileges($database, $data['privileges']);
+        } catch (DatabaseException $e) {
+            return back()->withErrors(['privileges' => $e->getMessage()]);
+        }
+
+        $audit->record(
+            $change['scope'] === 'server' ? 'database.server_privileges_changed' : 'database.privileges_changed',
+            $request->user(),
+            ['server' => $server->slug, 'database' => $database->name, 'user' => $database->username, 'scope' => $change['scope'], 'added' => $change['added'], 'removed' => $change['removed']],
+        );
+
+        return back()->with('status', __('The permissions of :user were saved.', ['user' => $database->username]));
+    }
+
+    /**
      * The connection details, with the password. Behind its own permission and
      * a recent password confirmation, and every look is recorded.
      */

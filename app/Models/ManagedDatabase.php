@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $restore_from
  * @property string|null $restore_error
  * @property string|null $restore_notice
+ * @property array{privileges: list<string>, grant_option: bool}|null $privileges
  */
 class ManagedDatabase extends Model
 {
@@ -27,7 +28,7 @@ class ManagedDatabase extends Model
 
     protected function casts(): array
     {
-        return ['password' => 'encrypted'];
+        return ['password' => 'encrypted', 'privileges' => 'array'];
     }
 
     /**

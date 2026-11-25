@@ -14,7 +14,6 @@ import {
     Trash2,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import AppController from '@/actions/App/Http/Controllers/AppController';
 import DatabaseBackupController from '@/actions/App/Http/Controllers/DatabaseBackupController';
 import DatabaseServerController from '@/actions/App/Http/Controllers/DatabaseServerController';
 import DatabaseToolController from '@/actions/App/Http/Controllers/DatabaseToolController';
@@ -24,6 +23,7 @@ import { CredentialsModal } from '@/components/databases/credentials-modal';
 import { DatabaseStatusBadge } from '@/components/databases/database-status';
 import { RestoreBackupModal } from '@/components/databases/restore-backup-modal';
 import { RestoreOverModal } from '@/components/databases/restore-over-modal';
+import { PermissionsCard } from '@/components/databases/permissions-card';
 import { RemoteAccessCard } from '@/components/databases/remote-access-card';
 import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
@@ -44,11 +44,13 @@ import type {
     DatabaseServer,
     ManagedDatabase,
     RemoteAccess,
+    ServerPermissions,
 } from '@/types';
 
 type Props = {
     server: DatabaseServer;
     databases: ManagedDatabase[];
+    permissions: ServerPermissions;
     backups: DatabaseBackupFile[];
     keep: number;
     remote: RemoteAccess;
@@ -60,6 +62,7 @@ type Props = {
 export default function Show({
     server,
     databases,
+    permissions,
     backups,
     keep,
     remote,
@@ -366,26 +369,6 @@ export default function Show({
                 }
             />
 
-            {server.dedicated_app && (
-                <Alert variant="info">
-                    <span>
-                        <Trans
-                            text="This server was made for <link>:app</link>. Its user can create and drop databases on it by itself (for multi-database or tenancy packages), so the databases the app makes are not listed here. Only that app should use this server."
-                            values={{ app: server.dedicated_app.name }}
-                            components={{
-                                link: (
-                                    <Link
-                                        href={AppController.show(
-                                            server.dedicated_app.slug,
-                                        )}
-                                        className="link font-medium"
-                                    />
-                                ),
-                            }}
-                        />
-                    </span>
-                </Alert>
-            )}
             {errors.database && (
                 <Alert variant="error">{errors.database}</Alert>
             )}
@@ -626,6 +609,11 @@ export default function Show({
                     </div>
                 )}
             </Card>
+
+            <PermissionsCard
+                permissions={permissions}
+                serverSlug={server.slug}
+            />
 
             {server.status !== 'provisioning' && server.status !== 'failed' && (
                 <RemoteAccessCard

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Audit\AuditLogger;
+use App\Auth\Permissions;
 use App\Databases\AppLinks;
 use App\Databases\SetupAppDatabase;
 use App\Deploy\AppProcesses;
@@ -14,6 +15,7 @@ use App\Deploy\EnvParser;
 use App\Deploy\LaravelEnvTemplate;
 use App\Deploy\LockedException;
 use App\Deploy\ReleaseScripts;
+use App\Deploy\SetupAppRedis;
 use App\Deploy\Source\AccessState;
 use App\Deploy\Source\GitCredentials;
 use App\Deploy\Source\GitProvider;
@@ -107,6 +109,26 @@ class AppSetupController extends Controller
             'inspecting' => $detected === null,
             'stack_options' => $app->stack_options === null ? (object) [] : $this->publicOptions($app->stack_options),
             'review' => $review,
+            'redis' => $this->redis($app),
+        ];
+    }
+
+    /**
+     * The Redis choice: whether the code seems to use it, what is chosen, the Redis apps to pick from.
+     *
+     * @return array<string, mixed>
+     */
+    private function redis(App $app): array
+    {
+        $setup = app(SetupAppRedis::class);
+        $user = request()->user();
+
+        return [
+            'suggested' => (bool) ($app->detected['redis']['suggested'] ?? false),
+            'why' => $app->detected['redis']['why'] ?? null,
+            'choice' => $setup->choice($app),
+            'existing' => $setup->existing(),
+            'can' => ['link' => (bool) $user?->can(Permissions::APPS_LINKS), 'create' => (bool) $user?->can(Permissions::APPS_CREATE)],
         ];
     }
 
@@ -308,10 +330,10 @@ class AppSetupController extends Controller
         if ($app->env_text === null) {
             $domain = $app->domains()->orderBy('name')->value('name');
             $domain = is_string($domain) && ! str_starts_with($domain, '*.') ? $domain : null;
-            $horizon = in_array(ProcessKind::Horizon->value, $enabled, true);
-            $queue = $horizon || in_array(ProcessKind::Queue->value, $enabled, true);
+            $queue = in_array(ProcessKind::Horizon->value, $enabled, true) || in_array(ProcessKind::Queue->value, $enabled, true);
 
-            $env->apply($app, $env->generate($app, $domain, $queue, $horizon));
+            // Redis, when the person linked one in the wizard, carries the cache, the sessions and the queue.
+            $env->apply($app, $env->generate($app, $domain, $queue, app(SetupAppRedis::class)->linked($app)));
         }
 
         $app->forceFill([

@@ -255,6 +255,17 @@ interface HostDriver
     public function dropDatabase(DatabaseTarget $server, string $database, string $user): void;
 
     /**
+     * Set what a database user may do. `$scope` is `database` (on the user's own database) or `server` (the
+     * administrator of a server made for one app). `$privileges` are the agent's names (`SELECT`, `CREATE VIEW`;
+     * for PostgreSQL `CREATEDB`, `CREATEROLE`); the grant option only applies to the server scope.
+     *
+     * @param  list<string>  $privileges
+     *
+     * @throws HostOperationFailed
+     */
+    public function setDatabasePrivileges(DatabaseTarget $server, string $database, string $user, string $scope, array $privileges, bool $grantOption = false): void;
+
+    /**
      * @throws HostOperationFailed
      */
     public function setDatabasePassword(DatabaseTarget $server, string $user, #[\SensitiveParameter] string $password): void;

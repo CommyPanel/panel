@@ -14,8 +14,6 @@ export type DatabaseServer = {
     host: string;
     port: number;
     databases_count: number;
-    /** The app this server was made for (its user may create and drop databases on it), if any. */
-    dedicated_app: { slug: string; name: string } | null;
     created_at: string | null;
 };
 
@@ -88,4 +86,24 @@ export type RemoteAccess = {
     opened_by: string | null;
     /** Whether the server runs with TLS (it does once it was opened). */
     tls: boolean;
+};
+
+/** What the users of a server may do, as CommyPanel grants it. */
+export type ServerPermissions = {
+    privileges: string[];
+    /** Whether one of the users may act on the whole server. */
+    whole_server: boolean;
+    /** Ready-made sets of database privileges (empty for PostgreSQL). */
+    presets: Record<string, string[]>;
+    users: {
+        id: number;
+        user: string;
+        database: string;
+        scope: 'database' | 'server';
+        granted: Record<string, boolean>;
+        /** What a person may switch on or off for this user; empty when nothing can be changed. */
+        editable_keys: string[];
+        /** Whether a person changed it from the default. */
+        custom: boolean;
+    }[];
 };

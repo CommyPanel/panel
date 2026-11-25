@@ -40,6 +40,17 @@ export type LaravelSetup = {
         node?: number;
         ssr?: boolean;
     };
+    /** The Redis choice of the wizard. */
+    redis: {
+        suggested: boolean;
+        why: string | null;
+        choice: {
+            mode: 'existing' | 'new' | 'none' | null;
+            app: string | null;
+        };
+        existing: { slug: string; name: string }[];
+        can: { link: boolean; create: boolean };
+    };
     review: {
         database: {
             mode: string | null;

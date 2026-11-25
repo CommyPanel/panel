@@ -99,17 +99,12 @@ describe('the links tab', function () {
 });
 
 describe('the Databases pages', function () {
-    it('say which app a dedicated server was made for, and nothing about an ordinary one', function () {
+    it('do not announce the app of a dedicated server in the list or on the server page', function () {
         $dedicated = app(DatabaseServers::class)->create('Blog db', DatabaseEngine::Mysql, '8.4')->fresh();
         $dedicated->forceFill(['dedicated_app_id' => $this->blog->id])->save();
 
-        $this->get('/databases')->assertInertia(fn (Assert $page) => $page
-            ->where('servers.0.slug', 'blog-db')
-            ->where('servers.0.dedicated_app', ['slug' => 'blog', 'name' => 'Blog'])
-            ->where('servers.1.slug', 'main')
-            ->where('servers.1.dedicated_app', null));
-
-        $this->get('/databases/blog-db')->assertInertia(fn (Assert $page) => $page->where('server.dedicated_app.slug', 'blog'));
+        $this->get('/databases')->assertInertia(fn (Assert $page) => $page->missing('servers.0.dedicated_app'));
+        $this->get('/databases/blog-db')->assertInertia(fn (Assert $page) => $page->missing('server.dedicated_app'));
     });
 
     it('still needs the typed name to delete a dedicated server', function () {

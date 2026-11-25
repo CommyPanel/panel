@@ -220,6 +220,16 @@ it('asks for full rights on the server only when the database is for a server ma
         ->and($bodies[1])->toBe([...$bodies[0], 'admin' => true]);
 });
 
+it('asks the agent to set what a database user may do', function () {
+    Http::fake(['agent/v1/databases/privileges' => Http::response(['ok' => true])]);
+
+    agentDriver()->setDatabasePrivileges(new DatabaseTarget('db-main', 'mysql', 'rootpw'), 'shop', 'shop', 'database', ['SELECT', 'INSERT'], false);
+
+    Http::assertSent(fn ($request) => $request->url() === 'http://agent/v1/databases/privileges'
+        && $request->data()['database'] === 'shop' && $request->data()['user'] === 'shop' && $request->data()['scope'] === 'database'
+        && $request->data()['privileges'] === ['SELECT', 'INSERT'] && $request->data()['grant_option'] === false);
+});
+
 it('treats a missing certificate as null', function () {
     Http::fake(['agent/v1/certificates/shop' => Http::response(['error' => 'no certificate with that name'], 404)]);
 

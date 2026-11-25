@@ -6,6 +6,7 @@ use App\Deploy\AppEnvironment;
 use App\Deploy\EnvText;
 use App\Deploy\LaravelEnvTemplate;
 use App\Enums\DeploymentStatus;
+use App\Enums\SetupStep;
 use App\Enums\Stack;
 use App\Models\App;
 use App\Models\AppEnvVar;
@@ -291,4 +292,13 @@ describe('the starting text', function () {
             ->and($blog->env_text)->toContain('# Logs go to')
             ->and(app(AppEnvironment::class)->text($blog))->toBe($blog->env_text);
     });
+});
+
+it('serves the text of a Laravel app that is still being set up, whose type is only a hint', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+    $app = App::factory()->create(['slug' => 'draft', 'stack' => null, 'stack_hint' => Stack::Laravel, 'setup_step' => SetupStep::Review, 'env_text' => "APP_ENV=production\n"]);
+
+    $this->withSession(['auth.password_confirmed_at' => time()])->getJson("/apps/{$app->slug}/env/text")
+        ->assertOk()->assertJson(['text' => "APP_ENV=production\n"]);
 });

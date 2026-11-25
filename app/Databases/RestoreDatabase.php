@@ -133,6 +133,8 @@ class RestoreDatabase
         }
 
         $database->forceFill(['restore_status' => null, 'restore_from' => null, 'restore_error' => null, 'restore_notice' => null])->save();
+
+        $this->restorePrivileges($database);
     }
 
     /**
@@ -155,7 +157,22 @@ class RestoreDatabase
         }
 
         $this->reverted($database, "Loading {$file} failed ({$reason}). The database was put back as it was before, from the safety copy {$safety}, which stays in the list of backups.");
+        $this->restorePrivileges($database);
         $this->audit->record('database.restore_replace_failed', null, $context + ['changed' => true, 'put_back' => true, 'safety' => $safety]);
+    }
+
+    /**
+     * A restore over a database makes its user again with the ordinary rights: put back what a person had set
+     * (and the administrator's rights of a server made for one app).
+     */
+    private function restorePrivileges(ManagedDatabase $database): void
+    {
+        try {
+            $this->databases->reapplyPrivileges($database->refresh());
+        } catch (DatabaseException $e) {
+            $notice = trim((string) $database->restore_notice.' The permissions of the user could not be set again; save them again on the Permissions card. '.$this->plain($e->getMessage()));
+            $database->forceFill(['restore_notice' => $notice])->save();
+        }
     }
 
     private function reverted(ManagedDatabase $database, string $notice): void

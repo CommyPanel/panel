@@ -31,8 +31,6 @@ class DatabasePresenter
             'host' => $server->slug,
             'port' => $server->engine->port(),
             'databases_count' => $server->databases()->count(),
-            // The app this server was made for: its user may create and drop databases here (not listed on this page).
-            'dedicated_app' => $server->dedicated_app_id === null ? null : $server->dedicatedApp?->only(['slug', 'name']),
             'created_at' => $server->created_at?->toIso8601String(),
         ];
     }

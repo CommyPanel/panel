@@ -82,7 +82,7 @@ export default function Setup({
             ) : app.setup_step === 'database' ? (
                 <LaravelDatabasePage app={app} />
             ) : app.setup_step === 'services' ? (
-                <LaravelServicesPage app={app} />
+                <LaravelServicesPage app={app} laravel={laravel} />
             ) : app.setup_step === 'volumes' ? (
                 <LaravelVolumesPage app={app} />
             ) : app.setup_step === 'review' && laravel !== null ? (

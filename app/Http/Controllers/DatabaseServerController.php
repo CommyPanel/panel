@@ -7,6 +7,7 @@ use App\Databases\DatabaseBackups;
 use App\Databases\DatabaseException;
 use App\Databases\DatabaseServers;
 use App\Databases\RemoteAccess;
+use App\Databases\UserPrivileges;
 use App\Dns\PanelDomain;
 use App\Dns\ServerAddress;
 use App\Enums\DatabaseEngine;
@@ -32,6 +33,7 @@ class DatabaseServerController extends Controller
     {
         return Inertia::render('databases/show', [
             'server' => DatabasePresenter::server($server),
+            'permissions' => UserPrivileges::present($server),
             'databases' => $server->databases()->with('links.app')->orderBy('name')->get()->map(fn ($d) => DatabasePresenter::database($d))->all(),
             'backups' => array_map(fn (array $b) => [...$b, 'created_at' => date('c', $b['created'])], $backups->all($server)),
             'keep' => (int) config('commypanel.backups.keep_databases'),
