@@ -297,11 +297,12 @@ class AgentHostDriver implements HostDriver
 
     public function buildImage(ImageBuildSpec $spec, ?callable $onOutput = null): void
     {
-        $this->stream('/v1/docker/images/build', [
+        $this->stream('/v1/docker/images/build', array_filter([
             'tag' => $spec->tag,
             'context_path' => $spec->contextPath,
             'dockerfile' => $spec->dockerfile,
-        ], 3600, $onOutput, 'The build output ended unexpectedly.');
+            'no_cache' => $spec->fresh,
+        ], fn ($value) => $value !== false), 3600, $onOutput, 'The build output ended unexpectedly.');
     }
 
     public function runTask(TaskSpec $spec, ?callable $onOutput = null): int

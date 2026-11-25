@@ -4,6 +4,7 @@ import {
     Cog,
     ExternalLink,
     Globe,
+    ChevronDown,
     HardDrive,
     Link2,
     Layers,
@@ -39,6 +40,7 @@ import { PendingChanges } from '@/components/apps/pending-changes';
 import { PageHeader } from '@/components/page-header';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
 import { LockIcon } from '@/components/ui/lock-icon';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { GroupedTabs } from '@/components/ui/grouped-tabs';
@@ -195,10 +197,10 @@ export default function Show({
         return () => clearInterval(timer);
     }, [app.status]);
 
-    const deploy = () =>
+    const deploy = (fresh = false) =>
         router.post(
             DeploymentController.store(app.slug),
-            {},
+            fresh ? { fresh: true } : {},
             {
                 onStart: () => setDeploying(true),
                 onFinish: () => setDeploying(false),
@@ -381,14 +383,47 @@ export default function Show({
                         </Link>
                         {can('apps.control') && <AppPower app={app} />}
                         {can('apps.deploy') && (
-                            <Button
-                                onClick={deploy}
-                                loading={deploying}
-                                disabled={app.status === 'deploying'}
-                            >
-                                <Rocket className="size-4" aria-hidden />
-                                {t('Deploy')}
-                            </Button>
+                            <div className="flex">
+                                <Button
+                                    className="rounded-r-none"
+                                    onClick={() => deploy()}
+                                    loading={deploying}
+                                    disabled={app.status === 'deploying'}
+                                >
+                                    <Rocket className="size-4" aria-hidden />
+                                    {t('Deploy')}
+                                </Button>
+                                <Dropdown
+                                    label={t('More ways to deploy')}
+                                    triggerClassName="btn-primary rounded-l-none border-l border-primary-content/30 px-2"
+                                    trigger={
+                                        <ChevronDown
+                                            className="size-4"
+                                            aria-hidden
+                                        />
+                                    }
+                                >
+                                    {(close) => (
+                                        <DropdownItem
+                                            onSelect={() => {
+                                                close();
+                                                deploy(true);
+                                            }}
+                                        >
+                                            <span className="flex flex-col">
+                                                <span>
+                                                    {t('Deploy without cache')}
+                                                </span>
+                                                <span className="text-xs font-normal text-base-content/60">
+                                                    {t(
+                                                        'Builds everything again and fetches the base images anew. Slower; use it to pick up updates of the base image.',
+                                                    )}
+                                                </span>
+                                            </span>
+                                        </DropdownItem>
+                                    )}
+                                </Dropdown>
+                            </div>
                         )}
                     </>
                 }

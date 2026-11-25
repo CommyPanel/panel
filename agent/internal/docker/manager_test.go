@@ -491,6 +491,26 @@ func TestBuildStreamsContextAndLogs(t *testing.T) {
 	}
 }
 
+func TestAFreshBuildSkipsTheCacheAndPullsTheBaseImage(t *testing.T) {
+	m, d, dir := setup(t)
+	d.buildReply = `{"stream":"ok\n"}` + "\n"
+	ctxDir := buildContext(t, dir)
+
+	if err := m.Build(context.Background(), BuildSpec{Tag: "commypanel/demo:r1", ContextPath: ctxDir}, func(string) {}); err != nil {
+		t.Fatal(err)
+	}
+	if q := d.queries["POST /build"]; strings.Contains(q, "nocache") || strings.Contains(q, "pull") {
+		t.Errorf("an ordinary build must use the cache: %q", q)
+	}
+
+	if err := m.Build(context.Background(), BuildSpec{Tag: "commypanel/demo:r2", ContextPath: ctxDir, NoCache: true}, func(string) {}); err != nil {
+		t.Fatal(err)
+	}
+	if q := d.queries["POST /build"]; !strings.Contains(q, "nocache=1") || !strings.Contains(q, "pull=1") {
+		t.Errorf("a fresh build must skip the cache and pull the base image: %q", q)
+	}
+}
+
 func TestBuildReportsFailure(t *testing.T) {
 	m, d, dir := setup(t)
 	d.buildReply = `{"stream":"Step 1\n"}` + "\n" + `{"error":"The command failed","errorDetail":{"message":"x"}}` + "\n"

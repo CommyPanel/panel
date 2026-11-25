@@ -498,3 +498,14 @@ it('asks the agent to unpack a volume archive and passes its refusal on', functi
     expect(fn () => agentDriver()->restoreVolume('shop', 'uploads', 'uploads-20261103-040000.tar.gz'))->toThrow(HostOperationFailed::class, 'stop the app first')
         ->and(fn () => agentDriver()->restoreVolume('../x', 'uploads', 'f'))->toThrow(InvalidArgumentException::class);
 });
+
+it('asks for a build without the cache only when the build is fresh', function () {
+    Http::fake(['agent/v1/docker/images/build' => Http::response('{"log":"ok"}'."\n".'{"ok":true}'."\n")]);
+
+    agentDriver()->buildImage(new ImageBuildSpec('commypanel/shop:1', '/data/builds/shop-1'));
+    agentDriver()->buildImage(new ImageBuildSpec('commypanel/shop:2', '/data/builds/shop-2', 'Dockerfile', true));
+
+    $sent = Http::recorded()->map(fn ($pair) => $pair[0]->data())->values();
+
+    expect($sent[0])->not->toHaveKey('no_cache')->and($sent[1]['no_cache'])->toBeTrue();
+});

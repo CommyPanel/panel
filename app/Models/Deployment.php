@@ -21,6 +21,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $commit_message
  * @property string|null $release_command
  * @property string|null $release_script
+ * @property bool $fresh_build
  * @property list<array<string, mixed>>|null $processes
  * @property string|null $image_tag
  * @property bool $image_available
@@ -59,6 +60,7 @@ class Deployment extends Model
             'settings_only' => 'boolean',
             'retry' => 'boolean',
             'skip_watch' => 'boolean',
+            'fresh_build' => 'boolean',
             'processes' => 'array',
             'live_at' => 'datetime',
             'watch_until' => 'datetime',

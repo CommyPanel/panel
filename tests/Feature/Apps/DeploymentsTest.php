@@ -73,3 +73,13 @@ it('explains why a rollback is impossible', function () {
 
     Queue::assertNothingPushed();
 });
+
+it('queues a deployment without the cache when asked, for any app', function () {
+    Queue::fake();
+
+    $this->post('/apps/shop/deployments', ['fresh' => 'maybe'])->assertSessionHasErrors('fresh');
+
+    $this->post('/apps/shop/deployments', ['fresh' => true])->assertRedirect('/apps/shop/deployments/1');
+
+    expect($this->shop->deployments()->first()->fresh_build)->toBeTrue();
+});

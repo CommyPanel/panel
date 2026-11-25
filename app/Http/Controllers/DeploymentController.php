@@ -24,7 +24,9 @@ class DeploymentController extends Controller
             return back()->withErrors(['deploy' => __('A deployment is already in progress.')]);
         }
 
-        $deployment = $deployer->deploy($app, $request->user());
+        $data = $request->validate(['fresh' => ['sometimes', 'boolean']]);
+
+        $deployment = $deployer->deploy($app, $request->user(), (bool) ($data['fresh'] ?? false));
 
         return redirect()->route('apps.deployments.show', [$app, $deployment]);
     }

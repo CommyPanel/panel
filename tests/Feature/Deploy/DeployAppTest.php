@@ -397,3 +397,32 @@ describe('stages', function () {
             ->assertInertia(fn ($page) => $page->where('deployment.stage', 'done'));
     });
 });
+
+describe('a build without the cache', function () {
+    it('is an ordinary build unless asked, and a fresh one when asked', function () {
+        $ordinary = ($this->deploy)();
+
+        $fresh = app(Deployer::class)->deploy($this->shop, null, true)->fresh();
+
+        $builds = collect($this->host->actions())->where('action', 'buildImage')->map(fn ($a) => $a['args']['spec'])->values();
+
+        expect($ordinary->fresh_build)->toBeFalse()
+            ->and($fresh->fresh_build)->toBeTrue()
+            ->and($fresh->status)->toBe(DeploymentStatus::Active)
+            ->and($builds[0]->fresh)->toBeFalse()
+            ->and($builds[1]->fresh)->toBeTrue()
+            ->and($fresh->log)->toContain('without the cache')
+            ->and($ordinary->log)->not->toContain('without the cache')
+            ->and(AuditLog::query()->where('action', 'deploy.queued')->latest('id')->first()->metadata['fresh'] ?? null)->toBeTrue();
+    });
+
+    it('keeps rollbacks as they are: nothing is built', function () {
+        $first = ($this->deploy)();
+        app(Deployer::class)->deploy($this->shop, null, true);
+
+        $before = collect($this->host->actions())->where('action', 'buildImage')->count();
+        app(Deployer::class)->rollback($this->shop->fresh(), $first->fresh());
+
+        expect(collect($this->host->actions())->where('action', 'buildImage')->count())->toBe($before);
+    });
+});

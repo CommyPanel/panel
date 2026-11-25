@@ -26,6 +26,9 @@ type BuildSpec struct {
 	Tag         string `json:"tag"`
 	ContextPath string `json:"context_path"`
 	Dockerfile  string `json:"dockerfile,omitempty"`
+	// NoCache builds every step again and fetches the base images anew (a fresh build), instead of
+	// reusing the layers of earlier builds.
+	NoCache bool `json:"no_cache,omitempty"`
 }
 
 // ValidateBuild checks a build spec without touching Docker.
@@ -86,6 +89,10 @@ func (m *Manager) Build(ctx context.Context, s BuildSpec, onLine func(string)) e
 		"memory":     {strconv.FormatInt(int64(m.cfg.BuildMemoryMB)<<20, 10)},
 		"cpuperiod":  {"100000"},
 		"cpuquota":   {strconv.FormatInt(int64(m.cfg.BuildCPUs*100000), 10)},
+	}
+	if s.NoCache {
+		query.Set("nocache", "1")
+		query.Set("pull", "1")
 	}
 	resp, err := m.engine.do(ctx, "POST", "/build", query, pr, "application/x-tar")
 	if err != nil {

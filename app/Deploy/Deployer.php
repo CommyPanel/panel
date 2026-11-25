@@ -18,11 +18,15 @@ class Deployer
 {
     public function __construct(private readonly AuditLogger $audit) {}
 
-    public function deploy(App $app, ?User $by = null): Deployment
+    /**
+     * @param  bool  $fresh  build without the layer cache and fetch the base images again (slower; picks up
+     *                       updates of the base image and anything the cache would have kept)
+     */
+    public function deploy(App $app, ?User $by = null, bool $fresh = false): Deployment
     {
-        $deployment = $this->create($app, ['release_command' => $app->release_command, 'release_script' => $app->release_script]);
+        $deployment = $this->create($app, ['release_command' => $app->release_command, 'release_script' => $app->release_script, 'fresh_build' => $fresh]);
 
-        $this->audit->record('deploy.queued', $by, ['app' => $app->slug, 'deployment' => $deployment->number], $app);
+        $this->audit->record('deploy.queued', $by, ['app' => $app->slug, 'deployment' => $deployment->number, ...($fresh ? ['fresh' => true] : [])], $app);
         RunDeployment::dispatch($deployment->id);
 
         return $deployment;

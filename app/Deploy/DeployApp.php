@@ -263,9 +263,11 @@ class DeployApp
         $tag = "commypanel/{$app->slug}:{$deployment->number}";
         $deployment->forceFill(['image_tag' => $tag])->save();
         $this->stage($deployment, DeploymentStage::Build);
-        $log->step("Building image {$tag}.");
+        $log->step($deployment->fresh_build
+            ? "Building image {$tag} without the cache, fetching the base images again."
+            : "Building image {$tag}.");
 
-        $this->host->buildImage(new ImageBuildSpec($tag, $workDir, $dockerfile), $log->line(...));
+        $this->host->buildImage(new ImageBuildSpec($tag, $workDir, $dockerfile, (bool) $deployment->fresh_build), $log->line(...));
     }
 
     private function start(App $app, Deployment $deployment, DeployLogger $log): bool
