@@ -75,3 +75,38 @@ describe('the server page', function () {
             ->missing('server.dedicated_app'));
     });
 });
+
+describe('the page of one user', function () {
+    beforeEach(function () {
+        // A page that is new has no entry in a build made before it existed.
+        $this->withoutVite();
+        $this->actingAs(User::factory()->create());
+        $this->server = app(DatabaseServers::class)->create('Main', DatabaseEngine::Mariadb, '11.4');
+        $this->database = app(ManageDatabases::class)->create($this->server->fresh(), 'shop');
+    });
+
+    it('shows what the user may do, and lists the users on the server page as a short list', function () {
+        $this->get("/databases/{$this->server->slug}/databases/{$this->database->id}/permissions")
+            ->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('databases/permissions')
+            ->where('user_id', $this->database->id)
+            ->where('server.slug', $this->server->slug)
+            ->where('permissions.users.0.user', $this->database->username)
+            ->where('permissions.users.0.granted.select', true));
+
+        $this->get("/databases/{$this->server->slug}")->assertInertia(fn (Assert $page) => $page
+            ->where('permissions.users.0.id', $this->database->id));
+    });
+
+    it('does not open a database of another server', function () {
+        $other = app(DatabaseServers::class)->create('Other', DatabaseEngine::Mariadb, '11.4');
+
+        $this->get("/databases/{$other->slug}/databases/{$this->database->id}/permissions")->assertNotFound();
+    });
+
+    it('needs the permission to see databases', function () {
+        $this->actingAs(User::factory()->regular()->create());
+
+        $this->get("/databases/{$this->server->slug}/databases/{$this->database->id}/permissions")->assertForbidden();
+    });
+});

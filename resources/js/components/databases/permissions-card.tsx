@@ -1,19 +1,14 @@
-import { Check, Minus, Pencil, ShieldAlert } from 'lucide-react';
-import { useState } from 'react';
-import {
-    PermissionEditor,
-    usePrivilegeLabels,
-} from '@/components/databases/permission-editor';
-import { Button } from '@/components/ui/button';
+import { Link } from '@inertiajs/react';
+import { ShieldAlert } from 'lucide-react';
+import ManagedDatabaseController from '@/actions/App/Http/Controllers/ManagedDatabaseController';
 import { Card } from '@/components/ui/card';
 import { useT } from '@/hooks/use-t';
-import { useCan } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 import type { ServerPermissions } from '@/types';
 
 /**
- * What the users of this server may do, as CommyPanel grants it: an ordinary user holds everything on its
- * own database and nothing else; the user of a server made for one app may also manage the whole server.
+ * Who may do what on this server, in a short list: each user opens a page of its own with the details
+ * (and, for people who may change them, an edit mode).
  */
 export function PermissionsCard({
     permissions,
@@ -23,12 +18,6 @@ export function PermissionsCard({
     serverSlug: string;
 }) {
     const { t } = useT();
-    const can = useCan();
-    const labels = usePrivilegeLabels();
-    const [editing, setEditing] = useState<number | null>(null);
-    const mayEdit = can('databases.manage');
-    const editingRow = permissions.users.find((row) => row.id === editing);
-    const postgres = permissions.privileges.includes('login');
 
     return (
         <Card
@@ -68,138 +57,89 @@ export function PermissionsCard({
                                 <tr>
                                     <th scope="col">{t('User')}</th>
                                     <th scope="col">{t('Applies to')}</th>
-                                    {permissions.privileges.map((key) => (
-                                        <th
-                                            key={key}
-                                            scope="col"
-                                            className="text-center"
-                                        >
-                                            {labels[key] ?? key}
-                                        </th>
-                                    ))}
-                                    {mayEdit && (
-                                        <th scope="col">
-                                            <span className="sr-only">
-                                                {t('Change')}
-                                            </span>
-                                        </th>
-                                    )}
+                                    <th scope="col">{t('Access')}</th>
+                                    <th scope="col">
+                                        <span className="sr-only">
+                                            {t('User permissions')}
+                                        </span>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {permissions.users.map((row) => (
-                                    <tr
-                                        key={row.user}
-                                        className={cn(
-                                            row.scope === 'server' &&
-                                                'bg-warning/10',
-                                            editing === row.id &&
-                                                'outline outline-primary',
-                                        )}
-                                    >
-                                        <th scope="row" className="font-mono">
-                                            {row.user}
-                                        </th>
-                                        <td className="min-w-40">
-                                            {row.scope === 'server' ? (
-                                                <span className="badge-soft badge badge-warning">
-                                                    {t('The whole server')}
-                                                </span>
-                                            ) : (
-                                                <span>
-                                                    {t(
-                                                        'Only the database :name',
-                                                        { name: row.database },
-                                                    )}
-                                                </span>
+                                {permissions.users.map((row) => {
+                                    const total =
+                                        row.editable_keys.length > 0
+                                            ? row.editable_keys.length
+                                            : Object.values(row.granted).filter(
+                                                  Boolean,
+                                              ).length;
+                                    const count =
+                                        row.editable_keys.length > 0
+                                            ? row.editable_keys.filter(
+                                                  (key) => row.granted[key],
+                                              ).length
+                                            : total;
+
+                                    return (
+                                        <tr
+                                            key={row.id}
+                                            className={cn(
+                                                row.scope === 'server' &&
+                                                    'bg-warning/10',
                                             )}
-                                        </td>
-                                        {permissions.privileges.map((key) => (
-                                            <td
-                                                key={key}
-                                                className="text-center"
+                                        >
+                                            <th
+                                                scope="row"
+                                                className="font-mono"
                                             >
-                                                {row.granted[key] ? (
-                                                    <span
-                                                        className={cn(
-                                                            'inline-flex',
-                                                            row.scope ===
-                                                                'server'
-                                                                ? 'text-warning'
-                                                                : 'text-success',
-                                                        )}
-                                                    >
-                                                        <Check
-                                                            className="size-4"
-                                                            aria-hidden
-                                                        />
-                                                        <span className="sr-only">
-                                                            {t('Allowed')}
-                                                        </span>
+                                                {row.user}
+                                            </th>
+                                            <td className="min-w-40">
+                                                {row.scope === 'server' ? (
+                                                    <span className="badge-soft badge badge-warning">
+                                                        {t('The whole server')}
                                                     </span>
                                                 ) : (
-                                                    <span className="inline-flex text-base-content/60">
-                                                        <Minus
-                                                            className="size-4"
-                                                            aria-hidden
-                                                        />
-                                                        <span className="sr-only">
-                                                            {t('Not allowed')}
-                                                        </span>
+                                                    t(
+                                                        'Only the database :name',
+                                                        { name: row.database },
+                                                    )
+                                                )}
+                                            </td>
+                                            <td className="whitespace-nowrap">
+                                                {t(':count of :total', {
+                                                    count: String(count),
+                                                    total: String(total),
+                                                })}
+                                                {row.custom && (
+                                                    <span className="badge-soft ml-2 badge badge-sm badge-info">
+                                                        {t('Custom')}
                                                     </span>
                                                 )}
                                             </td>
-                                        ))}
-                                        {mayEdit && (
                                             <td className="text-right">
-                                                {row.editable_keys.length >
-                                                    0 && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        aria-label={t(
-                                                            'Change the permissions of :user',
-                                                            { user: row.user },
-                                                        )}
-                                                        onClick={() =>
-                                                            setEditing(
-                                                                editing ===
-                                                                    row.id
-                                                                    ? null
-                                                                    : row.id,
-                                                            )
-                                                        }
-                                                    >
-                                                        <Pencil
-                                                            className="size-4"
-                                                            aria-hidden
-                                                        />
-                                                        {t('Edit')}
-                                                    </Button>
-                                                )}
+                                                <Link
+                                                    href={ManagedDatabaseController.permissions(
+                                                        {
+                                                            server: serverSlug,
+                                                            database: row.id,
+                                                        },
+                                                    )}
+                                                    className="btn btn-soft btn-sm"
+                                                    aria-label={t(
+                                                        'Permissions of :user',
+                                                        { user: row.user },
+                                                    )}
+                                                >
+                                                    {t('User permissions')}
+                                                </Link>
                                             </td>
-                                        )}
-                                    </tr>
-                                ))}
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
-                    {editingRow && (
-                        <PermissionEditor
-                            key={editingRow.id}
-                            serverSlug={serverSlug}
-                            row={editingRow}
-                            presets={permissions.presets}
-                            onClose={() => setEditing(null)}
-                        />
-                    )}
-                    {postgres && mayEdit && (
-                        <p className="text-sm text-base-content/70">
-                            {t(
-                                'On PostgreSQL an ordinary user keeps what it needs: it logs in and owns its database, so there is nothing to change.',
-                            )}
-                        </p>
-                    )}
                 </div>
             )}
         </Card>

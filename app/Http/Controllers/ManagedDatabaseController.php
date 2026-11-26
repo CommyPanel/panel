@@ -6,11 +6,15 @@ use App\Audit\AuditLogger;
 use App\Databases\DatabaseConnection;
 use App\Databases\DatabaseException;
 use App\Databases\ManageDatabases;
+use App\Databases\UserPrivileges;
 use App\Models\DatabaseServer;
 use App\Models\ManagedDatabase;
+use App\Presenters\DatabasePresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class ManagedDatabaseController extends Controller
 {
@@ -63,6 +67,18 @@ class ManagedDatabaseController extends Controller
      * Change what the database's user may do. An ordinary user only on its own database; the administrator
      * of a server made for one app on the whole server, which is graded as a high-risk change in the audit log.
      */
+    /**
+     * One database user's permissions on a page of its own, with an edit mode for people who may change them.
+     */
+    public function permissions(DatabaseServer $server, ManagedDatabase $database): Response
+    {
+        return Inertia::render('databases/permissions', [
+            'server' => DatabasePresenter::server($server),
+            'permissions' => UserPrivileges::present($server),
+            'user_id' => $database->id,
+        ]);
+    }
+
     public function privileges(Request $request, DatabaseServer $server, ManagedDatabase $database, ManageDatabases $databases, AuditLogger $audit): RedirectResponse
     {
         $data = $request->validate([

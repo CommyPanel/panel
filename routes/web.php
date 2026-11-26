@@ -245,6 +245,7 @@ Route::middleware('auth')->group(function () {
         Route::middleware('can:'.Permissions::DATABASES_VIEW)->group(function () {
             Route::get('/', [DatabaseServerController::class, 'index'])->name('index');
             Route::get('{server:slug}', [DatabaseServerController::class, 'show'])->name('show');
+            Route::get('{server:slug}/databases/{database}/permissions', [ManagedDatabaseController::class, 'permissions'])->whereNumber('database')->name('databases.permissions');
         });
 
         Route::middleware('can:'.Permissions::DATABASES_MANAGE)->group(function () {

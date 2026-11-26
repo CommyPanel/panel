@@ -43,35 +43,13 @@ export function usePrivilegeLabels(): Record<string, string> {
     };
 }
 
-/** The privileges that let a user change data. */
-const WRITE_KEYS = ['insert', 'update', 'delete'];
-
-/**
- * The editor of one user's permissions: tick what it may do, or start from a ready-made set, then save. It is
- * a panel under the table, not a dialog, so the matrix above stays in view. Saving asks for the password.
- */
-export function PermissionEditor({
-    serverSlug,
-    row,
-    presets,
-    onClose,
-}: {
-    serverSlug: string;
-    row: Row;
-    presets: Record<string, string[]>;
-    onClose: () => void;
-}) {
+/** The privileges in the groups a person thinks in, keeping only the ones in `keys`. */
+export function usePrivilegeGroups(
+    keys: string[],
+): { id: string; legend: string; keys: string[] }[] {
     const { t } = useT();
-    const labels = usePrivilegeLabels();
-    const confirmed = useConfirmedAction();
-    const editable = row.editable_keys;
-    const [selected, setSelected] = useState<Set<string>>(
-        () => new Set(editable.filter((key) => row.granted[key])),
-    );
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
 
-    const groups: { id: string; legend: string; keys: string[] }[] = [
+    return [
         {
             id: 'data',
             legend: t('Data'),
@@ -114,12 +92,48 @@ export function PermissionEditor({
                 'create_roles',
             ],
         },
+        {
+            id: 'account',
+            legend: t('Account'),
+            keys: ['login', 'database_owner'],
+        },
     ]
         .map((group) => ({
             ...group,
-            keys: group.keys.filter((key) => editable.includes(key)),
+            keys: group.keys.filter((key) => keys.includes(key)),
         }))
         .filter((group) => group.keys.length > 0);
+}
+
+/** The privileges that let a user change data. */
+const WRITE_KEYS = ['insert', 'update', 'delete'];
+
+/**
+ * The editor of one user's permissions: tick what it may do, or start from a ready-made set, then save.
+ * Saving asks for the password.
+ */
+export function PermissionEditor({
+    serverSlug,
+    row,
+    presets,
+    onClose,
+}: {
+    serverSlug: string;
+    row: Row;
+    presets: Record<string, string[]>;
+    onClose: () => void;
+}) {
+    const { t } = useT();
+    const labels = usePrivilegeLabels();
+    const confirmed = useConfirmedAction();
+    const editable = row.editable_keys;
+    const [selected, setSelected] = useState<Set<string>>(
+        () => new Set(editable.filter((key) => row.granted[key])),
+    );
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const groups = usePrivilegeGroups(editable);
 
     const presetNames: Record<string, string> = {
         full: t('Full access'),
