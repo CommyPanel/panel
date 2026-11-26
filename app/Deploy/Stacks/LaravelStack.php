@@ -49,6 +49,12 @@ class LaravelStack implements StackDefinition
         $image = LaravelRuntime::image($php);
         $exts = implode(' ', $extensions);
         $lockCopy = SourceTree::has($path, 'composer.lock') ? 'composer.json composer.lock' : 'composer.json';
+        $buildSsr = $ssr && $project->hasSsrBuild();
+
+        // Some builds run `php artisan` themselves (Laravel Wayfinder generates its route files when Vite starts),
+        // so their asset stage is the PHP image with Node added instead of the light Node image.
+        $phpAssets = $assets && $project->assetBuildNeedsPhp($buildSsr);
+        $devVendor = $phpAssets && $project->assetBuildNeedsDevVendor($buildSsr);
 
         $dockerfile = <<<DOCKER
         FROM composer:2 AS vendor
@@ -61,17 +67,40 @@ class LaravelStack implements StackDefinition
 
         DOCKER;
 
-        if ($assets) {
-            $dockerfile .= $this->assetsStage($path, $manager, $node, $ssr && $project->hasSsrBuild());
+        if ($devVendor) {
+            $dockerfile .= <<<DOCKER
+            FROM composer:2 AS vendor-dev
+            WORKDIR /app
+            COPY {$lockCopy} ./
+            RUN composer install --no-scripts --no-autoloader --prefer-dist --no-interaction --ignore-platform-reqs
+            COPY . .
+            RUN composer dump-autoload --optimize --no-scripts --ignore-platform-reqs
+
+
+            DOCKER;
         }
 
+        // The PHP image with nginx and the extensions: the runtime image is built on it, and so is the asset stage
+        // that needs PHP, so the slow extension layers are built once.
         $installer = LaravelRuntime::EXTENSION_INSTALLER;
         $dockerfile .= <<<DOCKER
-        FROM {$image}
+        FROM {$image} AS base
         COPY --from={$installer} /usr/bin/install-php-extensions /usr/local/bin/install-php-extensions
         RUN apt-get update && apt-get install -y --no-install-recommends nginx && rm -rf /var/lib/apt/lists/* \\
             && install-php-extensions {$exts} \\
             && cp "\$PHP_INI_DIR/php.ini-production" "\$PHP_INI_DIR/php.ini"
+
+
+        DOCKER;
+
+        if ($assets) {
+            $dockerfile .= $phpAssets
+                ? $this->phpAssetsStage($path, $manager, $node, $buildSsr, $devVendor ? 'vendor-dev' : 'vendor')
+                : $this->assetsStage($path, $manager, $node, $buildSsr);
+        }
+
+        $dockerfile .= <<<DOCKER
+        FROM base
         ENV PORT={$port}
         WORKDIR /app
         COPY .commypanel/php.ini /usr/local/etc/php/conf.d/zz-commypanel.ini
@@ -86,7 +115,7 @@ class LaravelStack implements StackDefinition
         if ($assets) {
             $dockerfile .= "COPY --from=assets --chown=www-data:www-data /app/public /app/public\n";
 
-            if ($ssr && $project->hasSsrBuild()) {
+            if ($buildSsr) {
                 $dockerfile .= "COPY --from=assets --chown=www-data:www-data /app/bootstrap/ssr /app/bootstrap/ssr\n";
                 $dockerfile .= "COPY --from=assets --chown=www-data:www-data /app/node_modules /app/node_modules\n";
                 $dockerfile .= "COPY --from=assets /usr/local/bin/node /usr/local/bin/node\n";
@@ -109,7 +138,10 @@ class LaravelStack implements StackDefinition
 
         $notes = ["Detected Laravel {$project->laravelMajor()}; building with PHP {$php} (nginx and PHP-FPM)."];
 
-        if ($assets) {
+        if ($phpAssets) {
+            $notes[] = "Building front-end assets with {$manager} (Node {$node}) on the PHP image, because the build runs PHP"
+                .($devVendor ? ' and uses development packages.' : '.');
+        } elseif ($assets) {
             $notes[] = "Building front-end assets with {$manager} (Node {$node}).";
         } elseif ($project->hasPackageJson() && ! $project->hasBuildScript()) {
             $notes[] = 'package.json has no build script, so no front-end build runs.';
@@ -122,33 +154,76 @@ class LaravelStack implements StackDefinition
         return new BuildPlan(
             Stack::Laravel,
             $dockerfile,
-            ".git\n.env\n.env.*\nnode_modules\nvendor\nstorage/logs/*\nstorage/framework/cache/*\nstorage/framework/sessions/*\nstorage/framework/views/*\nbootstrap/cache/*.php\npublic/hot\npublic/storage\n",
+            ".git\n.env\n.env.*\nnode_modules\n.pnpm-store\nvendor\nstorage/logs/*\nstorage/framework/cache/*\nstorage/framework/sessions/*\nstorage/framework/views/*\nbootstrap/cache/*.php\npublic/hot\npublic/storage\n",
             $notes,
             LaravelRuntime::files(),
         );
     }
 
+    /**
+     * The pieces of an asset stage: the COPY lines of the install layer, the install command, the corepack setup and the build command.
+     *
+     * @return array{string, string, string, string}
+     */
+    private function assetCommands(string $path, string $manager, bool $ssr): array
+    {
+        $lock = match ($manager) {
+            'pnpm' => 'pnpm-lock.yaml',
+            'yarn' => 'yarn.lock',
+            default => 'package-lock.json',
+        };
+        $locked = SourceTree::has($path, $lock);
+        $install = match ($manager) {
+            'pnpm' => $locked ? 'pnpm install --frozen-lockfile' : 'pnpm install',
+            'yarn' => $locked ? 'yarn install --frozen-lockfile' : 'yarn install',
+            default => $locked ? 'npm ci' : 'npm install',
+        };
+        $setup = in_array($manager, ['pnpm', 'yarn'], true) ? "RUN corepack enable\n" : '';
+        $run = $manager === 'npm' ? 'npm run' : $manager;
+
+        return [NodeInstall::copyLines($path, $manager), $install, $setup, $ssr ? "{$run} build:ssr" : "{$run} build"];
+    }
+
     /** The Node stage that builds Vite (or Mix) assets: the dependencies are installed from the lock file when there is one. */
     private function assetsStage(string $path, string $manager, int $node, bool $ssr): string
     {
-        [$copy, $install, $setup] = match ($manager) {
-            'pnpm' => [SourceTree::has($path, 'pnpm-lock.yaml') ? 'package.json pnpm-lock.yaml' : 'package.json', SourceTree::has($path, 'pnpm-lock.yaml') ? 'pnpm install --frozen-lockfile' : 'pnpm install', "RUN corepack enable\n"],
-            'yarn' => [SourceTree::has($path, 'yarn.lock') ? 'package.json yarn.lock' : 'package.json', SourceTree::has($path, 'yarn.lock') ? 'yarn install --frozen-lockfile' : 'yarn install', "RUN corepack enable\n"],
-            default => SourceTree::has($path, 'package-lock.json')
-                ? ['package.json package-lock.json', 'npm ci', '']
-                : ['package.json', 'npm install', ''],
-        };
-        $run = $manager === 'npm' ? 'npm run' : $manager;
-        $build = $ssr ? "{$run} build:ssr" : "{$run} build";
+        [$copy, $install, $setup, $build] = $this->assetCommands($path, $manager, $ssr);
 
         return <<<DOCKER
         FROM node:{$node}-slim AS assets
         WORKDIR /app
-        {$setup}COPY {$copy} ./
-        RUN {$install}
+        {$setup}{$copy}RUN {$install}
         COPY . .
         COPY --from=vendor /app/vendor ./vendor
         RUN {$build}
+
+
+        DOCKER;
+    }
+
+    /**
+     * The asset stage for a build that runs PHP: the PHP image (with its extensions) plus Node copied from the Node image,
+     * without replacing anything of PHP's. The application boots there without an .env, a key or a database, so the
+     * stage gets harmless settings; they live only in this stage, which never becomes part of the image.
+     */
+    private function phpAssetsStage(string $path, string $manager, int $node, bool $ssr, string $vendor): string
+    {
+        [$copy, $install, $setup, $build] = $this->assetCommands($path, $manager, $ssr);
+        $key = 'base64:'.base64_encode(str_repeat("\0", 32));
+
+        return <<<DOCKER
+        FROM base AS assets
+        COPY --from=node:{$node}-slim /usr/local/bin/node /usr/local/bin/node
+        COPY --from=node:{$node}-slim /usr/local/lib/node_modules /usr/local/lib/node_modules
+        RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \\
+            && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \\
+            && ln -s ../lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack
+        WORKDIR /app
+        ENV APP_ENV=production APP_KEY={$key} DB_CONNECTION=sqlite DB_DATABASE=:memory: CACHE_STORE=array SESSION_DRIVER=array QUEUE_CONNECTION=sync LOG_CHANNEL=stderr
+        {$setup}{$copy}RUN {$install}
+        COPY . .
+        COPY --from={$vendor} /app/vendor ./vendor
+        RUN mkdir -p bootstrap/cache storage/framework/cache storage/framework/sessions storage/framework/views storage/logs && {$build}
 
 
         DOCKER;

@@ -211,6 +211,90 @@ final class LaravelProject
         return self::DEFAULT_NODE;
     }
 
+    /**
+     * Whether building the front end needs PHP: the build runs `php artisan` itself, or a plugin does.
+     * That is the case when any of these holds:
+     *  - package.json lists a package whose name contains "wayfinder" (Laravel Wayfinder's Vite plugin
+     *    runs `php artisan wayfinder:generate` when a build starts) or `vite-plugin-run`;
+     *  - the build script, or a script it runs (`npm run x`, `pnpm x`, `yarn x`, and the pre and post
+     *    scripts), mentions `artisan` or `php`;
+     *  - the Vite config mentions `artisan` or `wayfinder`.
+     * The build script is `build:ssr` when the SSR bundle is built, else `build`.
+     */
+    public function assetBuildNeedsPhp(bool $ssr = false): bool
+    {
+        foreach (['dependencies', 'devDependencies', 'optionalDependencies'] as $section) {
+            foreach (array_keys(is_array($this->package[$section] ?? null) ? $this->package[$section] : []) as $name) {
+                if (str_contains(strtolower((string) $name), 'wayfinder') || $name === 'vite-plugin-run') {
+                    return true;
+                }
+            }
+        }
+
+        if (preg_match('/\b(artisan|php)\b/', $this->scriptText($ssr ? 'build:ssr' : 'build')) === 1) {
+            return true;
+        }
+
+        foreach (['js', 'ts', 'mjs', 'mts', 'cjs', 'cts'] as $extension) {
+            if (preg_match('/artisan|wayfinder/i', (string) self::read($this->path, "vite.config.{$extension}")) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether the PHP packages the front-end build uses are only in `require-dev`, so the build needs a
+     * vendor folder with the development packages: Laravel Wayfinder in `require-dev` only, or a build
+     * that calls `artisan` while the project has development packages (a command may come from one).
+     */
+    public function assetBuildNeedsDevVendor(bool $ssr = false): bool
+    {
+        if (isset($this->composer['require-dev']['laravel/wayfinder']) && ! isset($this->composer['require']['laravel/wayfinder'])) {
+            return true;
+        }
+
+        $dev = $this->composer['require-dev'] ?? [];
+
+        if (! is_array($dev) || $dev === []) {
+            return false;
+        }
+
+        $viteConfigs = '';
+
+        foreach (['js', 'ts', 'mjs', 'mts', 'cjs', 'cts'] as $extension) {
+            $viteConfigs .= (string) self::read($this->path, "vite.config.{$extension}");
+        }
+
+        return str_contains($this->scriptText($ssr ? 'build:ssr' : 'build'), 'artisan') || str_contains($viteConfigs, 'artisan');
+    }
+
+    /** The text of a package.json script and of the scripts it runs (to a few levels), with its pre and post scripts. */
+    private function scriptText(string $name, int $depth = 0): string
+    {
+        $scripts = is_array($this->package['scripts'] ?? null) ? $this->package['scripts'] : [];
+        $text = '';
+
+        foreach (["pre{$name}", $name, "post{$name}"] as $key) {
+            if (! is_string($scripts[$key] ?? null)) {
+                continue;
+            }
+
+            $text .= ' '.$scripts[$key];
+
+            if ($depth < 5 && preg_match_all('/(?:npm run|pnpm run|pnpm|yarn run|yarn)\s+([\w:.-]+)/', $scripts[$key], $matches) > 0) {
+                foreach ($matches[1] as $next) {
+                    if ($next !== $name && isset($scripts[$next])) {
+                        $text .= ' '.$this->scriptText($next, $depth + 1);
+                    }
+                }
+            }
+        }
+
+        return $text;
+    }
+
     /** `/up` when the app registers a health route (the default skeleton does since Laravel 11), else `/`. */
     public function healthPath(): string
     {

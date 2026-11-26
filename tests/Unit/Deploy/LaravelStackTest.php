@@ -192,6 +192,204 @@ describe('the front-end build', function () {
     });
 });
 
+describe('the install layer', function () {
+    /** The Dockerfile lines between the asset stage's start and the build, as written. */
+    $installLines = fn (string $dockerfile): string => (string) (preg_match('/FROM [^\n]+ AS assets\n(.*?)\nRUN [^\n]*build/s', $dockerfile, $m) === 1 ? $m[1] : '');
+
+    it('copies pnpm\'s settings with the lock file, because they change what the lock file means', function () {
+        $dockerfile = laravelPlan([
+            'package-lock.json' => null,
+            'pnpm-lock.yaml' => 'lockfileVersion: 9',
+            'pnpm-workspace.yaml' => "overrides:\n  picocolors: 1.1.1\n",
+            '.npmrc' => 'ignore-scripts=true',
+            '.pnpmfile.cjs' => 'module.exports = {};',
+            'patches/pkg@1.0.0.patch' => 'diff',
+        ])->dockerfile;
+
+        expect($dockerfile)->toContain("COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc .pnpmfile.cjs ./\nCOPY patches ./patches\nRUN pnpm install --frozen-lockfile");
+
+        // Settings first, the rest of the code after: the install layer stays cached until one of them changes.
+        expect(strpos($dockerfile, 'RUN pnpm install --frozen-lockfile'))->toBeLessThan(strpos($dockerfile, "COPY . .\nCOPY --from=vendor /app/vendor ./vendor"));
+    });
+
+    it('copies only what exists', function () {
+        $dockerfile = laravelPlan(['package-lock.json' => null, 'pnpm-lock.yaml' => 'lockfileVersion: 9'])->dockerfile;
+
+        expect($dockerfile)->toContain("COPY package.json pnpm-lock.yaml ./\n")->not->toContain('pnpm-workspace.yaml')->not->toContain('.pnpmfile.cjs')->not->toContain('COPY patches');
+    });
+
+    it('copies .npmrc for npm', function () {
+        expect(laravelPlan(['.npmrc' => 'registry=https://registry.example.com/'])->dockerfile)->toContain("COPY package.json package-lock.json .npmrc ./\nRUN npm ci");
+    });
+
+    it('copies Yarn\'s settings, releases and plugins, but not its cache', function () {
+        $dockerfile = laravelPlan([
+            'package-lock.json' => null,
+            'yarn.lock' => '# yarn',
+            '.npmrc' => 'x=y',
+            '.yarnrc.yml' => 'nodeLinker: node-modules',
+            '.yarn/releases/yarn-4.0.0.cjs' => '//',
+            '.yarn/plugins/plugin.cjs' => '//',
+            '.yarn/cache/big.zip' => 'zip',
+        ])->dockerfile;
+
+        expect($dockerfile)->toContain("COPY package.json yarn.lock .npmrc .yarnrc.yml ./\nCOPY .yarn/releases ./.yarn/releases\nCOPY .yarn/plugins ./.yarn/plugins\nRUN yarn install --frozen-lockfile")
+            ->not->toContain('.yarn/cache');
+    });
+
+    it('keeps the package manager\'s store out of the build context', function () {
+        expect(laravelPlan()->dockerignore)->toContain(".pnpm-store\n");
+    });
+});
+
+describe('a front-end build that runs PHP', function () {
+    $wayfinderPackage = fn (string $section = 'devDependencies') => json_encode(['scripts' => ['build' => 'vite build'], $section => ['vite' => '^7', '@laravel/vite-plugin-wayfinder' => '^0.1']]);
+
+    /** The Dockerfile from the last FROM on: the image that is shipped. */
+    $final = fn (string $dockerfile): string => substr($dockerfile, (int) strrpos($dockerfile, "\nFROM ") + 1);
+
+    it('is the PHP image with Node added, built on the same base as the runtime image', function () use ($wayfinderPackage, $final) {
+        $dockerfile = laravelPlan(['package.json' => $wayfinderPackage()])->dockerfile;
+
+        expect($dockerfile)
+            ->toContain("FROM php:8.4-fpm-bookworm AS base\n")
+            ->toContain("FROM base AS assets\n")
+            ->toContain('COPY --from=node:22-slim /usr/local/bin/node /usr/local/bin/node')
+            ->toContain('COPY --from=node:22-slim /usr/local/lib/node_modules /usr/local/lib/node_modules')
+            ->toContain('ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm')
+            ->toContain('ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx')
+            ->toContain('ln -s ../lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack')
+            ->toContain('COPY --from=vendor /app/vendor ./vendor')
+            ->toContain('npm run build')
+            ->not->toContain('FROM node:')
+            ->and(substr_count($dockerfile, 'install-php-extensions bcmath'))->toBe(1)
+            ->and(substr_count($dockerfile, 'AS base'))->toBe(1)
+            ->and($final($dockerfile))->toStartWith("FROM base\nENV PORT=8080");
+    });
+
+    it('lets the application boot without an .env, a key or a database, with settings that exist only in that stage', function () use ($wayfinderPackage, $final) {
+        $dockerfile = laravelPlan(['package.json' => $wayfinderPackage()])->dockerfile;
+
+        expect($dockerfile)->toContain('ENV APP_ENV=production APP_KEY=base64:'.base64_encode(str_repeat("\0", 32)).' DB_CONNECTION=sqlite DB_DATABASE=:memory: CACHE_STORE=array SESSION_DRIVER=array QUEUE_CONNECTION=sync LOG_CHANNEL=stderr')
+            ->toContain('mkdir -p bootstrap/cache storage/framework/cache storage/framework/sessions storage/framework/views storage/logs && npm run build')
+            // Nothing of it is in the shipped image.
+            ->and($final($dockerfile))->not->toContain('APP_KEY')->not->toContain('DB_DATABASE')->not->toContain('node:22-slim')
+            ->and($final($dockerfile))->toContain('COPY --from=assets --chown=www-data:www-data /app/public /app/public');
+    });
+
+    it('is chosen when package.json lists a Wayfinder plugin, wherever it is listed', function (string $section, string $name) {
+        $package = json_encode(['scripts' => ['build' => 'vite build'], $section => [$name => '^1']]);
+
+        expect(laravelPlan(['package.json' => $package])->dockerfile)->toContain('FROM base AS assets');
+    })->with([
+        ['devDependencies', '@laravel/vite-plugin-wayfinder'],
+        ['dependencies', '@laravel/vite-plugin-wayfinder'],
+        ['optionalDependencies', '@laravel/vite-plugin-wayfinder'],
+        ['devDependencies', 'vite-plugin-wayfinder-extra'],
+        ['devDependencies', 'vite-plugin-run'],
+    ]);
+
+    it('is chosen when the build runs artisan or php, directly or through the scripts it runs', function (array $scripts) {
+        $package = json_encode(['scripts' => $scripts, 'devDependencies' => ['vite' => '^7']]);
+
+        expect(laravelPlan(['package.json' => $package])->dockerfile)->toContain('FROM base AS assets');
+    })->with([
+        'directly' => [['build' => 'php artisan wayfinder:generate && vite build']],
+        'artisan alone' => [['build' => './artisan ziggy:generate && vite build']],
+        'through npm run' => [['build' => 'npm run types && vite build', 'types' => 'php artisan wayfinder:generate']],
+        'through pnpm' => [['build' => 'pnpm types && vite build', 'types' => 'php artisan x']],
+        'two levels deep' => [['build' => 'npm run a', 'a' => 'yarn b', 'b' => 'php artisan x']],
+        'a pre script' => [['build' => 'vite build', 'prebuild' => 'php artisan x']],
+        'a post script' => [['build' => 'vite build', 'postbuild' => 'php artisan x']],
+    ]);
+
+    it('is chosen when the Vite config calls artisan or Wayfinder', function (string $file, string $contents) {
+        $package = json_encode(['scripts' => ['build' => 'vite build'], 'devDependencies' => ['vite' => '^7']]);
+
+        expect(laravelPlan(['package.json' => $package, $file => $contents])->dockerfile)->toContain('FROM base AS assets');
+    })->with([
+        ['vite.config.js', "import { run } from 'vite-plugin-run'; run([{ run: ['php', 'artisan', 'x'] }])"],
+        ['vite.config.ts', "import { wayfinder } from './w'; plugins: [wayfinder()]"],
+        ['vite.config.mjs', 'exec("php artisan x")'],
+    ]);
+
+    it('is not chosen for an ordinary build, which keeps the light Node stage', function () {
+        $dockerfile = laravelPlan(['package.json' => json_encode(['scripts' => ['build' => 'vite build', 'dev' => 'php artisan serve'], 'devDependencies' => ['vite' => '^7', 'laravel-vite-plugin' => '^2']]), 'vite.config.js' => "import laravel from 'laravel-vite-plugin';"])->dockerfile;
+
+        expect($dockerfile)->toContain("FROM node:22-slim AS assets\nWORKDIR /app\nCOPY package.json package-lock.json ./\nRUN npm ci\nCOPY . .\nCOPY --from=vendor /app/vendor ./vendor\nRUN npm run build\n")
+            ->not->toContain('FROM base AS assets')
+            ->not->toContain('APP_KEY')
+            ->not->toContain('vendor-dev');
+    });
+
+    it('uses the package manager and Node version the app chose', function () use ($wayfinderPackage) {
+        $dockerfile = laravelPlan(['package.json' => $wayfinderPackage(), 'package-lock.json' => null, 'pnpm-lock.yaml' => 'x', 'pnpm-workspace.yaml' => 'overrides: {}'], options: ['node' => 20])->dockerfile;
+
+        expect($dockerfile)->toContain('COPY --from=node:20-slim /usr/local/bin/node')
+            ->toContain("RUN corepack enable\nCOPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./\nRUN pnpm install --frozen-lockfile")
+            ->toContain('&& pnpm build');
+    });
+
+    it('runs the SSR build through the same stage', function () {
+        $package = json_encode(['scripts' => ['build' => 'vite build', 'build:ssr' => 'vite build && vite build --ssr'], 'devDependencies' => ['@laravel/vite-plugin-wayfinder' => '^0.1']]);
+        $dockerfile = laravelPlan(['package.json' => $package], options: ['ssr' => true])->dockerfile;
+
+        expect($dockerfile)->toContain('FROM base AS assets')
+            ->toContain('&& npm run build:ssr')
+            ->toContain('COPY --from=assets --chown=www-data:www-data /app/bootstrap/ssr /app/bootstrap/ssr');
+    });
+
+    it('does not apply when the person turned the front-end build off', function () use ($wayfinderPackage) {
+        $dockerfile = laravelPlan(['package.json' => $wayfinderPackage()], options: ['node_manager' => 'none'])->dockerfile;
+
+        expect($dockerfile)->not->toContain('AS assets')->not->toContain('node:22-slim');
+    });
+
+    it('says in the build log that the assets are built on the PHP image', function () use ($wayfinderPackage) {
+        expect(laravelPlan(['package.json' => $wayfinderPackage()])->notes)->toContain('Building front-end assets with npm (Node 22) on the PHP image, because the build runs PHP.');
+    });
+});
+
+describe('the PHP packages a front-end build needs', function () {
+    $package = json_encode(['scripts' => ['build' => 'vite build'], 'devDependencies' => ['@laravel/vite-plugin-wayfinder' => '^0.1']]);
+    $composer = fn (array $require = [], array $dev = []) => json_encode(['require' => ['php' => '^8.3', 'laravel/framework' => '^12.0', ...$require], 'require-dev' => $dev]);
+
+    it('installs the development packages for the asset stage when Wayfinder is only a development package', function () use ($package, $composer) {
+        $plan = laravelPlan(['package.json' => $package, 'composer.json' => $composer([], ['laravel/wayfinder' => '^0.1'])]);
+        $dockerfile = $plan->dockerfile;
+
+        expect($dockerfile)->toContain("FROM composer:2 AS vendor-dev\n")
+            ->toContain('RUN composer install --no-scripts --no-autoloader --prefer-dist --no-interaction --ignore-platform-reqs')
+            ->toContain('RUN composer dump-autoload --optimize --no-scripts --ignore-platform-reqs')
+            ->toContain('COPY --from=vendor-dev /app/vendor ./vendor')
+            ->and(substr_count($dockerfile, '--no-dev'))->toBe(2); // the production vendor's install and autoload dump
+
+        // The shipped image still gets the production vendor.
+        expect(substr($dockerfile, (int) strrpos($dockerfile, "\nFROM ")))->toContain('COPY --from=vendor --chown=www-data:www-data /app /app')->not->toContain('vendor-dev');
+        expect($plan->notes)->toContain('Building front-end assets with npm (Node 22) on the PHP image, because the build runs PHP and uses development packages.');
+    });
+
+    it('needs no second install when Wayfinder is a normal package', function () use ($package, $composer) {
+        $dockerfile = laravelPlan(['package.json' => $package, 'composer.json' => $composer(['laravel/wayfinder' => '^0.1'], ['phpunit/phpunit' => '^11'])])->dockerfile;
+
+        expect($dockerfile)->not->toContain('vendor-dev')->toContain('COPY --from=vendor /app/vendor ./vendor');
+    });
+
+    it('installs them when the build calls artisan and the project has development packages, since a command may come from one', function () use ($composer) {
+        $package = json_encode(['scripts' => ['build' => 'php artisan x && vite build'], 'devDependencies' => ['vite' => '^7']]);
+        $with = laravelPlan(['package.json' => $package, 'composer.json' => $composer([], ['barryvdh/laravel-ide-helper' => '^3'])])->dockerfile;
+        $without = laravelPlan(['package.json' => $package, 'composer.json' => $composer()])->dockerfile;
+
+        expect($with)->toContain('FROM composer:2 AS vendor-dev')->and($without)->not->toContain('vendor-dev')->toContain('FROM base AS assets');
+    });
+
+    it('installs nothing extra for a build that does not run PHP, whatever composer.json says', function () use ($composer) {
+        $package = json_encode(['scripts' => ['build' => 'vite build']]);
+
+        expect(laravelPlan(['package.json' => $package, 'composer.json' => $composer([], ['laravel/wayfinder' => '^0.1'])])->dockerfile)->not->toContain('vendor-dev');
+    });
+});
+
 describe('Octane', function () {
     it('is not run: the build says the app is served with PHP-FPM and what to do to run Octane', function () {
         $plan = laravelPlan(['composer.json' => '{"require":{"php":"^8.3","laravel/framework":"^12.0","laravel/octane":"^2.0"}}'], options: ['octane' => true]);

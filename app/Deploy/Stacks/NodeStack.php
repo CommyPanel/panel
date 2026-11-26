@@ -59,14 +59,13 @@ class NodeStack implements StackDefinition
             $manager === 'yarn' && ! $berry => "RUN yarn install --production --frozen-lockfile --ignore-scripts\n",
             default => '',
         };
-        $copy = trim('package.json '.$lockfile.($berry ? ' .yarnrc.yml' : ''));
+        $copy = NodeInstall::copyLines($path, $manager);
         $cmd = json_encode($command, JSON_UNESCAPED_SLASHES);
 
         $dockerfile = <<<DOCKER
         FROM node:{$major}-slim AS build
         WORKDIR /app
-        {$setup}COPY {$copy} ./
-        RUN {$install}
+        {$setup}{$copy}RUN {$install}
         COPY . .
         {$build}{$prune}
         FROM node:{$major}-slim
