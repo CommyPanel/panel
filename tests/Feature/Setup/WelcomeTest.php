@@ -253,7 +253,9 @@ describe('certificate', function () {
         expect($this->panel->certificateUsable())->toBeTrue()
             ->and($site->domains)->toBe(['panel.example.com'])
             ->and($site->certificate)->toBe('panel')
-            ->and($site->upstreamPort)->toBe((int) config('commypanel.panel_internal_port'));
+            ->and($site->upstreamPort)->toBe((int) config('commypanel.panel_internal_port'))
+            // Uploads of projects and backups go through this site: nginx's 1 MB default would refuse them.
+            ->and($site->custom)->toContain('client_max_body_size 64m;');
 
         $this->get('/welcome')->assertInertia(fn (Assert $page) => $page
             ->where('panel.certificate.status', 'active')

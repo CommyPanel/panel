@@ -31,6 +31,9 @@ class PanelRouting
             [$domain],
             (int) config('commypanel.panel_internal_port'),
             PanelDomain::SLUG,
+            // nginx refuses a request body over 1 MB unless told otherwise, so project and backup uploads
+            // would fail on the panel's own domain. The same limit as the panel's address by IP (and PHP's).
+            custom: "client_max_body_size 64m;\n",
         ));
     }
 }
