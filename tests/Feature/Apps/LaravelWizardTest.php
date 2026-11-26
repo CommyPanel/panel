@@ -1,14 +1,15 @@
 <?php
 
+use App\Deploy\Source\SourceFetcher;
 use App\Enums\SetupStep;
 use App\Enums\Stack;
-use App\Jobs\InspectSourceJob;
 use App\Jobs\RunDeployment;
 use App\Models\App;
 use App\Models\User;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\FakeSourceFetcher;
 
 /**
  * The extra steps of a Laravel app: settings, database, services, volumes, domain, and a last look
@@ -40,17 +41,33 @@ beforeEach(function () {
 
 afterEach(fn () => File::deleteDirectory((string) config('commypanel.data_path')));
 
-it('looks at the code when the source is verified, and shows the answer on the settings page', function () {
-    $this->shop->update(['setup_step' => SetupStep::Source, 'detected' => null]);
+it('looks at the code when the source is verified, so the settings page already knows it is a Laravel app', function () {
+    app()->instance(SourceFetcher::class, new FakeSourceFetcher([
+        'composer.json' => json_encode(['require' => ['php' => '^8.3', 'laravel/framework' => '^12.0']]),
+        'artisan' => "#!/usr/bin/env php\n",
+    ]));
+    // The person left the type on automatic.
+    $this->shop->update(['setup_step' => SetupStep::Source, 'detected' => null, 'stack_hint' => null]);
 
     $this->post('/apps/shop/setup/continue')->assertRedirect('/apps/shop/setup');
-    Queue::assertPushed(InspectSourceJob::class);
 
-    $this->shop->update(['detected' => $this->detected]);
+    expect($this->shop->fresh()->stack_hint)->toBe(Stack::Laravel);
+
     $this->get('/apps/shop/setup')->assertInertia(fn (Assert $page) => $page
         ->where('app.setup_step', 'settings')
         ->where('laravel.inspecting', false)
-        ->where('laravel.detected.php', '8.4'));
+        ->where('laravel.detected.stack', 'laravel')
+        ->where('laravel.detected.laravel_major', 12));
+});
+
+it('does not look at the code of an app whose type the person chose', function () {
+    $fetcher = new FakeSourceFetcher(['package.json' => '{}']);
+    app()->instance(SourceFetcher::class, $fetcher);
+    $this->shop->update(['setup_step' => SetupStep::Source, 'detected' => null, 'stack_hint' => Stack::Node]);
+
+    $this->post('/apps/shop/setup/continue')->assertRedirect('/apps/shop/setup');
+
+    expect($this->shop->fresh()->detected)->toBeNull()->and($this->shop->fresh()->stack_hint)->toBe(Stack::Node);
 });
 
 it('goes from the settings to the database, services, volumes, domain and review in order', function () {

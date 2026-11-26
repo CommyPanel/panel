@@ -211,8 +211,13 @@ class AppSetupController extends Controller
 
         $app->forceFill(['setup_step' => SetupStep::Settings])->save();
 
-        // Look at the code (a Laravel app gets its own steps); the settings page follows the answer.
-        InspectSource::queue($app);
+        // Look at the code now, so the next page already knows whether it is a Laravel app (it gets its own
+        // steps and choices). A person who chose another type needs no look.
+        if ($app->stack_hint === null || $app->stack_hint === Stack::Laravel) {
+            $app->forceFill(['detected' => null])->save();
+            app(InspectSource::class)($app);
+            $app->refresh();
+        }
 
         return redirect()->route('apps.setup', $app);
     }
