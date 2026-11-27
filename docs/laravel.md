@@ -51,7 +51,7 @@ A Laravel app's **Environment** tab shows the variables as one `.env` text, with
 
 ## The release script
 
-Before every release goes live, CommyPanel runs your **release script**, one command per line, in a container from the new image with your variables, volumes and links. The default is `php artisan migrate --force`. Any shell syntax works. If a line fails, nothing changes and the old release keeps serving. Edit it on the Review step or on the app's Settings tab.
+Before every release goes live, CommyPanel runs your **release script**, one command per line, in a container from the new image with your variables, volumes and links. The default is `php artisan migrate --force`. Any shell syntax works. If a line fails, nothing changes and the old release keeps serving. Edit it on the Review step or on the app's **Deployment script** page under Configuration.
 
 Rolling back brings back the old code but not the old database: write migrations that the previous release can still run against (add first, remove in a later release).
 

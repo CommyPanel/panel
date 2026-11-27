@@ -14,6 +14,7 @@ use App\Http\Controllers\AppLogController;
 use App\Http\Controllers\AppNginxController;
 use App\Http\Controllers\AppProcessController;
 use App\Http\Controllers\AppSafeDeployController;
+use App\Http\Controllers\AppScriptController;
 use App\Http\Controllers\AppSetupController;
 use App\Http\Controllers\AppSourceController;
 use App\Http\Controllers\AppStateController;
@@ -178,6 +179,7 @@ Route::middleware('auth')->group(function () {
             Route::put('alerts', [AppAlertsController::class, 'update'])->name('alerts.update');
             Route::put('safe-deploys', [AppSafeDeployController::class, 'update'])->name('safe-deploys.update');
             Route::put('processes', [AppProcessController::class, 'update'])->name('processes.update');
+            Route::put('script', [AppScriptController::class, 'update'])->name('script.update');
             Route::post('webhook', [AppWebhookController::class, 'store'])->name('webhook.store');
             Route::delete('webhook', [AppWebhookController::class, 'destroy'])->name('webhook.destroy');
             Route::post('source', [AppSourceController::class, 'upload'])->name('source.upload');

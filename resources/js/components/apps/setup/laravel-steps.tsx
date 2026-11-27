@@ -405,13 +405,13 @@ export function LaravelReviewPage({
                 </dl>
             </Card>
             <Card
-                title={t('Release script')}
+                title={t('Deployment script')}
                 description={t(
                     'Runs before every release goes live, in the new image with your variables, volumes and database. One command per line; any shell syntax works. If a line fails, nothing changes and the old release keeps serving.',
                 )}
             >
                 <textarea
-                    aria-label={t('Release script')}
+                    aria-label={t('Deployment script')}
                     rows={6}
                     className="textarea w-full font-mono text-sm"
                     value={script}

@@ -127,6 +127,8 @@ export type AppSettings = AppSummary & {
     release_command: string | null;
     /** Laravel apps: the lines run before every release goes live. */
     release_script: string | null;
+    /** Whether the Deployment script page exists for this app (its image has a shell). */
+    has_release_script: boolean;
     /** Whether the app has extra processes (Laravel: scheduler, workers); the Services page is for these. */
     uses_processes: boolean;
     processes: AppProcess[];

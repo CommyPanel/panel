@@ -5,6 +5,7 @@ namespace App\Presenters;
 use App\Deploy\AppEnvironment;
 use App\Deploy\AppProcesses;
 use App\Deploy\ReleaseProcesses;
+use App\Deploy\ReleaseScripts;
 use App\Deploy\Safe\RolloutService;
 use App\Deploy\Source\GitProvider;
 use App\Enums\AppStatus;
@@ -78,6 +79,8 @@ class AppPresenter
             'token_help' => self::tokenHelp($app),
             'release_command' => $app->release_command,
             'release_script' => $app->release_script,
+            // Whether the Deployment script page exists for this app (see ReleaseScripts::supports).
+            'has_release_script' => ReleaseScripts::supports($app->stack ?? $app->stack_hint),
             // Laravel apps run extra processes (scheduler, workers) beside the web one; others have none.
             'uses_processes' => AppProcesses::isLaravel($app),
             'processes' => app(AppProcesses::class)->present($app),

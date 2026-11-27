@@ -14,6 +14,7 @@ import {
     ShieldCheck,
     SquareTerminal,
     Settings,
+    FileTerminal,
     SlidersHorizontal,
     Split,
     Variable,
@@ -34,6 +35,7 @@ import { LogsTab } from '@/components/apps/tabs/logs-tab';
 import { EnvironmentTab } from '@/components/apps/tabs/environment-tab';
 import { NginxTab } from '@/components/apps/tabs/nginx-tab';
 import { SafeDeploysTab } from '@/components/apps/tabs/safe-deploys-tab';
+import { ScriptTab } from '@/components/apps/tabs/script-tab';
 import { SettingsTab } from '@/components/apps/tabs/settings-tab';
 import { UsageTab } from '@/components/apps/tabs/usage-tab';
 import { PendingChanges } from '@/components/apps/pending-changes';
@@ -84,6 +86,7 @@ type TabId =
     | 'domains'
     | 'environment'
     | 'services'
+    | 'script'
     | 'nginx'
     | 'settings'
     | 'advanced';
@@ -99,6 +102,7 @@ const TAB_IDS: TabId[] = [
     'domains',
     'environment',
     'services',
+    'script',
     'nginx',
     'settings',
     'advanced',
@@ -139,6 +143,8 @@ export default function Show({
     const nginxDirty = useRef(false);
     // The .env editor of a Laravel app does the same.
     const envDirty = useRef(false);
+    // So does the deployment script.
+    const scriptDirty = useRef(false);
     const canNginx = can('apps.nginx');
     const canLogs = can('apps.logs');
     const canVolumes = can('apps.volumes');
@@ -150,7 +156,8 @@ export default function Show({
         (tab === 'volumes' && !canVolumes) ||
         (tab === 'terminal' && !canTerminal) ||
         (tab === 'links' && !canLinks) ||
-        (tab === 'services' && !app.uses_processes)
+        (tab === 'services' && !app.uses_processes) ||
+        (tab === 'script' && !(app.has_release_script && can('apps.update')))
             ? 'deployments'
             : tab;
 
@@ -169,6 +176,16 @@ export default function Show({
             id !== 'environment' &&
             !window.confirm(
                 t('You have unsaved changes to the variables. Discard them?'),
+            )
+        ) {
+            return;
+        }
+
+        if (
+            scriptDirty.current &&
+            id !== 'script' &&
+            !window.confirm(
+                t('You have unsaved changes to the script. Discard them?'),
             )
         ) {
             return;
@@ -303,6 +320,14 @@ export default function Show({
                                   app.processes.filter((p) => p.enabled).length
                               }
                           />,
+                      )
+                    : null,
+                // The script runs in the app's own image, so only stacks whose image has a shell have the page.
+                app.has_release_script && can('apps.update')
+                    ? item(
+                          'script',
+                          t('Deployment script'),
+                          <FileTerminal className="size-4" aria-hidden />,
                       )
                     : null,
                 item(
@@ -533,6 +558,14 @@ export default function Show({
                         slug={app.slug}
                         processes={app.processes}
                         variant="page"
+                    />
+                )}
+                {active === 'script' && (
+                    <ScriptTab
+                        app={app}
+                        onDirtyChange={(dirty) => {
+                            scriptDirty.current = dirty;
+                        }}
                     />
                 )}
                 {active === 'settings' && (

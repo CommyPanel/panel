@@ -15,6 +15,15 @@ CommyPanel needs read access to a private repository. Use one of these:
 
 If both are set, the token is used. Tokens are stored encrypted and never shown again. CommyPanel never puts a token in a URL or on a command line; it is handed to Git through its environment, and Git is told not to follow redirects so the token is never sent to another host. This needs Git 2.31 or newer, which every supported system has.
 
+## Deployment script
+
+Laravel, Node.js, Python, .NET and Dockerfile apps have a **Deployment script** entry under **Configuration**: the steps a release runs before it goes live, one command per line, for example `npx prisma migrate deploy` or `python manage.py migrate`. It runs by `sh -ec` in a fresh container made from the new image, with the app's environment variables, volumes and links, so any shell syntax works (`&&`, `|`, `$VARIABLES`) and the first line that fails stops the release: the old version keeps serving and the output is in the deployment log. Lines starting with `#` are comments. It needs a shell in the image, which the images CommyPanel builds have; with your own Dockerfile, make sure yours does.
+
+- Changes apply from the next deployment, and rollbacks do not run it again. The old version keeps serving while it runs, so what it changes must still work for the old version.
+- An app that had a single release command (below) starts with it as the first line. Saving moves it into the script, so the two never both run.
+- It is also on the Settings step of the setup wizard (the Review step for Laravel). Changing it needs `apps.update` and is recorded in the audit log with the number of lines before and after, never the text.
+- Go apps and quick installs have no script: a Go image has no shell, so they keep the release command.
+
 ## Release command
 
 An optional command that runs once per deployment, for example database migrations (`npm run migrate`). It runs in a fresh container made from the new image, with the app's environment variables, after the build and before the new version starts.
@@ -28,7 +37,7 @@ An optional command that runs once per deployment, for example database migratio
 
 An app, or one of its volumes, can be **locked**. A locked app cannot be deleted, and neither can its volumes' files with it; a locked volume cannot be removed from its app, and deleting the app is refused while one of its volumes is locked. The delete button stays visible but is disabled, with a note saying why, and a lock icon shows next to the name in the lists and beside the title.
 
-The app page groups its sections under five entries: **Deployments**, **Runtime** (Usage, Logs, Terminal), **Networking** (Domains & SSL, Nginx, Links), **Configuration** (Environment, Volumes, Safe deploys, Settings) and **Advanced**. Where this page says "tab", it means one of these sections.
+The app page groups its sections under five entries: **Deployments**, **Runtime** (Usage, Logs, Terminal), **Networking** (Domains & SSL, Nginx, Links), **Configuration** (Environment, Volumes, Deployment script, Safe deploys, Settings) and **Advanced**. Where this page says "tab", it means one of these sections.
 
 Locking is a safety catch against a slip, such as deleting the wrong app. It does not stop deployments, restarts or any other change, and anyone who may change the app (`apps.update`) can unlock it. Locking and unlocking are recorded in the audit log. Lock an app on its **Advanced** tab, and a volume on the **Volumes** tab.
 

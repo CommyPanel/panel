@@ -14,6 +14,8 @@ type Props = {
     disabled?: boolean;
     invalid?: boolean;
     describedBy?: string;
+    /** Shown, muted, while the editor is empty. */
+    placeholder?: string;
     /** The editor is at least this many lines tall, and at most `maxLines`. */
     minLines?: number;
     maxLines?: number;
@@ -38,6 +40,7 @@ export function CodeEditor({
     disabled,
     invalid,
     describedBy,
+    placeholder,
     minLines = 12,
     maxLines = 28,
     highlight,
@@ -147,12 +150,13 @@ export function CodeEditor({
                     value={value}
                     disabled={disabled}
                     wrap="off"
+                    placeholder={placeholder}
                     spellCheck={false}
                     autoCapitalize="off"
                     autoCorrect="off"
                     autoComplete="off"
                     className={cn(
-                        'relative block w-full min-w-0 resize-none overflow-auto bg-transparent px-3 font-mono text-sm whitespace-pre outline-none',
+                        'relative block w-full min-w-0 resize-none overflow-auto bg-transparent px-3 font-mono text-sm whitespace-pre outline-none placeholder:text-base-content/40',
                         highlight && 'text-transparent caret-base-content',
                     )}
                     style={{

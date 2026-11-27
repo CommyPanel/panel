@@ -1,7 +1,9 @@
 import { useId } from 'react';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { CodeEditor } from '@/components/ui/code-editor';
 import { useT } from '@/hooks/use-t';
+import { highlightShell } from '@/lib/shell-highlight';
 import { cn } from '@/lib/utils';
 
 export type AppFormData = {
@@ -13,15 +15,13 @@ export type AppFormData = {
     health_timeout: string;
     deploy_strategy: string;
     release_command: string;
-    /** Laravel apps: several lines run before every release goes live. */
-    release_script?: string;
     memory_limit_mb: string;
     cpu_limit: string;
 };
 
 type Props = {
-    /** Show the multi-line release script instead of the single release command (Laravel apps). */
-    releaseScript?: boolean;
+    /** The Deployment script page owns the release step, so the single release command is not shown here. */
+    hideRelease?: boolean;
     data: AppFormData;
     errors: Partial<Record<keyof AppFormData, string>>;
     setData: <K extends keyof AppFormData>(
@@ -70,7 +70,7 @@ export function RuntimeFields({
     data,
     errors,
     setData,
-    releaseScript = false,
+    hideRelease = false,
 }: Props) {
     const { t } = useT();
 
@@ -126,13 +126,7 @@ export function RuntimeFields({
                     {t('Stop the old version first')}
                 </option>
             </Select>
-            {releaseScript ? (
-                <ReleaseScriptInput
-                    value={data.release_script ?? ''}
-                    onChange={(value) => setData('release_script', value)}
-                    error={errors.release_script}
-                />
-            ) : (
+            {!hideRelease && (
                 <ReleaseCommandInput
                     value={data.release_command}
                     onChange={(value) => setData('release_command', value)}
@@ -195,42 +189,45 @@ export function ReleaseCommandInput({
 }
 
 /**
- * The script a Laravel release runs before it goes live: one command per line, run by a shell, so anything a
- * shell accepts works. It is made for you; edit it if your app needs more. Shared by the settings tab and the
- * setup wizard.
+ * The deployment script: the lines a release runs before it goes live, one command per line, run by a shell,
+ * so anything a shell accepts works. Shared by the Deployment script page and the setup wizard.
  */
 export function ReleaseScriptInput({
     value,
     onChange,
     error,
+    placeholder,
+    onSave,
+    minLines = 6,
+    maxLines = 24,
 }: {
     value: string;
     onChange: (value: string) => void;
     error?: string;
+    /** An example command for the app's stack. */
+    placeholder?: string;
+    /** Called for Cmd/Ctrl+S. */
+    onSave?: () => void;
+    minLines?: number;
+    maxLines?: number;
 }) {
     const { t } = useT();
     const id = useId();
 
     return (
         <div className="w-full">
-            <label className="mb-1 label-text block px-0!" htmlFor={id}>
-                {t('Release script')}
-            </label>
-            <textarea
-                id={id}
-                className={cn(
-                    'textarea w-full font-mono text-sm',
-                    error && 'is-invalid',
-                )}
-                rows={7}
+            <span className="mb-1 label-text block px-0!">{t('Script')}</span>
+            <CodeEditor
+                label={t('Script')}
                 value={value}
-                onChange={(e) => onChange(e.target.value)}
-                spellCheck={false}
-                autoComplete="off"
-                autoCapitalize="off"
-                aria-invalid={error ? true : undefined}
-                aria-describedby={`${id}-help`}
-                placeholder={t('php artisan migrate --force')}
+                onChange={onChange}
+                onSave={onSave}
+                invalid={error !== undefined}
+                describedBy={`${id}-help`}
+                placeholder={placeholder}
+                highlight={highlightShell}
+                minLines={minLines}
+                maxLines={maxLines}
             />
             <span
                 id={`${id}-help`}

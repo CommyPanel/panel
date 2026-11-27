@@ -9,7 +9,11 @@ import { AppDomains } from '@/components/apps/app-domains';
 import type { DomainDraft } from '@/components/apps/app-domains';
 import AppDomainController from '@/actions/App/Http/Controllers/AppDomainController';
 import { Modal } from '@/components/ui/modal';
-import { ReleaseCommandInput } from '@/components/apps/app-fields';
+import {
+    ReleaseCommandInput,
+    ReleaseScriptInput,
+} from '@/components/apps/app-fields';
+import { scriptExample } from '@/components/apps/script-examples';
 import {
     LaravelDatabasePage,
     LaravelReviewPage,
@@ -443,6 +447,7 @@ function SettingsStep({
         health_timeout: app.health_timeout ? String(app.health_timeout) : '',
         deploy_strategy: app.deploy_strategy,
         release_command: app.release_command ?? '',
+        release_script: app.release_script ?? '',
         memory_limit_mb: app.memory_limit_mb ? String(app.memory_limit_mb) : '',
         cpu_limit: app.cpu_limit ? String(app.cpu_limit) : '',
         env: '',
@@ -468,9 +473,13 @@ function SettingsStep({
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        form.transform((data) =>
-            laravel ? { ...data, stack_options: options } : data,
-        );
+        form.transform((data) => {
+            // A script replaces the single release command, so only one of them is sent.
+            const { release_command: _command, ...withScript } = data;
+            const sent = app.has_release_script ? withScript : data;
+
+            return laravel ? { ...sent, stack_options: options } : sent;
+        });
         form.post(AppSetupController.settings(app.slug).url);
     };
 
@@ -587,7 +596,19 @@ function SettingsStep({
                         {t('Stop the old version first')}
                     </option>
                 </Select>
-                {!laravel && (
+                {!laravel && app.has_release_script && (
+                    <ReleaseScriptInput
+                        value={form.data.release_script}
+                        onChange={(value) =>
+                            form.setData('release_script', value)
+                        }
+                        error={form.errors.release_script}
+                        placeholder={scriptExample(app.stack_hint ?? app.stack)}
+                        minLines={6}
+                        maxLines={14}
+                    />
+                )}
+                {!laravel && !app.has_release_script && (
                     <ReleaseCommandInput
                         value={form.data.release_command}
                         onChange={(value) =>

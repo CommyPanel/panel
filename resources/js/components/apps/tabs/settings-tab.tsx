@@ -33,13 +33,20 @@ export function SettingsTab({
         health_timeout: app.health_timeout?.toString() ?? '',
         deploy_strategy: app.deploy_strategy,
         release_command: app.release_command ?? '',
-        release_script: app.release_script ?? '',
         memory_limit_mb: app.memory_limit_mb?.toString() ?? '',
         cpu_limit: app.cpu_limit?.toString() ?? '',
     });
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
+        // With a Deployment script page the command is not sent: that page owns the release step.
+        form.transform((data) => {
+            if (!app.has_release_script) return data;
+
+            const { release_command: _command, ...rest } = data;
+
+            return rest;
+        });
         form.submit(AppController.update(app.slug), { preserveScroll: true });
     };
 
@@ -81,7 +88,7 @@ export function SettingsTab({
                     >
                         <RuntimeFields
                             {...fields}
-                            releaseScript={app.uses_processes}
+                            hideRelease={app.has_release_script}
                         />
                     </Card>
                     <Button type="submit" loading={form.processing}>
