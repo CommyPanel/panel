@@ -111,6 +111,20 @@ describe('starting a server', function () {
             ->and($server->status)->toBe(DatabaseServerStatus::Running);
     });
 
+    it('puts a restarted server back on the networks its linked apps reach it on', function () {
+        $server = runningServer('Main');
+        $database = app(ManageDatabases::class)->create($server, 'shop');
+        $link = app(AppLinks::class)->linkDatabase(App::factory()->create(['name' => 'Shop', 'slug' => 'shop']), $database, 'DATABASE');
+
+        app(ProvisionDatabaseServer::class)($server->fresh());
+
+        $spec = collect($this->host->actions())->where('action', 'runContainer')->last()['args']['spec'];
+
+        expect($spec->networks)->toHaveCount(1)
+            ->and($spec->networks[0]->name)->toBe($link->networkName())
+            ->and($spec->networks[0]->aliases)->toBe(['main']);
+    });
+
     it('sets the administrator password the way each image expects', function (DatabaseEngine $engine, string $version, string $variable, string $path) {
         $server = runningServer('Db', $engine, $version);
 

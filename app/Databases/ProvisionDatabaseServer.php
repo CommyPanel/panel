@@ -4,9 +4,11 @@ namespace App\Databases;
 
 use App\Enums\DatabaseServerStatus;
 use App\Host\Data\ContainerSpec;
+use App\Host\Data\NetworkAttachment;
 use App\Host\Data\Volume;
 use App\Host\Exceptions\HostOperationFailed;
 use App\Host\HostDriver;
+use App\Models\AppDatabaseLink;
 use App\Models\DatabaseServer;
 use Illuminate\Support\Sleep;
 use Throwable;
@@ -45,6 +47,7 @@ class ProvisionDatabaseServer
                 memoryLimitMb: $server->memory_limit_mb ?? (int) config('commypanel.databases.memory_mb'),
                 volumes: [new Volume($this->dataPath($server), $server->engine->dataPath())],
                 network: $server->networkName(),
+                networks: $this->linkNetworks($server),
                 databaseTls: (bool) $server->tls_enabled,
             ));
 
@@ -61,6 +64,23 @@ class ProvisionDatabaseServer
         }
 
         $server->forceFill(['status' => DatabaseServerStatus::Running, 'error' => null])->save();
+    }
+
+    /**
+     * The link networks apps reach this server on. A new container starts with only its own network,
+     * so without these every linked app loses the server's name after a restart or a switch to TLS.
+     *
+     * @return list<NetworkAttachment>
+     */
+    private function linkNetworks(DatabaseServer $server): array
+    {
+        $networks = [];
+
+        foreach (AppDatabaseLink::query()->whereHas('database', fn ($query) => $query->where('database_server_id', $server->id))->get() as $link) {
+            $networks[] = new NetworkAttachment($link->networkName(), [$server->slug]);
+        }
+
+        return $networks;
     }
 
     public function dataPath(DatabaseServer $server): string
