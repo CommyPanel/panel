@@ -129,7 +129,7 @@ final class LaravelInspector
                 'kind' => 'ssr', 'name' => 'ssr', 'detected_by' => 'inertiajs/inertia-laravel',
                 'default_command' => 'php artisan inertia:start-ssr', 'supported' => true, 'default_enabled' => false,
                 'overlap' => 'stop_first', 'needs_node' => true,
-                'note' => 'Renders Inertia pages on the server. It needs the SSR build (npm run build:ssr) and Node in the image, which the build adds when this is on.',
+                'note' => 'Renders Inertia pages on the server. It needs the SSR build (a build:ssr script, or a build script that runs vite build --ssr) and Node in the image, which the build adds when this is on.',
                 'env_note' => 'The web process finds it through INERTIA_SSR_URL, which must point at this process rather than at 127.0.0.1.',
             ];
         }

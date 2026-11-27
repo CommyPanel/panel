@@ -45,6 +45,7 @@ class LaravelStack implements StackDefinition
             : $project->nodeManager();
         $node = is_int($options['node'] ?? null) && $options['node'] >= 18 && $options['node'] <= 30 ? $options['node'] : $project->nodeMajor();
         $assets = $manager !== 'none' && $project->hasPackageJson() && ($project->hasBuildScript() || ($ssr && $project->hasSsrBuild()));
+        $script = $ssr ? ($project->ssrBuildScript() ?? 'build') : 'build';
 
         $image = LaravelRuntime::image($php);
         $exts = implode(' ', $extensions);
@@ -95,8 +96,8 @@ class LaravelStack implements StackDefinition
 
         if ($assets) {
             $dockerfile .= $phpAssets
-                ? $this->phpAssetsStage($path, $manager, $node, $buildSsr, $devVendor ? 'vendor-dev' : 'vendor')
-                : $this->assetsStage($path, $manager, $node, $buildSsr);
+                ? $this->phpAssetsStage($path, $manager, $node, $script, $devVendor ? 'vendor-dev' : 'vendor')
+                : $this->assetsStage($path, $manager, $node, $script);
         }
 
         $dockerfile .= <<<DOCKER
@@ -165,7 +166,7 @@ class LaravelStack implements StackDefinition
      *
      * @return array{string, string, string, string}
      */
-    private function assetCommands(string $path, string $manager, bool $ssr): array
+    private function assetCommands(string $path, string $manager, string $script): array
     {
         $lock = match ($manager) {
             'pnpm' => 'pnpm-lock.yaml',
@@ -181,13 +182,13 @@ class LaravelStack implements StackDefinition
         $setup = in_array($manager, ['pnpm', 'yarn'], true) ? "RUN corepack enable\n" : '';
         $run = $manager === 'npm' ? 'npm run' : $manager;
 
-        return [NodeInstall::copyLines($path, $manager), $install, $setup, $ssr ? "{$run} build:ssr" : "{$run} build"];
+        return [NodeInstall::copyLines($path, $manager), $install, $setup, "{$run} {$script}"];
     }
 
     /** The Node stage that builds Vite (or Mix) assets: the dependencies are installed from the lock file when there is one. */
-    private function assetsStage(string $path, string $manager, int $node, bool $ssr): string
+    private function assetsStage(string $path, string $manager, int $node, string $script): string
     {
-        [$copy, $install, $setup, $build] = $this->assetCommands($path, $manager, $ssr);
+        [$copy, $install, $setup, $build] = $this->assetCommands($path, $manager, $script);
 
         return <<<DOCKER
         FROM node:{$node}-slim AS assets
@@ -206,9 +207,9 @@ class LaravelStack implements StackDefinition
      * without replacing anything of PHP's. The application boots there without an .env, a key or a database, so the
      * stage gets harmless settings; they live only in this stage, which never becomes part of the image.
      */
-    private function phpAssetsStage(string $path, string $manager, int $node, bool $ssr, string $vendor): string
+    private function phpAssetsStage(string $path, string $manager, int $node, string $script, string $vendor): string
     {
-        [$copy, $install, $setup, $build] = $this->assetCommands($path, $manager, $ssr);
+        [$copy, $install, $setup, $build] = $this->assetCommands($path, $manager, $script);
         $key = 'base64:'.base64_encode(str_repeat("\0", 32));
 
         return <<<DOCKER

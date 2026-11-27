@@ -178,6 +178,15 @@ describe('the front-end build', function () {
             ->and(laravelPlan(['package.json' => json_encode(['scripts' => ['dev' => 'vite']])])->notes)->toContain('package.json has no build script, so no front-end build runs.');
     });
 
+    it('ships the SSR bundle when the build script already builds it', function () {
+        $plan = laravelPlan(['package.json' => json_encode(['scripts' => ['build' => 'vite build && vite build --ssr']])], options: ['ssr' => true]);
+
+        expect($plan->dockerfile)->toContain('RUN npm run build')
+            ->not->toContain('build:ssr')
+            ->toContain('COPY --from=assets --chown=www-data:www-data /app/bootstrap/ssr /app/bootstrap/ssr')
+            ->toContain('COPY --from=assets /usr/local/bin/node /usr/local/bin/node');
+    });
+
     it('builds the SSR bundle and keeps Node in the image when SSR is on', function () {
         $plan = laravelPlan(['package.json' => json_encode(['scripts' => ['build' => 'vite build', 'build:ssr' => 'vite build && vite build --ssr']])], options: ['ssr' => true]);
 

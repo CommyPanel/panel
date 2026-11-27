@@ -181,9 +181,26 @@ final class LaravelProject
         return is_string($this->package['scripts']['build'] ?? null);
     }
 
+    /**
+     * The script that builds the Inertia SSR bundle: `build:ssr` when there is one, else `build` when it
+     * already builds the bundle too (Inertia 3's default is `vite build && vite build --ssr`), else null.
+     */
+    public function ssrBuildScript(): ?string
+    {
+        if (is_string($this->package['scripts']['build:ssr'] ?? null)) {
+            return 'build:ssr';
+        }
+
+        if ($this->hasBuildScript() && preg_match('/(?:^|\s)--ssr(?:\s|$)/', $this->scriptText('build')) === 1) {
+            return 'build';
+        }
+
+        return null;
+    }
+
     public function hasSsrBuild(): bool
     {
-        return is_string($this->package['scripts']['build:ssr'] ?? null);
+        return $this->ssrBuildScript() !== null;
     }
 
     /** npm, pnpm or yarn: what package.json declares, else which lock file there is, else npm. */
@@ -231,7 +248,7 @@ final class LaravelProject
             }
         }
 
-        if (preg_match('/\b(artisan|php)\b/', $this->scriptText($ssr ? 'build:ssr' : 'build')) === 1) {
+        if (preg_match('/\b(artisan|php)\b/', $this->scriptText($ssr ? ($this->ssrBuildScript() ?? 'build') : 'build')) === 1) {
             return true;
         }
 
@@ -267,7 +284,7 @@ final class LaravelProject
             $viteConfigs .= (string) self::read($this->path, "vite.config.{$extension}");
         }
 
-        return str_contains($this->scriptText($ssr ? 'build:ssr' : 'build'), 'artisan') || str_contains($viteConfigs, 'artisan');
+        return str_contains($this->scriptText($ssr ? ($this->ssrBuildScript() ?? 'build') : 'build'), 'artisan') || str_contains($viteConfigs, 'artisan');
     }
 
     /** The text of a package.json script and of the scripts it runs (to a few levels), with its pre and post scripts. */
